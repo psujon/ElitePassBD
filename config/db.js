@@ -63,6 +63,14 @@ async function createTables() {
     );
   `;
 
+  const categoriesTable = `
+    CREATE TABLE IF NOT EXISTS categories (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) UNIQUE NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
   const productsTable = `
     CREATE TABLE IF NOT EXISTS products (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -71,8 +79,10 @@ async function createTables() {
       price DECIMAL(10, 2) NOT NULL,
       image_url TEXT,
       stock INT DEFAULT 0,
+      category_id INT DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     );
   `;
 
@@ -136,6 +146,7 @@ async function createTables() {
   `;
 
   await pool.query(usersTable);
+  await pool.query(categoriesTable);
   await pool.query(productsTable);
   await pool.query(ordersTable);
   await pool.query(orderItemsTable);
@@ -169,6 +180,76 @@ async function updateSchema() {
     if (orderColumns.length === 0) {
       await pool.query("ALTER TABLE orders ADD COLUMN cancel_reason VARCHAR(255) DEFAULT NULL");
       console.log("Added column 'cancel_reason' to 'orders' table.");
+    }
+
+    const [prodColumns] = await pool.query("SHOW COLUMNS FROM products LIKE 'category_id'");
+    if (prodColumns.length === 0) {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS categories (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(255) UNIQUE NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await pool.query("ALTER TABLE products ADD COLUMN category_id INT DEFAULT NULL");
+      await pool.query("ALTER TABLE products ADD FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL");
+      console.log("Added column 'category_id' to 'products' table.");
+    }
+
+    // New Columns for Product Configurations
+    const [tagsCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'tags'");
+    if (tagsCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN tags TEXT DEFAULT NULL");
+      console.log("Added column 'tags' to 'products' table.");
+    }
+
+    const [addInfoCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'additional_info'");
+    if (addInfoCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN additional_info TEXT DEFAULT NULL");
+      console.log("Added column 'additional_info' to 'products' table.");
+    }
+
+    const [faqsCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'faqs'");
+    if (faqsCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN faqs TEXT DEFAULT NULL");
+      console.log("Added column 'faqs' to 'products' table.");
+    }
+
+    const [packagesCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'packages'");
+    if (packagesCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN packages TEXT DEFAULT NULL");
+      console.log("Added column 'packages' to 'products' table.");
+    }
+
+    const [deviceOptsCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'device_options'");
+    if (deviceOptsCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN device_options TEXT DEFAULT NULL");
+      console.log("Added column 'device_options' to 'products' table.");
+    }
+
+    const [actOptsCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'activation_options'");
+    if (actOptsCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN activation_options TEXT DEFAULT NULL");
+      console.log("Added column 'activation_options' to 'products' table.");
+    }
+
+    // New Columns for Order Item Selections
+    const [packageNameCols] = await pool.query("SHOW COLUMNS FROM order_items LIKE 'package_name'");
+    if (packageNameCols.length === 0) {
+      await pool.query("ALTER TABLE order_items ADD COLUMN package_name VARCHAR(255) DEFAULT NULL");
+      console.log("Added column 'package_name' to 'order_items' table.");
+    }
+
+    const [selectedDeviceCols] = await pool.query("SHOW COLUMNS FROM order_items LIKE 'selected_device'");
+    if (selectedDeviceCols.length === 0) {
+      await pool.query("ALTER TABLE order_items ADD COLUMN selected_device VARCHAR(255) DEFAULT NULL");
+      console.log("Added column 'selected_device' to 'order_items' table.");
+    }
+
+    const [selectedActivationCols] = await pool.query("SHOW COLUMNS FROM order_items LIKE 'selected_activation'");
+    if (selectedActivationCols.length === 0) {
+      await pool.query("ALTER TABLE order_items ADD COLUMN selected_activation VARCHAR(255) DEFAULT NULL");
+      console.log("Added column 'selected_activation' to 'order_items' table.");
     }
   } catch (error) {
     console.error("Error updating database schema:", error.message);

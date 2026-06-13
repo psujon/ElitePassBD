@@ -55,39 +55,55 @@ export default function CartDrawer({ isOpen, onClose }) {
           ) : (
             cartItems.map((item) => (
               <div 
-                key={item.product_id} 
-                className="flex items-center space-x-3 p-3 bg-slate-950/40 border border-slate-800/80 rounded-xl"
+                key={item.cart_key} 
+                className="flex items-start space-x-3 p-3 bg-slate-950/40 border border-slate-800/80 rounded-xl animate-fade-in"
               >
                 {/* Product Image */}
                 {item.image_url ? (
                   <img 
                     src={item.image_url} 
                     alt={item.name} 
-                    className="w-14 h-14 object-cover rounded-lg bg-slate-850" 
+                    className="w-14 h-14 object-cover rounded-lg bg-slate-850 shrink-0 mt-0.5" 
                   />
                 ) : (
-                  <div className="w-14 h-14 bg-slate-800 rounded-lg flex items-center justify-center text-xs text-slate-500">
+                  <div className="w-14 h-14 bg-slate-800 rounded-lg flex items-center justify-center text-xs text-slate-500 shrink-0 mt-0.5">
                     No Image
                   </div>
                 )}
 
                 {/* Details */}
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 text-left">
                   <h4 className="text-sm font-semibold text-white truncate">{item.name}</h4>
-                  <p className="text-xs text-violet-400 mt-0.5">৳{parseFloat(item.price).toFixed(2)}</p>
+                  
+                  {/* Selected Options */}
+                  {(item.package_name || item.selected_device || item.selected_activation) && (
+                    <div className="text-[10px] text-slate-400 mt-1 space-y-0.5 leading-relaxed">
+                      {item.package_name && (
+                        <div>Package: <span className="text-violet-400 font-medium">{item.package_name}</span></div>
+                      )}
+                      {item.selected_device && (
+                        <div>Device: <span className="text-violet-400 font-medium">{item.selected_device}</span></div>
+                      )}
+                      {item.selected_activation && (
+                        <div>Activation: <span className="text-violet-400 font-medium">{item.selected_activation}</span></div>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-violet-400 mt-1">৳{parseFloat(item.price).toFixed(2)}</p>
                   
                   {/* Quantity Controls */}
                   <div className="flex items-center space-x-2 mt-2">
                     <button 
-                      onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
-                      className="p-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300 hover:text-white"
+                      onClick={() => updateQuantity(item.cart_key, item.quantity - 1)}
+                      className="p-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300 hover:text-white cursor-pointer animate-scale"
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
                     <span className="text-xs font-semibold text-white px-2">{item.quantity}</span>
                     <button 
-                      onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                      className="p-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300 hover:text-white"
+                      onClick={() => updateQuantity(item.cart_key, item.quantity + 1)}
+                      className="p-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300 hover:text-white cursor-pointer animate-scale"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
@@ -96,8 +112,8 @@ export default function CartDrawer({ isOpen, onClose }) {
 
                 {/* Delete Button */}
                 <button 
-                  onClick={() => removeFromCart(item.product_id)}
-                  className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                  onClick={() => removeFromCart(item.cart_key)}
+                  className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

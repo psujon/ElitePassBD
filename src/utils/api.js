@@ -1,10 +1,10 @@
-const API_BASE_URL = import.meta.env.DEV 
-  ? 'http://localhost:5000/api' 
-  : '/api';
+const API_BASE_URL = import.meta.env.DEV
+  ? 'http://localhost:5000/api'
+  : 'http://api.elitepassbd.com:30016/api';
 
 const apiRequest = async (endpoint, options = {}) => {
   const token = localStorage.getItem('token');
-  
+
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,

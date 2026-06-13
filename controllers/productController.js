@@ -1,10 +1,44 @@
 const db = require('../config/db');
 
+// Helpers for JSON fields
+const parseJSON = (str, fallback = null) => {
+  if (!str) return fallback;
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    return fallback;
+  }
+};
+
+const stringifyField = (val) => {
+  if (val === undefined || val === null) return null;
+  if (typeof val === 'string') return val;
+  try {
+    return JSON.stringify(val);
+  } catch (e) {
+    return null;
+  }
+};
+
+const formatProduct = (prod) => {
+  if (!prod) return prod;
+  return {
+    ...prod,
+    faqs: parseJSON(prod.faqs, []),
+    packages: parseJSON(prod.packages, [])
+  };
+};
+
 // Get all products
 exports.getAllProducts = async (req, res) => {
   try {
-    const [products] = await db.query('SELECT * FROM products ORDER BY created_at DESC');
-    res.json(products);
+    const [products] = await db.query(`
+      SELECT p.*, c.name AS category_name 
+      FROM products p 
+      LEFT JOIN categories c ON p.category_id = c.id 
+      ORDER BY p.created_at DESC
+    `);
+    res.json(products.map(formatProduct));
   } catch (error) {
     console.error('Fetch products error:', error);
     res.status(500).json({ message: 'Database error occurred while fetching products.' });
@@ -15,11 +49,16 @@ exports.getAllProducts = async (req, res) => {
 exports.getProductById = async (req, res) => {
   const { id } = req.params;
   try {
-    const [products] = await db.query('SELECT * FROM products WHERE id = ?', [id]);
+    const [products] = await db.query(`
+      SELECT p.*, c.name AS category_name 
+      FROM products p 
+      LEFT JOIN categories c ON p.category_id = c.id 
+      WHERE p.id = ?
+    `, [id]);
     if (products.length === 0) {
       return res.status(404).json({ message: 'Product not found.' });
     }
-    res.json(products[0]);
+    res.json(formatProduct(products[0]));
   } catch (error) {
     console.error('Fetch product by id error:', error);
     res.status(500).json({ message: 'Database error occurred while fetching product details.' });
@@ -28,7 +67,10 @@ exports.getProductById = async (req, res) => {
 
 // Create product (Admin)
 exports.createProduct = async (req, res) => {
-  const { name, description, price, image_url, stock } = req.body;
+  const { 
+    name, description, price, image_url, stock, category_id,
+    tags, additional_info, faqs, packages, device_options, activation_options 
+  } = req.body;
 
   if (!name || !description || price === undefined || stock === undefined) {
     return res.status(400).json({ message: 'Name, description, price, and stock are required fields.' });
@@ -36,8 +78,15 @@ exports.createProduct = async (req, res) => {
 
   try {
     const [result] = await db.query(
-      'INSERT INTO products (name, description, price, image_url, stock) VALUES (?, ?, ?, ?, ?)',
-      [name, description, parseFloat(price), image_url || '', parseInt(stock)]
+      `INSERT INTO products (
+        name, description, price, image_url, stock, category_id, 
+        tags, additional_info, faqs, packages, device_options, activation_options
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        name, description, parseFloat(price), image_url || '', parseInt(stock), category_id || null,
+        tags || null, additional_info || null, stringifyField(faqs), stringifyField(packages),
+        device_options || null, activation_options || null
+      ]
     );
 
     res.status(201).json({
@@ -53,7 +102,10 @@ exports.createProduct = async (req, res) => {
 // Update product (Admin)
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-  const { name, description, price, image_url, stock } = req.body;
+  const { 
+    name, description, price, image_url, stock, category_id,
+    tags, additional_info, faqs, packages, device_options, activation_options 
+  } = req.body;
 
   if (!name || !description || price === undefined || stock === undefined) {
     return res.status(400).json({ message: 'Name, description, price, and stock are required fields.' });
@@ -61,8 +113,16 @@ exports.updateProduct = async (req, res) => {
 
   try {
     const [result] = await db.query(
-      'UPDATE products SET name = ?, description = ?, price = ?, image_url = ?, stock = ? WHERE id = ?',
-      [name, description, parseFloat(price), image_url || '', parseInt(stock), id]
+      `UPDATE products SET 
+        name = ?, description = ?, price = ?, image_url = ?, stock = ?, category_id = ?, 
+        tags = ?, additional_info = ?, faqs = ?, packages = ?, device_options = ?, activation_options = ? 
+      WHERE id = ?`,
+      [
+        name, description, parseFloat(price), image_url || '', parseInt(stock), category_id || null,
+        tags || null, additional_info || null, stringifyField(faqs), stringifyField(packages),
+        device_options || null, activation_options || null,
+        id
+      ]
     );
 
     if (result.affectedRows === 0) {
@@ -198,5 +258,75 @@ exports.getLatestReviews = async (req, res) => {
   } catch (error) {
     console.error('Fetch latest reviews error:', error);
     res.status(500).json({ message: 'Database error occurred while fetching latest reviews.' });
+  }
+};
+
+// Get all categories
+exports.getAllCategories = async (req, res) => {
+  try {
+    const [categories] = await db.query('SELECT * FROM categories ORDER BY name ASC');
+    res.json(categories);
+  } catch (error) {
+    console.error('Fetch categories error:', error);
+    res.status(500).json({ message: 'Database error occurred while fetching categories.' });
+  }
+};
+
+// Create category (Admin)
+exports.createCategory = async (req, res) => {
+  const { name } = req.body;
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ message: 'Category name is required.' });
+  }
+  try {
+    const trimmed = name.trim();
+    const [existing] = await db.query('SELECT id FROM categories WHERE name = ?', [trimmed]);
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'Category name already exists.' });
+    }
+    const [result] = await db.query('INSERT INTO categories (name) VALUES (?)', [trimmed]);
+    res.status(201).json({ message: 'Category created successfully!', categoryId: result.insertId });
+  } catch (error) {
+    console.error('Create category error:', error);
+    res.status(500).json({ message: 'Database error occurred while creating category.' });
+  }
+};
+
+// Update category (Admin)
+exports.updateCategory = async (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ message: 'Category name is required.' });
+  }
+  try {
+    const trimmed = name.trim();
+    const [existing] = await db.query('SELECT id FROM categories WHERE name = ? AND id != ?', [trimmed, id]);
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'Category name already exists.' });
+    }
+    const [result] = await db.query('UPDATE categories SET name = ? WHERE id = ?', [trimmed, id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Category not found.' });
+    }
+    res.json({ message: 'Category updated successfully!' });
+  } catch (error) {
+    console.error('Update category error:', error);
+    res.status(500).json({ message: 'Database error occurred while updating category.' });
+  }
+};
+
+// Delete category (Admin)
+exports.deleteCategory = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [result] = await db.query('DELETE FROM categories WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Category not found to delete.' });
+    }
+    res.json({ message: 'Category deleted successfully!' });
+  } catch (error) {
+    console.error('Delete category error:', error);
+    res.status(500).json({ message: 'Database error occurred while deleting category.' });
   }
 };

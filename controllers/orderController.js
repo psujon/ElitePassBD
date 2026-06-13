@@ -28,7 +28,7 @@ exports.createOrder = async (req, res) => {
 
     // 2. Insert order items & update product stock
     for (const item of items) {
-      const { product_id, quantity, price } = item;
+      const { product_id, quantity, price, package_name, selected_device, selected_activation } = item;
 
       if (!product_id || !quantity || !price) {
         throw new Error('Invalid item details in cart.');
@@ -59,8 +59,8 @@ exports.createOrder = async (req, res) => {
 
       // Insert order item
       await connection.query(
-        'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
-        [orderId, product_id, quantity, price]
+        'INSERT INTO order_items (order_id, product_id, quantity, price, package_name, selected_device, selected_activation) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [orderId, product_id, quantity, price, package_name || null, selected_device || null, selected_activation || null]
       );
     }
 

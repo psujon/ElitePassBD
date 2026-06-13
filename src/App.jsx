@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 // Context Providers
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -20,6 +21,7 @@ import Checkout from './pages/Checkout';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import ContactSupport from './pages/ContactSupport';
+import ProductDetails from './pages/ProductDetails';
 
 // Protected Route Guard (For Logged in Users)
 const ProtectedRoute = ({ children }) => {
@@ -54,6 +56,7 @@ function AppContent() {
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/contact" element={<ContactSupport />} />
+          <Route path="/product/:id" element={<ProductDetails />} />
 
           {/* User Dashboard & Order Tracking */}
           <Route
@@ -104,6 +107,7 @@ export default function App() {
     <AuthProvider>
       <CartProvider>
         <BrowserRouter>
+          <Toaster position="top-right" reverseOrder={false} />
           <AppContent />
         </BrowserRouter>
       </CartProvider>
