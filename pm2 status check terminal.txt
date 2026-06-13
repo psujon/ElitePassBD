@@ -10,3 +10,6 @@
 কোডের লাইভ এরর লগ (Console.log) দেখতে: ./node_modules/pm2/bin/pm2 logs
 
 এবার ব্রাউজারে আপনার মেইন ডোমেন elitepassbd.com ভিজিট করে চেক করে দেখুন। এতক্ষণের খাটাখাটনি শেষে আপনার পুরো ফুল-স্ট্যাক প্রজেক্টটি এখন ইন্টারনেটে লাইভ! কেমন ফিল করছেন?
+
+
+./node_modules/pm2/bin/pm2 stop server.js --name "elitepass-backend"
