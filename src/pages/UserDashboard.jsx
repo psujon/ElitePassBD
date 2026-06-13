@@ -212,7 +212,7 @@ export default function UserDashboard() {
       <div className="w-full md:w-64 bg-[#111e35] text-slate-300 p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-850">
         {/* Logo and brand name */}
         <div className="flex items-center space-x-2.5 px-2 mb-6 text-left">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
             E
           </div>
           <span className="text-sm font-extrabold tracking-wider text-white uppercase truncate">ElitePass BD</span>
@@ -472,7 +472,7 @@ export default function UserDashboard() {
                         {/* Horizontal Line connector (desktop only) */}
                         <div className="absolute top-4 left-[12%] right-[12%] h-0.5 bg-slate-200 -z-10 hidden sm:block">
                           <div 
-                            className="h-full bg-gradient-to-r from-violet-500 to-pink-500 transition-all duration-700" 
+                            className="h-full bg-violet-600 transition-all duration-700" 
                             style={{ width: `${(Math.max(0, currentStep - 1) / 3) * 100}%` }}
                           />
                         </div>
@@ -519,7 +519,7 @@ export default function UserDashboard() {
                         {/* Step 4: Delivered */}
                         <div className="flex sm:flex-col items-center gap-3 sm:gap-2 text-left sm:text-center w-full sm:w-1/4">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
-                            currentStep >= 4 ? 'bg-gradient-to-r from-violet-600 to-pink-650 text-white shadow-md shadow-violet-500/20' : 'bg-slate-100 text-slate-400 border border-slate-200'
+                            currentStep >= 4 ? 'bg-violet-600 text-white shadow-md shadow-violet-500/20' : 'bg-slate-100 text-slate-400 border border-slate-200'
                           }`}>
                             {currentStep >= 4 ? <CheckCircle2 className="w-5 h-5 text-white" /> : '4'}
                           </div>
@@ -613,7 +613,7 @@ export default function UserDashboard() {
                     setNewTicketError('');
                     setNewTicketSuccess('');
                   }}
-                  className="flex items-center space-x-1 px-3 py-1.5 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white text-xxs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xxs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>New Ticket</span>
@@ -735,7 +735,7 @@ export default function UserDashboard() {
                       <button
                         type="submit"
                         disabled={newTicketSubmitting || !!newTicketSuccess}
-                        className="px-5 py-2 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white text-xs font-bold rounded-lg transition-all active:scale-95 disabled:opacity-50 flex items-center space-x-1 cursor-pointer"
+                        className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-all active:scale-95 disabled:opacity-50 flex items-center space-x-1 cursor-pointer"
                       >
                         {newTicketSubmitting ? (
                           <>
@@ -886,7 +886,7 @@ export default function UserDashboard() {
                 <button
                   type="submit"
                   disabled={reviewSubmitting || !!reviewSuccess}
-                  className="px-4 py-2 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white text-xs font-bold rounded-lg transition-all active:scale-95 disabled:opacity-50 flex items-center space-x-1 cursor-pointer"
+                  className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-all active:scale-95 disabled:opacity-50 flex items-center space-x-1 cursor-pointer"
                 >
                   {reviewSubmitting ? (
                     <>

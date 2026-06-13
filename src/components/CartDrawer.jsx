@@ -90,7 +90,7 @@ export default function CartDrawer({ isOpen, onClose }) {
                     </div>
                   )}
 
-                  <p className="text-xs text-violet-605 font-bold mt-1.5">৳{parseFloat(item.price).toFixed(2)}</p>
+                  <p className="text-xs text-violet-600 font-bold mt-1.5">৳{parseFloat(item.price).toFixed(2)}</p>
                   
                   {/* Quantity Controls */}
                   <div className="flex items-center space-x-2 mt-2">
@@ -132,7 +132,7 @@ export default function CartDrawer({ isOpen, onClose }) {
 
             <button
               onClick={handleProceedToCheckout}
-              className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white font-bold rounded-lg text-sm transition-all flex items-center justify-center space-x-2 active:scale-98 shadow-sm cursor-pointer border-none"
+              className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-lg text-sm transition-all flex items-center justify-center space-x-2 active:scale-98 shadow-sm cursor-pointer border-none"
             >
               <CreditCard className="w-4 h-4" />
               <span>Proceed to Checkout</span>

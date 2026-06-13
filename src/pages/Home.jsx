@@ -127,7 +127,7 @@ export default function Home() {
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] text-slate-800 py-8 text-left">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Premium Hero Banner */}
-        <div className="relative mb-12 p-8 md:p-12 rounded-3xl bg-gradient-to-br from-violet-600 to-indigo-700 text-white overflow-hidden shadow-sm">
+        <div className="relative mb-12 p-8 md:p-12 rounded-3xl bg-indigo-950 text-white overflow-hidden shadow-sm">
           <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full filter blur-3xl -z-10" />
           <div className="absolute bottom-0 left-10 w-60 h-60 bg-pink-500/10 rounded-full filter blur-3xl -z-10" />
 
@@ -193,7 +193,7 @@ export default function Home() {
                   onClick={() => setSelectedCategory('All')}
                   className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all cursor-pointer ${
                     selectedCategory === 'All'
-                      ? 'bg-gradient-to-r from-violet-600 to-pink-650 text-white shadow-sm'
+                      ? 'bg-violet-600 text-white shadow-sm'
                       : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 shadow-xs'
                   }`}
                 >
@@ -205,7 +205,7 @@ export default function Home() {
                     onClick={() => setSelectedCategory(cat.name)}
                     className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all cursor-pointer ${
                       selectedCategory === cat.name
-                        ? 'bg-gradient-to-r from-violet-600 to-pink-650 text-white shadow-sm'
+                        ? 'bg-violet-600 text-white shadow-sm'
                         : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 shadow-xs'
                     }`}
                   >
@@ -225,7 +225,7 @@ export default function Home() {
                   onClick={() => setSelectedCategory('All')}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${
                     selectedCategory === 'All'
-                      ? 'bg-gradient-to-r from-violet-600 to-pink-650 text-white shadow-sm'
+                      ? 'bg-violet-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
                   }`}
                 >
@@ -245,7 +245,7 @@ export default function Home() {
                       onClick={() => setSelectedCategory(cat.name)}
                       className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${
                         selectedCategory === cat.name
-                          ? 'bg-gradient-to-r from-violet-600 to-pink-650 text-white shadow-sm'
+                          ? 'bg-violet-600 text-white shadow-sm'
                           : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
                       }`}
                     >
@@ -329,7 +329,7 @@ export default function Home() {
                             handleProductClick(prod.id);
                           }}
                           disabled={prod.stock === 0}
-                          className="px-4 py-2 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white text-xs font-bold rounded-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-xs cursor-pointer"
+                          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-xs cursor-pointer"
                         >
                           Buy Now
                         </button>

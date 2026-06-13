@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { api } from '../utils/api';
-import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown } from 'lucide-react';
 
 const parseJSON = (str, fallback) => {
   if (!str) return fallback;
@@ -15,7 +15,7 @@ const parseJSON = (str, fallback) => {
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('products'); // 'products', 'orders', or 'tickets'
-  
+
   // Data lists
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -28,6 +28,7 @@ export default function AdminDashboard() {
     closed: 0
   });
   const [loading, setLoading] = useState(true);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
 
   // Modal State for Product Create/Edit
   const [showProductModal, setShowProductModal] = useState(false);
@@ -288,9 +289,9 @@ export default function AdminDashboard() {
 
     try {
       setCancelSubmitting(true);
-      await api.put(`/orders/${cancellingOrderId}/status`, { 
-        status: 'Cancelled', 
-        cancel_reason: cancelRemarks 
+      await api.put(`/orders/${cancellingOrderId}/status`, {
+        status: 'Cancelled',
+        cancel_reason: cancelRemarks
       });
       toast.success('Order status updated to Cancelled');
       setShowCancelModal(false);
@@ -329,6 +330,20 @@ export default function AdminDashboard() {
     }
   };
 
+  const filteredProducts = products.filter((prod) => {
+    if (!productSearchQuery) return true;
+    const query = productSearchQuery.toLowerCase();
+    return (
+      prod.name?.toLowerCase().includes(query) ||
+      prod.description?.toLowerCase().includes(query) ||
+      prod.category_name?.toLowerCase().includes(query) ||
+      prod.tags?.toLowerCase().includes(query) ||
+      prod.device_options?.toLowerCase().includes(query) ||
+      prod.activation_options?.toLowerCase().includes(query) ||
+      prod.id?.toString().includes(query)
+    );
+  });
+
   if (loading) {
     return (
       <div className="h-[80vh] flex items-center justify-center">
@@ -339,17 +354,17 @@ export default function AdminDashboard() {
 
   return (
     <div className="w-full min-h-[calc(100vh-64px)] flex flex-col md:flex-row bg-[#f5f7fa] text-slate-800">
-      
+
       {/* Left Side: Navigation Sidebar */}
       <div className="w-full md:w-64 bg-[#111e35] text-slate-300 p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-800">
         {/* Logo and brand name */}
         <div className="flex items-center space-x-2.5 px-2 mb-6 text-left">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
             E
           </div>
           <span className="text-sm font-extrabold tracking-wider text-white uppercase truncate">ElitePass BD</span>
         </div>
-        
+
         <div className="mb-6 px-2 hidden md:block text-left">
           <span className="text-[10px] font-bold text-orange-400 bg-orange-950/45 border border-orange-900/30 px-2.5 py-0.5 rounded-full uppercase tracking-wider block w-fit">
             Admin Console
@@ -361,14 +376,13 @@ export default function AdminDashboard() {
           <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-4 text-left">
             General
           </div>
-          
+
           <button
             onClick={() => setActiveTab('products')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${
-              activeTab === 'products'
-                ? 'bg-white/10 text-white shadow-xs'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'products'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
           >
             <Package className={`w-4 h-4 shrink-0 ${activeTab === 'products' ? 'text-orange-400' : 'text-slate-500'}`} />
             <span>Catalog Products</span>
@@ -376,11 +390,10 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('orders')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${
-              activeTab === 'orders'
-                ? 'bg-white/10 text-white shadow-xs'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'orders'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
           >
             <ClipboardList className={`w-4 h-4 shrink-0 ${activeTab === 'orders' ? 'text-orange-400' : 'text-slate-500'}`} />
             <span>Customer Orders</span>
@@ -397,11 +410,10 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('categories')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${
-              activeTab === 'categories'
-                ? 'bg-white/10 text-white shadow-xs'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'categories'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
           >
             <Layers className={`w-4 h-4 shrink-0 ${activeTab === 'categories' ? 'text-orange-400' : 'text-slate-500'}`} />
             <span>Categories</span>
@@ -409,11 +421,10 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('tickets')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${
-              activeTab === 'tickets'
-                ? 'bg-white/10 text-white shadow-xs'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'tickets'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
           >
             <MessageSquare className={`w-4 h-4 shrink-0 ${activeTab === 'tickets' ? 'text-orange-400' : 'text-slate-500'}`} />
             <span>Support Tickets</span>
@@ -428,14 +439,14 @@ export default function AdminDashboard() {
 
       {/* Right Side Content Panel */}
       <div className="flex-1 bg-[#f5f7fa] p-6 sm:p-8 overflow-y-auto space-y-6 min-w-0">
-        
+
         {/* Header Row */}
         <div className="flex justify-between items-center border-b border-slate-200/60 pb-5 shrink-0">
           <div className="text-left">
             <h1 className="text-2xl font-extrabold text-slate-850 tracking-tight">Dashboard</h1>
             <p className="text-xs text-slate-500 mt-1">Welcome back, Admin. Manage catalog and track customer orders.</p>
           </div>
-          
+
           {/* Header Actions */}
           <div className="flex items-center space-x-4">
             <button className="p-2 text-slate-400 hover:text-slate-650 bg-white border border-slate-200/60 hover:bg-slate-50 rounded-xl transition-colors relative cursor-pointer shadow-xs">
@@ -470,8 +481,8 @@ export default function AdminDashboard() {
                 ৳
               </div>
             </div>
-            <button 
-              onClick={() => setActiveTab('orders')} 
+            <button
+              onClick={() => setActiveTab('orders')}
               className="text-[10px] text-violet-600 hover:text-violet-850 font-bold flex items-center cursor-pointer"
             >
               View orders &rarr;
@@ -489,8 +500,8 @@ export default function AdminDashboard() {
                 📋
               </div>
             </div>
-            <button 
-              onClick={() => setActiveTab('orders')} 
+            <button
+              onClick={() => setActiveTab('orders')}
               className="text-[10px] text-violet-600 hover:text-violet-850 font-bold flex items-center cursor-pointer"
             >
               View all orders &rarr;
@@ -508,8 +519,8 @@ export default function AdminDashboard() {
                 📦
               </div>
             </div>
-            <button 
-              onClick={() => setActiveTab('products')} 
+            <button
+              onClick={() => setActiveTab('products')}
               className="text-[10px] text-violet-600 hover:text-violet-850 font-bold flex items-center cursor-pointer"
             >
               View catalog &rarr;
@@ -526,7 +537,7 @@ export default function AdminDashboard() {
                 <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700">Products Catalog ({products.length})</h3>
                 <button
                   onClick={() => handleOpenProductModal()}
-                  className="flex items-center space-x-1.5 px-4 py-2 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-98"
+                  className="flex items-center space-x-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-98"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Product</span>
@@ -536,53 +547,166 @@ export default function AdminDashboard() {
               <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xxs tracking-wider border-b border-slate-200/60">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xxs tracking-wider border-b border-slate-200/60 whitespace-nowrap">
                       <tr>
-                        <th className="p-4">Item Details</th>
+                        <th className="p-4">ID</th>
+                        <th className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <span>Item Details</span>
+                            <input
+                              type="text"
+                              placeholder="Search..."
+                              value={productSearchQuery}
+                              onChange={(e) => setProductSearchQuery(e.target.value)}
+                              className="bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded px-2 py-0.5 text-[10px] font-normal text-slate-700 w-36 normal-case"
+                            />
+                          </div>
+                        </th>
+                        <th className="p-4">Category</th>
+                        <th className="p-4">Description</th>
                         <th className="p-4">Price</th>
-                        <th className="p-4">In Stock</th>
+                        <th className="p-4">Stock</th>
+                        <th className="p-4">Tags</th>
+                        <th className="p-4">Devices</th>
+                        <th className="p-4">Activation</th>
+                        <th className="p-4">Additional Info</th>
+                        <th className="p-4">Packages</th>
+                        <th className="p-4">FAQs</th>
                         <th className="p-4 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {products.length === 0 ? (
+                      {filteredProducts.length === 0 ? (
                         <tr>
-                          <td colSpan="4" className="p-8 text-center text-slate-400 font-medium">No products available. Add some products to your catalog.</td>
+                          <td colSpan="13" className="p-8 text-center text-slate-400 font-medium">
+                            {products.length === 0 ? 'No products available. Add some products to your catalog.' : 'No matching products found.'}
+                          </td>
                         </tr>
                       ) : (
-                        products.map((prod) => (
-                          <tr key={prod.id} className="hover:bg-slate-50/40 transition-colors">
+                        filteredProducts.map((prod) => (
+                          <tr key={prod.id} className="hover:bg-slate-50/40 transition-colors border-b border-slate-100 text-slate-700 font-medium text-xs whitespace-nowrap">
+                            {/* 1. ID */}
+                            <td className="p-4 font-bold text-slate-800">#{prod.id}</td>
+
+                            {/* 2. Item Details (Image & Name) */}
                             <td className="p-4">
-                              <div className="flex items-center space-x-3">
+                              <div className="flex items-center space-x-2.5">
                                 {prod.image_url ? (
-                                  <img src={prod.image_url} alt={prod.name} className="w-10 h-10 object-cover rounded-lg bg-slate-100 border border-slate-200/50 shrink-0" />
+                                  <img src={prod.image_url} alt={prod.name} className="w-8 h-8 object-cover rounded-lg bg-slate-100 border border-slate-200/50 shrink-0" />
                                 ) : (
-                                  <div className="w-10 h-10 bg-slate-100 border border-slate-200/50 rounded-lg flex items-center justify-center text-[10px] text-slate-400 shrink-0 font-bold">No Img</div>
+                                  <div className="w-8 h-8 bg-slate-100 border border-slate-200/50 rounded-lg flex items-center justify-center text-[9px] text-slate-400 shrink-0 font-bold">No Img</div>
                                 )}
-                                <div className="min-w-0 text-left">
-                                  <p className="font-bold text-slate-800 truncate text-sm">{prod.name}</p>
-                                  <p className="text-[10px] text-slate-500 truncate max-w-md mt-0.5">{prod.description}</p>
-                                </div>
+                                <span className="font-bold text-slate-850 truncate max-w-[150px]">{prod.name}</span>
                               </div>
                             </td>
-                            <td className="p-4 font-bold text-slate-850">৳{parseFloat(prod.price).toFixed(2)}</td>
+
+                            {/* 3. Category */}
                             <td className="p-4">
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                prod.stock === 0 ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-slate-100 text-slate-700'
-                              }`}>
+                              {prod.category_name ? (
+                                <span className="bg-violet-50 text-violet-600 border border-violet-100/60 px-2 py-0.5 rounded-lg text-[10px] font-bold">{prod.category_name}</span>
+                              ) : (
+                                <span className="text-slate-450 italic text-[10px]">-</span>
+                              )}
+                            </td>
+
+                            {/* 4. Description */}
+                            <td className="p-4 max-w-[200px] truncate text-slate-500 text-[11px]" title={prod.description}>
+                              {prod.description}
+                            </td>
+
+                            {/* 5. Price */}
+                            <td className="p-4 font-bold text-slate-850">৳{parseFloat(prod.price).toFixed(2)}</td>
+
+                            {/* 6. Stock */}
+                            <td className="p-4">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${prod.stock === 0 ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-slate-100 text-slate-700'
+                                }`}>
                                 {prod.stock} left
                               </span>
                             </td>
+
+                            {/* 7. Tags */}
+                            <td className="p-4">
+                              {prod.tags ? (
+                                <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                  {prod.tags.split(',').map((tag, idx) => (
+                                    <span key={idx} className="bg-slate-100 text-slate-605 border border-slate-200/50 px-1.5 py-0.5 rounded text-[9px] font-bold">{tag.trim()}</span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-slate-450 italic">-</span>
+                              )}
+                            </td>
+
+                            {/* 8. Devices */}
+                            <td className="p-4">
+                              {prod.device_options ? (
+                                <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                  {prod.device_options.split(',').map((device, idx) => (
+                                    <span key={idx} className="bg-blue-50 text-blue-600 border border-blue-100/60 px-1.5 py-0.5 rounded text-[9px] font-bold">{device.trim()}</span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-slate-450 italic">-</span>
+                              )}
+                            </td>
+
+                            {/* 9. Activation */}
+                            <td className="p-4">
+                              {prod.activation_options ? (
+                                <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                  {prod.activation_options.split(',').map((opt, idx) => (
+                                    <span key={idx} className="bg-emerald-50 text-emerald-600 border border-emerald-100/60 px-1.5 py-0.5 rounded text-[9px] font-bold">{opt.trim()}</span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-slate-450 italic">-</span>
+                              )}
+                            </td>
+
+                            {/* 10. Additional Info */}
+                            <td className="p-4 max-w-[180px] truncate text-slate-500 text-[11px]" title={prod.additional_info}>
+                              {prod.additional_info || <span className="text-slate-450 italic">-</span>}
+                            </td>
+
+                            {/* 11. Packages */}
+                            <td className="p-4">
+                              {prod.packages && prod.packages.length > 0 ? (
+                                <div className="space-y-1 max-w-[150px]">
+                                  {prod.packages.map((pkg, idx) => (
+                                    <div key={idx} className="text-[10px] text-slate-600 flex justify-between gap-2 border-b border-slate-100 pb-0.5">
+                                      <span className="text-slate-500">{pkg.duration}</span>
+                                      <span className="font-extrabold text-violet-605">৳{parseFloat(pkg.price).toFixed(0)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-slate-450 italic">-</span>
+                              )}
+                            </td>
+
+                            {/* 12. FAQs */}
+                            <td className="p-4">
+                              {prod.faqs && prod.faqs.length > 0 ? (
+                                <span className="text-[10px] text-slate-650 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded font-bold cursor-help" title={prod.faqs.map(f => `Q: ${f.q}\nA: ${f.a}`).join('\n\n')}>
+                                  {prod.faqs.length} FAQs
+                                </span>
+                              ) : (
+                                <span className="text-slate-450 italic">-</span>
+                              )}
+                            </td>
+
+                            {/* 13. Actions */}
                             <td className="p-4 text-right space-x-1.5">
                               <button
                                 onClick={() => handleOpenProductModal(prod)}
-                                className="p-2 bg-slate-50 hover:bg-violet-50 hover:text-violet-650 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer"
+                                className="p-2 bg-slate-50 hover:bg-violet-55 hover:text-violet-650 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer inline-block"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteProduct(prod.id)}
-                                className="p-2 bg-slate-50 hover:bg-red-55 hover:text-red-650 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer"
+                                className="p-2 bg-slate-50 hover:bg-red-55 hover:text-red-650 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer inline-block"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -685,7 +809,7 @@ export default function AdminDashboard() {
                                     <span className="font-semibold text-slate-850">{i.product_name}</span>
                                     <span className="text-slate-450 ml-1 font-bold">x{i.quantity}</span>
                                     {(i.package_name || i.selected_device || i.selected_activation) && (
-                                      <div className="text-[10px] text-violet-605 font-bold mt-0.5 space-y-0.5 leading-relaxed bg-violet-50 border border-violet-100/60 p-1.5 rounded-lg max-w-xs">
+                                      <div className="text-[10px] text-violet-600 font-bold mt-0.5 space-y-0.5 leading-relaxed bg-violet-50 border border-violet-100/60 p-1.5 rounded-lg max-w-xs">
                                         {i.package_name && <div>📦 Pkg: {i.package_name}</div>}
                                         {i.selected_device && <div>📱 Dev: {i.selected_device}</div>}
                                         {i.selected_activation && <div>🔑 Act: {i.selected_activation}</div>}
@@ -720,11 +844,10 @@ export default function AdminDashboard() {
                               <select
                                 value={ord.status}
                                 onChange={(e) => handleStatusChange(ord.id, e.target.value)}
-                                className={`text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 focus:outline-none focus:border-violet-500 font-semibold cursor-pointer ${
-                                  ord.status === 'Delivered' ? 'text-emerald-600 border-emerald-200 bg-emerald-50/20' :
+                                className={`text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 focus:outline-none focus:border-violet-500 font-semibold cursor-pointer ${ord.status === 'Delivered' ? 'text-emerald-600 border-emerald-200 bg-emerald-50/20' :
                                   ord.status === 'Cancelled' ? 'text-red-500 border-red-200 bg-red-50/20' :
-                                  'text-violet-605 border-violet-200 bg-violet-50/20'
-                                }`}
+                                    'text-violet-600 border-violet-200 bg-violet-50/20'
+                                  }`}
                               >
                                 <option value="Pending">Pending</option>
                                 <option value="Processing">Processing</option>
@@ -814,20 +937,18 @@ export default function AdminDashboard() {
                             <td className="p-4 text-left">
                               <span className="font-bold text-slate-700 block">{ticket.name}</span>
                               <span className="text-[10px] text-slate-450 block mt-0.5">{ticket.email}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[9px] inline-block mt-1.5 font-bold ${
-                                ticket.user_name ? 'bg-violet-50 text-violet-605 border border-violet-100' : 'bg-slate-100 text-slate-600 border border-slate-200/50'
-                              }`}>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] inline-block mt-1.5 font-bold ${ticket.user_name ? 'bg-violet-50 text-violet-600 border border-violet-100' : 'bg-slate-100 text-slate-600 border border-slate-200/50'
+                                }`}>
                                 {ticket.user_name ? 'Registered' : 'Guest'}
                               </span>
                             </td>
                             <td className="p-4 text-slate-800 font-semibold text-left">{ticket.subject}</td>
                             <td className="p-4 text-slate-500 max-w-[200px] whitespace-pre-wrap text-left">{ticket.message}</td>
                             <td className="p-4 text-left">
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                ticket.status === 'Resolved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${ticket.status === 'Resolved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                 ticket.status === 'Closed' ? 'bg-slate-100 text-slate-500 border border-slate-200' :
-                                'bg-amber-50 text-amber-600 border border-amber-100'
-                              }`}>
+                                  'bg-amber-50 text-amber-600 border border-amber-100'
+                                }`}>
                                 {ticket.status}
                               </span>
                             </td>
@@ -859,7 +980,7 @@ export default function AdminDashboard() {
                 <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700">Product Categories ({categories.length})</h3>
                 <button
                   onClick={() => handleOpenCategoryModal()}
-                  className="flex items-center space-x-1.5 px-4 py-2 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-555 hover:to-pink-555 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-98"
+                  className="flex items-center space-x-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-98"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Category</span>
@@ -916,8 +1037,8 @@ export default function AdminDashboard() {
       {showProductModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs" onClick={() => setShowProductModal(false)} />
-          
-          <div className="relative bg-white border border-slate-200 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl z-10 animate-slide-up max-h-[90vh] flex flex-col">
+
+          <div className="relative bg-white border border-slate-200 w-full rounded-2xl overflow-hidden shadow-2xl z-10 animate-slide-up max-h-[90vh] flex flex-col">
             <div className="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center shrink-0">
               <h4 className="text-base font-bold text-slate-800">{editingProduct ? 'Edit Catalog Product' : 'Add New Product'}</h4>
               <button onClick={() => setShowProductModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer"><X className="w-5 h-5" /></button>
@@ -942,7 +1063,20 @@ export default function AdminDashboard() {
                     required
                   />
                 </div>
-                
+
+                <div>
+                  <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Image URL (Optional)</label>
+                  <input
+                    type="url"
+                    value={productForm.image_url}
+                    onChange={(e) => setProductForm({ ...productForm, image_url: e.target.value })}
+                    placeholder="https://example.com/product.jpg"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Category (Optional)</label>
                   <select
@@ -956,21 +1090,6 @@ export default function AdminDashboard() {
                     ))}
                   </select>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Description *</label>
-                <textarea
-                  rows="3"
-                  value={productForm.description}
-                  onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                  placeholder="Details, features, activation region..."
-                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Base Price (৳) *</label>
                   <input
@@ -994,6 +1113,9 @@ export default function AdminDashboard() {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Product Tags (comma-separated)</label>
                   <input
@@ -1004,9 +1126,6 @@ export default function AdminDashboard() {
                     className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Device Options (comma-separated)</label>
                   <input
@@ -1029,153 +1148,156 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Additional Information Box</label>
-                <textarea
-                  rows="3"
-                  value={productForm.additional_info}
-                  onChange={(e) => setProductForm({ ...productForm, additional_info: e.target.value })}
-                  placeholder="E.g. full period warranty, official accounts, 28 days validity..."
-                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Image URL (Optional)</label>
-                <input
-                  type="url"
-                  value={productForm.image_url}
-                  onChange={(e) => setProductForm({ ...productForm, image_url: e.target.value })}
-                  placeholder="https://example.com/product.jpg"
-                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
-                />
-              </div>
-
-              {/* Package Builder */}
-              <div className="border border-slate-200 p-4 rounded-xl space-y-3 bg-slate-50">
-                <div className="flex justify-between items-center">
-                  <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider">Product Packages</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updatedPkgs = [...productForm.packages, { duration: '', price: '' }];
-                      setProductForm({ ...productForm, packages: updatedPkgs });
-                    }}
-                    className="px-2.5 py-1 bg-violet-50 hover:bg-violet-600 text-violet-605 hover:text-white border border-violet-200 hover:border-transparent rounded text-[10px] font-bold transition-all cursor-pointer"
-                  >
-                    + Add Package Option
-                  </button>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                <div>
+                  <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Description *</label>
+                  <textarea
+                    rows="5"
+                    value={productForm.description}
+                    onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                    placeholder="Details, features, activation region..."
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                    required
+                  />
                 </div>
-                
-                {productForm.packages.length === 0 ? (
-                  <p className="text-[11px] text-slate-450 italic">No packages defined. Base price will apply.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {productForm.packages.map((pkg, idx) => (
-                      <div key={idx} className="flex items-center space-x-2">
-                        <input
-                          type="text"
-                          value={pkg.duration}
-                          onChange={(e) => {
-                            const updated = [...productForm.packages];
-                            updated[idx].duration = e.target.value;
-                            setProductForm({ ...productForm, packages: updated });
-                          }}
-                          placeholder="e.g. 1 Month, 6 Months"
-                          className="flex-1 text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-850"
-                          required
-                        />
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={pkg.price}
-                          onChange={(e) => {
-                            const updated = [...productForm.packages];
-                            updated[idx].price = e.target.value;
-                            setProductForm({ ...productForm, packages: updated });
-                          }}
-                          placeholder="Price in ৳"
-                          className="w-28 text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-855"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = productForm.packages.filter((_, i) => i !== idx);
-                            setProductForm({ ...productForm, packages: updated });
-                          }}
-                          className="p-1.5 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white border border-red-200 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* FAQ Builder */}
-              <div className="border border-slate-200 p-4 rounded-xl space-y-3 bg-slate-50">
-                <div className="flex justify-between items-center">
-                  <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider">Frequently Asked Questions (FAQ)</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updatedFaqs = [...productForm.faqs, { q: '', a: '' }];
-                      setProductForm({ ...productForm, faqs: updatedFaqs });
-                    }}
-                    className="px-2.5 py-1 bg-violet-50 hover:bg-violet-600 text-violet-605 hover:text-white border border-violet-200 hover:border-transparent rounded text-[10px] font-bold transition-all cursor-pointer"
-                  >
-                    + Add FAQ
-                  </button>
+                <div>
+                  <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Additional Information Box</label>
+                  <textarea
+                    rows="5"
+                    value={productForm.additional_info}
+                    onChange={(e) => setProductForm({ ...productForm, additional_info: e.target.value })}
+                    placeholder="E.g. full period warranty, official accounts, 28 days validity..."
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                  />
                 </div>
-                
-                {productForm.faqs.length === 0 ? (
-                  <p className="text-[11px] text-slate-450 italic">No FAQs added yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {productForm.faqs.map((faq, idx) => (
-                      <div key={idx} className="space-y-1.5 p-3 bg-white rounded-lg border border-slate-200 relative">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = productForm.faqs.filter((_, i) => i !== idx);
-                            setProductForm({ ...productForm, faqs: updated });
-                          }}
-                          className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500 rounded cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                        <input
-                          type="text"
-                          value={faq.q}
-                          onChange={(e) => {
-                            const updated = [...productForm.faqs];
-                            updated[idx].q = e.target.value;
-                            setProductForm({ ...productForm, faqs: updated });
-                          }}
-                          placeholder="Question (e.g. How do I purchase?)"
-                          className="w-full text-xs bg-slate-50 border border-slate-200 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-800 pr-8"
-                          required
-                        />
-                        <textarea
-                          rows="2"
-                          value={faq.a}
-                          onChange={(e) => {
-                            const updated = [...productForm.faqs];
-                            updated[idx].a = e.target.value;
-                            setProductForm({ ...productForm, faqs: updated });
-                          }}
-                          placeholder="Answer"
-                          className="w-full text-xs bg-slate-50 border border-slate-200 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-800"
-                          required
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                {/* Package Builder */}
+                <div className="border border-slate-200 p-4 rounded-xl space-y-3 bg-slate-50">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider">Product Packages</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedPkgs = [...productForm.packages, { duration: '', price: '' }];
+                        setProductForm({ ...productForm, packages: updatedPkgs });
+                      }}
+                      className="px-2.5 py-1 bg-violet-50 hover:bg-violet-600 text-violet-600 hover:text-white border border-violet-200 hover:border-transparent rounded text-[10px] font-bold transition-all cursor-pointer"
+                    >
+                      + Add Package Option
+                    </button>
+                  </div>
+
+                  {productForm.packages.length === 0 ? (
+                    <p className="text-[11px] text-slate-450 italic">No packages defined. Base price will apply.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {productForm.packages.map((pkg, idx) => (
+                        <div key={idx} className="flex items-center space-x-2">
+                          <input
+                            type="text"
+                            value={pkg.duration}
+                            onChange={(e) => {
+                              const updated = [...productForm.packages];
+                              updated[idx].duration = e.target.value;
+                              setProductForm({ ...productForm, packages: updated });
+                            }}
+                            placeholder="e.g. 1 Month, 6 Months"
+                            className="flex-1 text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-850"
+                            required
+                          />
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={pkg.price}
+                            onChange={(e) => {
+                              const updated = [...productForm.packages];
+                              updated[idx].price = e.target.value;
+                              setProductForm({ ...productForm, packages: updated });
+                            }}
+                            placeholder="Price in ৳"
+                            className="w-28 text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-855"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = productForm.packages.filter((_, i) => i !== idx);
+                              setProductForm({ ...productForm, packages: updated });
+                            }}
+                            className="p-1.5 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white border border-red-200 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* FAQ Builder */}
+                <div className="border border-slate-200 p-4 rounded-xl space-y-3 bg-slate-50">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider">Frequently Asked Questions (FAQ)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedFaqs = [...productForm.faqs, { q: '', a: '' }];
+                        setProductForm({ ...productForm, faqs: updatedFaqs });
+                      }}
+                      className="px-2.5 py-1 bg-violet-50 hover:bg-violet-600 text-violet-600 hover:text-white border border-violet-200 hover:border-transparent rounded text-[10px] font-bold transition-all cursor-pointer"
+                    >
+                      + Add FAQ
+                    </button>
+                  </div>
+
+                  {productForm.faqs.length === 0 ? (
+                    <p className="text-[11px] text-slate-450 italic">No FAQs added yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {productForm.faqs.map((faq, idx) => (
+                        <div key={idx} className="space-y-1.5 p-3 bg-white rounded-lg border border-slate-200 relative">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = productForm.faqs.filter((_, i) => i !== idx);
+                              setProductForm({ ...productForm, faqs: updated });
+                            }}
+                            className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500 rounded cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                          <input
+                            type="text"
+                            value={faq.q}
+                            onChange={(e) => {
+                              const updated = [...productForm.faqs];
+                              updated[idx].q = e.target.value;
+                              setProductForm({ ...productForm, faqs: updated });
+                            }}
+                            placeholder="Question (e.g. How do I purchase?)"
+                            className="w-full text-xs bg-slate-50 border border-slate-200 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-800 pr-8"
+                            required
+                          />
+                          <textarea
+                            rows="2"
+                            value={faq.a}
+                            onChange={(e) => {
+                              const updated = [...productForm.faqs];
+                              updated[idx].a = e.target.value;
+                              setProductForm({ ...productForm, faqs: updated });
+                            }}
+                            placeholder="Answer"
+                            className="w-full text-xs bg-slate-50 border border-slate-200 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-800"
+                            required
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="pt-4 border-t border-slate-200 flex justify-end space-x-3 shrink-0">
                 <button
                   type="button"
@@ -1187,7 +1309,7 @@ export default function AdminDashboard() {
                 <button
                   type="submit"
                   disabled={formSubmitting}
-                  className="px-5 py-2 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-555 text-white text-xs font-bold rounded-lg transition-all flex items-center space-x-1 cursor-pointer"
+                  className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-all flex items-center space-x-1 cursor-pointer"
                 >
                   {formSubmitting ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1205,7 +1327,7 @@ export default function AdminDashboard() {
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs" onClick={() => setShowCancelModal(false)} />
-          
+
           <div className="relative bg-white border border-slate-200 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl z-10 animate-slide-up text-left">
             <div className="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
               <h4 className="text-base font-bold text-slate-800">Order Cancellation Reason</h4>
@@ -1315,7 +1437,7 @@ export default function AdminDashboard() {
                 <button
                   type="submit"
                   disabled={ticketSubmitting}
-                  className="px-4 py-2 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-555 hover:to-pink-555 text-white text-xs font-bold rounded-lg transition-all active:scale-95 disabled:opacity-50 flex items-center space-x-1 cursor-pointer"
+                  className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-all active:scale-95 disabled:opacity-50 flex items-center space-x-1 cursor-pointer"
                 >
                   {ticketSubmitting ? (
                     <>
@@ -1336,7 +1458,7 @@ export default function AdminDashboard() {
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs" onClick={() => setShowCategoryModal(false)} />
-          
+
           <div className="relative bg-white border border-slate-200 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl z-10 animate-slide-up text-left">
             <div className="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
               <h4 className="text-base font-bold text-slate-850">{editingCategory ? 'Edit Category' : 'Add New Category'}</h4>
@@ -1373,7 +1495,7 @@ export default function AdminDashboard() {
                 <button
                   type="submit"
                   disabled={categoryFormSubmitting}
-                  className="px-5 py-2 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-555 hover:to-pink-555 text-white text-xs font-bold rounded-lg transition-all flex items-center space-x-1 cursor-pointer"
+                  className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-all flex items-center space-x-1 cursor-pointer"
                 >
                   {categoryFormSubmitting ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

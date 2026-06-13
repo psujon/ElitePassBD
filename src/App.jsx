@@ -22,6 +22,8 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import ContactSupport from './pages/ContactSupport';
 import ProductDetails from './pages/ProductDetails';
+import AboutUs from './pages/AboutUs';
+import RefundPolicy from './pages/RefundPolicy';
 
 // Protected Route Guard (For Logged in Users)
 const ProtectedRoute = ({ children }) => {
@@ -56,6 +58,8 @@ function AppContent() {
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/contact" element={<ContactSupport />} />
+          <Route path="/about" element={<AboutUs />} />
+          <Route path="/refund-policy" element={<RefundPolicy />} />
           <Route path="/product/:id" element={<ProductDetails />} />
 
           {/* User Dashboard & Order Tracking */}

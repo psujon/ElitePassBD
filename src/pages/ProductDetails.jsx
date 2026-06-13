@@ -299,7 +299,7 @@ export default function ProductDetails() {
                         onClick={() => setSelectedPackage(pkg)}
                         className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                           selectedPackage?.duration === pkg.duration
-                            ? 'bg-gradient-to-r from-violet-600 to-pink-650 border-transparent text-white shadow-sm'
+                            ? 'bg-violet-600 border-transparent text-white shadow-sm'
                             : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-350 shadow-xs'
                         }`}
                       >
@@ -321,7 +321,7 @@ export default function ProductDetails() {
                         onClick={() => setSelectedDevice(dev)}
                         className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                           selectedDevice === dev
-                            ? 'bg-gradient-to-r from-violet-600 to-pink-650 border-transparent text-white shadow-sm'
+                            ? 'bg-violet-600 border-transparent text-white shadow-sm'
                             : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-350 shadow-xs'
                         }`}
                       >
@@ -343,7 +343,7 @@ export default function ProductDetails() {
                         onClick={() => setSelectedActivation(act)}
                         className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                           selectedActivation === act
-                            ? 'bg-gradient-to-r from-violet-600 to-pink-655 border-transparent text-white shadow-sm'
+                            ? 'bg-violet-600 border-transparent text-white shadow-sm'
                             : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-350 shadow-xs'
                         }`}
                       >
@@ -388,7 +388,7 @@ export default function ProductDetails() {
                   <button
                     onClick={handleBuyNow}
                     disabled={product.stock === 0}
-                    className="flex-1 py-3 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     <span>Buy Now</span>
                   </button>

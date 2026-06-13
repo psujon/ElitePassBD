@@ -12,7 +12,8 @@ import {
   Loader2,
   CheckCircle2,
   Smartphone,
-  DollarSign
+  DollarSign,
+  Mail
 } from 'lucide-react';
 
 export default function Checkout() {
@@ -23,6 +24,7 @@ export default function Checkout() {
   // State fields
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState(user?.whatsapp_number || '');
+  const [deliveryEmail, setDeliveryEmail] = useState(user?.email || '');
   const [paymentMethod, setPaymentMethod] = useState('bkash');
   const [bkashNumber, setBkashNumber] = useState('');
   const [bkashTxId, setBkashTxId] = useState('');
@@ -44,11 +46,17 @@ export default function Checkout() {
     }
   }, [user, phone]);
 
+  useEffect(() => {
+    if (user?.email && !deliveryEmail) {
+      setDeliveryEmail(user.email);
+    }
+  }, [user, deliveryEmail]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!address || !phone) {
-      setError('Please provide a shipping address and contact number.');
+    if (!address || !phone || !deliveryEmail) {
+      setError('Please provide shipping address, phone number, and email for delivery keys.');
       return;
     }
 
@@ -71,10 +79,10 @@ export default function Checkout() {
           selected_activation: item.selected_activation || null
         })),
         total_amount: cartTotal,
-        shipping_address: address,
+        shipping_address: `Delivery Email: ${deliveryEmail} | Address: ${address}`,
         phone: phone,
-        payment_method: paymentMethod === 'bkash' 
-          ? `bKash (No: ${bkashNumber}, TxID: ${bkashTxId})` 
+        payment_method: paymentMethod === 'bkash'
+          ? `bKash (No: ${bkashNumber}, TxID: ${bkashTxId})`
           : paymentMethod
       };
 
@@ -133,7 +141,7 @@ export default function Checkout() {
             <div className="space-y-3">
               <Link
                 to="/dashboard"
-                className="block w-full py-3 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white font-bold rounded-xl text-sm transition-all shadow-sm text-center"
+                className="block w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl text-sm transition-all shadow-sm text-center"
               >
                 Track Order in Dashboard
               </Link>
@@ -228,8 +236,28 @@ export default function Checkout() {
                   />
                   <Phone className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
                 </div>
-                <p className="text-slate-455 text-xxs mt-1.5">
-                  We will contact you on this number for keys, delivery details or verification.
+                <p className="text-slate-455 text-xs mt-1.5">
+                  We will contact or WhatsApp you on this number for keys, delivery details or verification.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Email (For Delivery Keys)
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    value={deliveryEmail}
+                    onChange={(e) => setDeliveryEmail(e.target.value)}
+                    placeholder="Enter email address where we should deliver keys..."
+                    className="w-full text-sm bg-slate-50 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-colors"
+                    required
+                  />
+                  <Mail className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
+                </div>
+                <p className="text-slate-455 text-xs mt-1.5">
+                  Your digital codes / subscription activation keys will be sent to this email address.
                 </p>
               </div>
 
@@ -273,7 +301,7 @@ export default function Checkout() {
                     />
                     <div className="text-left">
                       <span className="block text-sm font-bold text-slate-800">Cash on Delivery</span>
-                      <span className="block text-xxs text-slate-500 mt-0.5">Pay upon key activation or receipt</span>
+                      <span className="block text-xs text-slate-500 mt-0.5">Pay upon key activation or receipt</span>
                     </div>
                   </label>
 
@@ -295,7 +323,7 @@ export default function Checkout() {
                         <span>bKash / Nagad</span>
                         <span className="ml-2 text-[8px] px-1 py-0.5 bg-pink-100 text-pink-600 rounded-md border border-pink-200 font-extrabold uppercase tracking-wide">Popular</span>
                       </span>
-                      <span className="block text-xxs text-slate-500 mt-0.5">Mock online sandbox verification</span>
+                      <span className="block text-xs text-slate-500 mt-0.5">Manual verification</span>
                     </div>
                   </label>
                 </div>
@@ -306,9 +334,9 @@ export default function Checkout() {
                     <div className="p-3 bg-pink-100/50 border border-pink-200 rounded-lg text-xs text-pink-700">
                       <p className="font-extrabold text-left">Simulated bKash Payment Instructions:</p>
                       <p className="mt-1 text-slate-600 text-left leading-relaxed">
-                        1. Send the total amount <strong>৳{cartTotal.toFixed(2)}</strong> to bKash Personal: <strong>01799998888</strong>.
+                        1. Send the total amount <strong>৳{cartTotal.toFixed(2)}</strong> to bKash Personal: <strong>017********</strong>.
                         <br />
-                        2. Input your bKash sender number and the 10-digit Transaction ID below.
+                        2. Input your bKash sender number and the Transaction ID below.
                       </p>
                     </div>
 
@@ -348,7 +376,7 @@ export default function Checkout() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white font-bold rounded-xl text-sm transition-all shadow-sm flex items-center justify-center space-x-2 active:scale-98 disabled:opacity-50 cursor-pointer"
+                className="w-full py-3.5 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl text-sm transition-all shadow-sm flex items-center justify-center space-x-2 active:scale-98 disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? (
                   <>
@@ -393,7 +421,7 @@ export default function Checkout() {
 
                     <div className="flex-1 min-w-0 text-left">
                       <h4 className="text-sm font-bold text-slate-800 truncate">{item.name}</h4>
-                      
+
                       {/* Selected Options display */}
                       {(item.package_name || item.selected_device || item.selected_activation) && (
                         <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 leading-relaxed">

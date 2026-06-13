@@ -67,6 +67,7 @@ exports.getProductById = async (req, res) => {
 
 // Create product (Admin)
 exports.createProduct = async (req, res) => {
+  console.log('CREATE PRODUCT REQUEST BODY:', req.body);
   const { 
     name, description, price, image_url, stock, category_id,
     tags, additional_info, faqs, packages, device_options, activation_options 
@@ -102,6 +103,7 @@ exports.createProduct = async (req, res) => {
 // Update product (Admin)
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
+  console.log('UPDATE PRODUCT REQUEST BODY:', req.body);
   const { 
     name, description, price, image_url, stock, category_id,
     tags, additional_info, faqs, packages, device_options, activation_options 

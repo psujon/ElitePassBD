@@ -19,15 +19,21 @@ export default function Navbar({ onCartClick }) {
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         {/* Brand Logo */}
         <Link to="/" className="flex items-center space-x-2 text-xl font-bold tracking-tight text-white">
-          <span className="bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 text-transparent bg-clip-text font-extrabold text-2xl glow-primary">
+          <span className="text-violet-500 font-extrabold text-2xl glow-primary">
             ElitePassBD
           </span>
         </Link>
 
         {/* Action Items */}
         <div className="flex items-center space-x-4">
-          <Link to="/" className="text-sm font-medium text-slate-300 hover:text-white transition-colors hidden sm:block">
-            Shop
+          <Link to="/" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+            Home
+          </Link>
+          <Link to="/about" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+            About Us
+          </Link>
+          <Link to="/contact" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+            Contact
           </Link>
 
           {/* User Links */}
@@ -46,9 +52,10 @@ export default function Navbar({ onCartClick }) {
               <Link
                 to="/dashboard"
                 className="flex items-center space-x-1 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                title="My Account"
               >
                 <User className="w-4 h-4 text-violet-400" />
-                <span className="hidden md:inline">{user.name}</span>
+                <span className="hidden md:inline">My Account</span>
               </Link>
 
               <button
@@ -65,7 +72,7 @@ export default function Navbar({ onCartClick }) {
               className="text-sm font-medium text-slate-300 hover:text-white transition-colors flex items-center space-x-1"
             >
               <User className="w-4 h-4" />
-              <span>Login</span>
+              <span>My Account</span>
             </Link>
           )}
 
@@ -77,7 +84,7 @@ export default function Navbar({ onCartClick }) {
           >
             <ShoppingCart className="w-5 h-5" />
             {cartCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-violet-600 to-pink-600 text-white text-xxs font-bold px-1.5 py-0.5 rounded-full min-w-5 h-5 flex items-center justify-center animate-pulse-subtle">
+              <span className="absolute -top-1.5 -right-1.5 bg-violet-600 text-white text-xxs font-bold px-1.5 py-0.5 rounded-full min-w-5 h-5 flex items-center justify-center animate-pulse-subtle">
                 {cartCount}
               </span>
             )}
