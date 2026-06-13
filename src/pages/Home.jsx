@@ -216,7 +216,7 @@ export default function Home() {
             </div>
 
             {/* Desktop Sidebar */}
-            <div className="hidden md:block bg-[#111e35] border border-slate-800 p-5 rounded-2xl sticky top-24 shadow-sm text-slate-350">
+            <div className="hidden md:block bg-white border border-slate-200/80 p-5 rounded-2xl sticky top-24 shadow-xs text-slate-700">
               <span className="text-xxs font-bold uppercase tracking-wider text-slate-400 block mb-4 px-1">
                 Product Categories
               </span>
@@ -225,13 +225,13 @@ export default function Home() {
                   onClick={() => setSelectedCategory('All')}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${
                     selectedCategory === 'All'
-                      ? 'bg-white/10 text-white shadow-xs'
-                      : 'text-slate-450 hover:bg-white/5 hover:text-white'
+                      ? 'bg-gradient-to-r from-violet-600 to-pink-650 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
                   }`}
                 >
                   <span>All Products</span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold transition-colors ${
-                    selectedCategory === 'All' ? 'bg-white/20 text-white' : 'bg-slate-900/60 text-slate-500 group-hover:text-slate-455'
+                    selectedCategory === 'All' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-700'
                   }`}>
                     {products.length}
                   </span>
@@ -245,13 +245,13 @@ export default function Home() {
                       onClick={() => setSelectedCategory(cat.name)}
                       className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${
                         selectedCategory === cat.name
-                          ? 'bg-white/10 text-white shadow-xs'
-                          : 'text-slate-455 hover:bg-white/5 hover:text-white'
+                          ? 'bg-gradient-to-r from-violet-600 to-pink-650 text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
                       }`}
                     >
                       <span>{cat.name}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold transition-colors ${
-                        selectedCategory === cat.name ? 'bg-white/20 text-white' : 'bg-slate-900/60 text-slate-500 group-hover:text-slate-455'
+                        selectedCategory === cat.name ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-700'
                       }`}>
                         {count}
                       </span>

@@ -96,52 +96,54 @@ export default function Checkout() {
 
   if (orderSuccess) {
     return (
-      <div className="max-w-md w-full mx-auto px-4 py-20 flex flex-col justify-center min-h-[75vh] text-left">
-        <div className="bg-white border border-slate-200/80 rounded-3xl p-8 text-center shadow-md animate-fade-in">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-emerald-50 text-emerald-600 mb-6 shadow-xs">
-            <CheckCircle2 className="h-10 w-10" />
-          </div>
-          <h2 className="text-2xl font-extrabold text-slate-850 tracking-tight">
-            Order Confirmed!
-          </h2>
-          <p className="text-slate-500 text-sm mt-3 leading-relaxed">
-            Thank you for your purchase. Your order has been placed successfully.
-          </p>
+      <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] py-20 flex flex-col justify-center items-center text-left animate-fade-in">
+        <div className="max-w-md w-full mx-auto px-4">
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-8 text-center shadow-md">
+            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-emerald-50 text-emerald-600 mb-6 shadow-xs">
+              <CheckCircle2 className="h-10 w-10" />
+            </div>
+            <h2 className="text-2xl font-extrabold text-slate-850 tracking-tight">
+              Order Confirmed!
+            </h2>
+            <p className="text-slate-500 text-sm mt-3 leading-relaxed">
+              Thank you for your purchase. Your order has been placed successfully.
+            </p>
 
-          <div className="my-6 p-4 bg-slate-50 rounded-2xl border border-slate-150 text-left space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Order ID:</span>
-              <span className="text-violet-600 font-extrabold">#{orderSuccess.orderId}</span>
+            <div className="my-6 p-4 bg-slate-50 rounded-2xl border border-slate-150 text-left space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Order ID:</span>
+                <span className="text-violet-600 font-extrabold">#{orderSuccess.orderId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Payment Method:</span>
+                <span className="text-pink-600 font-bold">
+                  {paymentMethod === 'bkash' ? `bKash (No: ${bkashNumber}, TxID: ${bkashTxId})` : paymentMethod}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Shipping To:</span>
+                <span className="text-slate-800 font-bold truncate max-w-[200px]">{address}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">WhatsApp/Phone:</span>
+                <span className="text-slate-800 font-bold">{phone}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Payment Method:</span>
-              <span className="text-pink-600 font-bold">
-                {paymentMethod === 'bkash' ? `bKash (No: ${bkashNumber}, TxID: ${bkashTxId})` : paymentMethod}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Shipping To:</span>
-              <span className="text-slate-800 font-bold truncate max-w-[200px]">{address}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">WhatsApp/Phone:</span>
-              <span className="text-slate-800 font-bold">{phone}</span>
-            </div>
-          </div>
 
-          <div className="space-y-3">
-            <Link
-              to="/dashboard"
-              className="block w-full py-3 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white font-bold rounded-xl text-sm transition-all shadow-sm text-center"
-            >
-              Track Order in Dashboard
-            </Link>
-            <Link
-              to="/"
-              className="block w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 font-bold rounded-xl text-sm transition-colors border border-slate-200 text-center"
-            >
-              Continue Shopping
-            </Link>
+            <div className="space-y-3">
+              <Link
+                to="/dashboard"
+                className="block w-full py-3 bg-gradient-to-r from-violet-600 to-pink-650 hover:from-violet-550 hover:to-pink-550 text-white font-bold rounded-xl text-sm transition-all shadow-sm text-center"
+              >
+                Track Order in Dashboard
+              </Link>
+              <Link
+                to="/"
+                className="block w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 font-bold rounded-xl text-sm transition-colors border border-slate-200 text-center"
+              >
+                Continue Shopping
+              </Link>
+            </div>
           </div>
         </div>
       </div>
