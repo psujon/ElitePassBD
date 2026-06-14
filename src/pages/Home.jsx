@@ -81,7 +81,7 @@ export default function Home() {
       id: 1,
       title: "WE PROVIDE AUTHENTIC DIGITAL LICENSE.",
       subtitle: "THAT WILL ENSURE 100% SECURE YOUR DEVICE.",
-      phone: "01610-555228",
+      phone: "01925-112444",
       accent: "from-blue-600 to-indigo-900",
       images: [
         'https://www.digitalproductsbd.com/wp-content/uploads/Windows-11-Pro-min-600x600.webp',
@@ -93,7 +93,7 @@ export default function Home() {
       id: 2,
       title: "PREMIUM AI & CREATIVE SUBSCRIPTIONS.",
       subtitle: "GET CHATGPT PLUS, ADOBE CC & MORE INSTANTLY.",
-      phone: "01610-555228",
+      phone: "01925-112444",
       accent: "from-violet-600 to-purple-950",
       images: [
         'https://www.digitalproductsbd.com/wp-content/uploads/Adobe-Creative-Cloud-min-600x600.webp',
@@ -281,9 +281,9 @@ export default function Home() {
               >
                 <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full filter blur-xl -z-10 group-hover:scale-110 transition-transform" />
                 <div>
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-md">
+                  {/* <span className="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-md">
                     Up to 50%
-                  </span>
+                  </span> */}
                   <h3 className="text-xs font-black tracking-tight mt-2 leading-snug">
                     EDUCATION SUBSCRIPTION
                   </h3>
@@ -300,9 +300,9 @@ export default function Home() {
               >
                 <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full filter blur-xl -z-10 group-hover:scale-110 transition-transform" />
                 <div>
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-md">
+                  {/* <span className="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-md">
                     Big 65% Offer
-                  </span>
+                  </span> */}
                   <h3 className="text-xs font-black tracking-tight mt-2 leading-snug">
                     OFFICE BUNDLE SALE
                   </h3>
@@ -631,7 +631,7 @@ export default function Home() {
         {/* ================= SECTION 4: WHY CHOOSE US ================= */}
         <div className="bg-slate-50 border border-slate-150 rounded-3xl p-8 mb-12 shadow-xs text-center">
           <h2 className="text-xl font-black text-slate-900 tracking-tight">
-            Why Choose License Mart Bangladesh?
+            Why Choose ElitePassBD?
           </h2>
           <p className="text-slate-500 text-xs mt-2 max-w-lg mx-auto">
             We're committed to providing the best software purchasing experience with guaranteed authenticity and support.

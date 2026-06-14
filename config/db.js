@@ -6,7 +6,7 @@ const dbConfig = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306,
+  port: process.env.DB_PORT,
   waitForConnections: true,
   connectionLimit: 0,
   queueLimit: 0
@@ -16,7 +16,7 @@ let pool;
 
 async function initDB() {
   try {
-    const dbName = process.env.DB_NAME || 'elitepass_db';
+    const dbName = process.env.DB_NAME;
 
     // Try creating the database if privileges allow (mainly for local development)
     try {
