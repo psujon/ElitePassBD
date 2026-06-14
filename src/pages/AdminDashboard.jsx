@@ -821,6 +821,11 @@ export default function AdminDashboard() {
                               <p className="text-[10px] text-slate-400 mt-2 font-semibold">
                                 <span>Phone: {ord.phone} | Addr: {ord.shipping_address}</span>
                               </p>
+                              {ord.additional_notes && (
+                                <p className="text-[10px] text-slate-600 bg-slate-50 border border-slate-200/85 px-2.5 py-1.5 rounded-lg mt-1.5 text-left leading-relaxed max-w-xs">
+                                  <strong>Notes:</strong> {ord.additional_notes}
+                                </p>
+                              )}
                               <p className="text-[10px] mt-1.5 flex flex-wrap items-center gap-1.5 text-left">
                                 <span className="text-slate-400 font-bold uppercase">Payment:</span>
                                 {ord.payment_method?.includes('bKash') ? (

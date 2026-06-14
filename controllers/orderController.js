@@ -2,7 +2,7 @@ const db = require('../config/db');
 
 // Create Order (User)
 exports.createOrder = async (req, res) => {
-  const { items, total_amount, shipping_address, phone, payment_method } = req.body;
+  const { items, total_amount, shipping_address, phone, payment_method, additional_notes } = req.body;
   const userId = req.user.id;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -21,8 +21,8 @@ exports.createOrder = async (req, res) => {
 
     // 1. Insert order record
     const [orderResult] = await connection.query(
-      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method) VALUES (?, ?, ?, ?, ?)',
-      [userId, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery']
+      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes) VALUES (?, ?, ?, ?, ?, ?)',
+      [userId, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery', additional_notes || null]
     );
     const orderId = orderResult.insertId;
 

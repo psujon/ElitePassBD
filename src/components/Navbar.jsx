@@ -1,18 +1,35 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { ShoppingCart, User, LogOut, ShieldAlert, ShoppingBag } from 'lucide-react';
+import { ShoppingCart, User, LogOut, ShieldAlert, ChevronDown } from 'lucide-react';
+import { api } from '../utils/api';
 
 export default function Navbar({ onCartClick }) {
   const { user, logout, isAdmin } = useAuth();
   const { cartCount } = useCart();
   const navigate = useNavigate();
 
+  const [categories, setCategories] = useState([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const data = await api.get('/products/categories');
+        setCategories(data || []);
+      } catch (err) {
+        console.error('Navbar category fetch failed:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
 
   return (
     <nav className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-slate-900 px-4 sm:px-6 py-4">
@@ -29,12 +46,47 @@ export default function Navbar({ onCartClick }) {
           <Link to="/" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
             Home
           </Link>
+
+          {/* Products Dropdown */}
+          <div 
+            className="relative"
+            onMouseEnter={() => setIsDropdownOpen(true)}
+            onMouseLeave={() => setIsDropdownOpen(false)}
+          >
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="text-sm font-medium text-slate-300 hover:text-white transition-colors flex items-center space-x-1 py-1 focus:outline-none cursor-pointer"
+            >
+              <span>Products</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isDropdownOpen && (
+              <div className="absolute left-0 mt-1 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-lg py-2 z-50 animate-fade-in">
+                {categories.length === 0 ? (
+                  <span className="block px-4 py-2 text-xs text-slate-500">No categories</span>
+                ) : (
+                  categories.map((cat) => (
+                    <Link
+                      key={cat.id}
+                      to={`/products?category=${encodeURIComponent(cat.name)}`}
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="block px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+                    >
+                      {cat.name}
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           <Link to="/about" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
             About Us
           </Link>
           <Link to="/contact" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
             Contact
           </Link>
+
 
           {/* User Links */}
           {user ? (

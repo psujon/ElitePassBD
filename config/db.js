@@ -166,6 +166,7 @@ async function createTables() {
   }
 
   console.log('Database tables verified/created successfully.');
+  await seedCategoriesAndProducts();
 }
 
 async function updateSchema() {
@@ -180,6 +181,12 @@ async function updateSchema() {
     if (orderColumns.length === 0) {
       await pool.query("ALTER TABLE orders ADD COLUMN cancel_reason VARCHAR(255) DEFAULT NULL");
       console.log("Added column 'cancel_reason' to 'orders' table.");
+    }
+
+    const [additionalNotesCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'additional_notes'");
+    if (additionalNotesCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN additional_notes TEXT DEFAULT NULL");
+      console.log("Added column 'additional_notes' to 'orders' table.");
     }
 
     const [prodColumns] = await pool.query("SHOW COLUMNS FROM products LIKE 'category_id'");
@@ -253,6 +260,178 @@ async function updateSchema() {
     }
   } catch (error) {
     console.error("Error updating database schema:", error.message);
+  }
+}
+
+async function seedCategoriesAndProducts() {
+  try {
+    const categories = [
+      'Windows',
+      'Microsoft Office',
+      'Antivirus',
+      'Creative Software',
+      'Subscription',
+      'Gift Card',
+      'VPN',
+      'AI Subscription'
+    ];
+
+    for (const cat of categories) {
+      await pool.query('INSERT IGNORE INTO categories (name) VALUES (?)', [cat]);
+    }
+
+    // Get categories with their IDs
+    const [catRows] = await pool.query('SELECT * FROM categories');
+    const catMap = {};
+    catRows.forEach(row => {
+      catMap[row.name] = row.id;
+    });
+
+    const productsToSeed = [
+      {
+        name: 'Office 365 Premium Subscription',
+        description: 'Office 365 Premium Family/Personal account for 1 year with authentic Microsoft activation.',
+        price: 950.00,
+        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Office-365-Pro-Plus-min-600x600.webp',
+        stock: 10,
+        category_name: 'Microsoft Office',
+        tags: 'Best Sellers, Office, Microsoft, Subscription',
+        additional_info: 'Includes 1TB OneDrive cloud storage. Direct download from official Microsoft portal.',
+        faqs: JSON.stringify([{ q: 'How many devices can I use?', a: 'Up to 5 devices simultaneously.' }]),
+        packages: JSON.stringify([{ duration: '1 Year', price: '950' }]),
+        device_options: 'Windows, Mac, Mobile',
+        activation_options: 'Shared, Personal'
+      },
+      {
+        name: 'Surfshark VPN 1 Year Subscription',
+        description: 'Surfshark VPN Premium Subscription with unlimited devices, high-speed servers, and complete privacy.',
+        price: 950.00,
+        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Surfshark-VPN-min-600x600.webp',
+        stock: 15,
+        category_name: 'VPN',
+        tags: 'Best Sellers, VPN, Privacy, Security',
+        additional_info: 'Unlimited devices support. Strict no-logs policy.',
+        faqs: JSON.stringify([{ q: 'Can I use it on Android TV?', a: 'Yes, Surfshark supports Android TV.' }]),
+        packages: JSON.stringify([{ duration: '1 Year', price: '950' }]),
+        device_options: 'All Devices',
+        activation_options: 'Shared Account'
+      },
+      {
+        name: 'Freepik Premium 1/12 Month',
+        description: 'High-quality vectors, stock photos, PSD, and templates with Freepik Premium subscription.',
+        price: 500.00,
+        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Freepik-Premium-min-600x600.webp',
+        stock: 0,
+        category_name: 'Subscription',
+        tags: 'Best Sellers, Graphic, Subscription, Designer',
+        additional_info: 'Premium assets download limit: 100 per day.',
+        faqs: JSON.stringify([{ q: 'Is it a personal email account?', a: 'No, this is a shared high-quality team access.' }]),
+        packages: JSON.stringify([{ duration: '1 Month', price: '500' }, { duration: '12 Months', price: '9800' }]),
+        device_options: 'Browser Only',
+        activation_options: 'Shared Access'
+      },
+      {
+        name: 'Windows 11 Pro Genuine Retail/OEM License Key',
+        description: 'Windows 11 Pro Retail/OEM License activation key. Lifetime valid, fast digital delivery.',
+        price: 799.00,
+        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Windows-11-Pro-min-600x600.webp',
+        stock: 20,
+        category_name: 'Windows',
+        tags: 'Best Sellers, Windows, Microsoft, OS',
+        additional_info: 'Single PC lifetime license. Bindable key. Supports both 32-bit and 64-bit.',
+        faqs: JSON.stringify([{ q: 'Is this upgradeable to future updates?', a: 'Yes, you will receive all official Microsoft updates.' }]),
+        packages: JSON.stringify([{ duration: 'Lifetime', price: '799' }]),
+        device_options: 'PC',
+        activation_options: 'OEM, Retail'
+      },
+      {
+        name: 'Windows 10 Pro Genuine Retail/OEM License Key',
+        description: 'Windows 10 Pro Retail/OEM License activation key. Fast delivery, lifetime activation.',
+        price: 699.00,
+        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Windows-10-Pro-min-600x600.webp',
+        stock: 25,
+        category_name: 'Windows',
+        tags: 'Best Sellers, Windows, Microsoft, OS',
+        additional_info: 'OEM/Retail online activation key. Global activation.',
+        faqs: JSON.stringify([{ q: 'Can I reactivate after reinstalling OS?', a: 'Yes, the key binds to your motherboard for digital activation.' }]),
+        packages: JSON.stringify([{ duration: 'Lifetime', price: '699' }]),
+        device_options: 'PC',
+        activation_options: 'OEM, Retail'
+      },
+      {
+        name: 'Autodesk Official Subscription',
+        description: 'Autodesk AutoCAD / Maya / 3ds Max student or commercial official subscription access.',
+        price: 300.00,
+        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Autodesk-Official-Subscription-min-600x600.webp',
+        stock: 12,
+        category_name: 'Creative Software',
+        tags: 'Creative, Autodesk, Engineering, Design',
+        additional_info: 'Activates on your own email. 1-year warranty.',
+        faqs: JSON.stringify([{ q: 'Is it official?', a: 'Yes, activated directly on Autodesk portal.' }]),
+        packages: JSON.stringify([{ duration: '1 Year', price: '300' }]),
+        device_options: 'PC, Mac',
+        activation_options: 'Personal Email'
+      },
+      {
+        name: 'Internet Download Manager (IDM) License Key',
+        description: 'Internet Download Manager (IDM) 1-Year or Lifetime registration serial license key.',
+        price: 244.00,
+        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/IDM-min-600x600.webp',
+        stock: 30,
+        category_name: 'Windows',
+        tags: 'Utility, Downloader, Windows',
+        additional_info: '5x faster downloads. Integrates with all major browsers.',
+        faqs: JSON.stringify([{ q: 'Is this lifetime?', a: 'We offer both 1-Year and Lifetime packages.' }]),
+        packages: JSON.stringify([{ duration: '1 Year', price: '120' }, { duration: 'Lifetime', price: '244' }]),
+        device_options: 'PC Only',
+        activation_options: 'Personal Registration'
+      },
+      {
+        name: 'Adobe Creative Cloud All Apps',
+        description: 'Adobe Creative Cloud All Apps subscription. Photoshop, Premiere, Illustrator on your own email.',
+        price: 244.00,
+        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Adobe-Creative-Cloud-min-600x600.webp',
+        stock: 15,
+        category_name: 'Creative Software',
+        tags: 'Creative, Adobe, Design, Photoshop',
+        additional_info: '100GB Cloud Storage included. Activates on your personal Adobe ID.',
+        faqs: JSON.stringify([{ q: 'How many devices can I log in?', a: 'Up to 2 devices simultaneously.' }]),
+        packages: JSON.stringify([{ duration: '1 Month', price: '120' }, { duration: '1 Year', price: '244' }]),
+        device_options: 'PC, Mac, iPad',
+        activation_options: 'Personal Account'
+      }
+    ];
+
+    for (const prod of productsToSeed) {
+      const categoryId = catMap[prod.category_name] || null;
+      // Check if product already exists by name
+      const [existing] = await pool.query('SELECT id FROM products WHERE name = ?', [prod.name]);
+      if (existing.length === 0) {
+        await pool.query(
+          `INSERT INTO products (
+            name, description, price, image_url, stock, category_id,
+            tags, additional_info, faqs, packages, device_options, activation_options
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            prod.name,
+            prod.description,
+            prod.price,
+            prod.image_url,
+            prod.stock,
+            categoryId,
+            prod.tags,
+            prod.additional_info,
+            prod.faqs,
+            prod.packages,
+            prod.device_options,
+            prod.activation_options
+          ]
+        );
+        console.log(`Seeded product: ${prod.name}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error seeding database categories and products:', error);
   }
 }
 

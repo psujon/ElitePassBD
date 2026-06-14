@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   Smartphone,
   DollarSign,
-  Mail
+  Mail,
+  FileText
 } from 'lucide-react';
 
 export default function Checkout() {
@@ -23,6 +24,7 @@ export default function Checkout() {
 
   // State fields
   const [address, setAddress] = useState('');
+  const [additionalNotes, setAdditionalNotes] = useState('');
   const [phone, setPhone] = useState(user?.whatsapp_number || '');
   const [deliveryEmail, setDeliveryEmail] = useState(user?.email || '');
   const [paymentMethod, setPaymentMethod] = useState('bkash');
@@ -83,7 +85,8 @@ export default function Checkout() {
         phone: phone,
         payment_method: paymentMethod === 'bkash'
           ? `bKash (No: ${bkashNumber}, TxID: ${bkashTxId})`
-          : paymentMethod
+          : paymentMethod,
+        additional_notes: additionalNotes
       };
 
       const res = await api.post('/orders', orderPayload);
@@ -136,6 +139,12 @@ export default function Checkout() {
                 <span className="text-slate-500">WhatsApp/Phone:</span>
                 <span className="text-slate-800 font-bold">{phone}</span>
               </div>
+              {additionalNotes && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Additional Notes:</span>
+                  <span className="text-slate-800 font-bold truncate max-w-[200px]">{additionalNotes}</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -275,6 +284,22 @@ export default function Checkout() {
                     required
                   />
                   <MapPin className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Additional Notes
+                </label>
+                <div className="relative">
+                  <textarea
+                    rows="2"
+                    value={additionalNotes}
+                    onChange={(e) => setAdditionalNotes(e.target.value)}
+                    placeholder="Enter any additional notes or instructions..."
+                    className="w-full text-sm bg-slate-50 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-colors resize-none"
+                  />
+                  <FileText className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
                 </div>
               </div>
 

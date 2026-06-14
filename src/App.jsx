@@ -24,6 +24,8 @@ import ContactSupport from './pages/ContactSupport';
 import ProductDetails from './pages/ProductDetails';
 import AboutUs from './pages/AboutUs';
 import RefundPolicy from './pages/RefundPolicy';
+import Products from './pages/Products';
+
 
 // Protected Route Guard (For Logged in Users)
 const ProtectedRoute = ({ children }) => {
@@ -61,6 +63,8 @@ function AppContent() {
           <Route path="/about" element={<AboutUs />} />
           <Route path="/refund-policy" element={<RefundPolicy />} />
           <Route path="/product/:id" element={<ProductDetails />} />
+          <Route path="/products" element={<Products />} />
+
 
           {/* User Dashboard & Order Tracking */}
           <Route

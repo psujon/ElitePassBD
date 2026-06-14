@@ -585,6 +585,12 @@ export default function UserDashboard() {
                         <MapPin className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
                         <span className="leading-relaxed">{trackingOrder.shipping_address}</span>
                       </div>
+                      {trackingOrder.additional_notes && (
+                        <div className="flex items-start space-x-2 text-slate-750 mt-1.5 bg-slate-50 border border-slate-200/80 rounded-lg p-2">
+                          <span className="text-xs shrink-0">📝</span>
+                          <span className="leading-relaxed"><strong>Notes:</strong> {trackingOrder.additional_notes}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2 text-left">
                       <span className="text-xxs font-bold text-slate-450 uppercase block tracking-wider">Contact Info</span>
