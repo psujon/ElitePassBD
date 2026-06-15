@@ -71,9 +71,65 @@ export default function Home() {
   };
 
   // Filter products for sections
-  const bestSellers = products.filter(p => p.tags && p.tags.toLowerCase().includes('best sellers')).slice(0, 5);
+  const bestSellers = products.filter(p => p.tags && p.tags.toLowerCase().includes('best sellers')).slice(0, 4);
   const windowsProducts = products.filter(p => p.category_name && p.category_name.toLowerCase() === 'windows').slice(0, 4);
   const subscriptionProducts = products.filter(p => p.category_name && p.category_name.toLowerCase() === 'subscription').slice(0, 4);
+
+  // Helper to format recent titles
+  const formatRecentTitle = (name, maxLen = 35) => {
+    if (!name) return "";
+    return name.length > maxLen ? name.substring(0, maxLen).trim() + "..." : name;
+  };
+
+  // Recent 2 Products (the products list is returned sorted by p.id DESC)
+  const recentProduct1 = products[0];
+  const recentProduct2 = products[1];
+
+  const recent1Link = recentProduct1 ? `/product/${recentProduct1.id}` : "/products?category=Subscription";
+  const recent1Badge = recentProduct1
+    ? (recentProduct1.discount_percent ? `SAVE ${recentProduct1.discount_percent}%` : "NEW ARRIVAL")
+    : "Up to 50%";
+  const recent1Title = recentProduct1
+    ? formatRecentTitle(recentProduct1.name).toUpperCase()
+    : "EDUCATION SUBSCRIPTION";
+  const recent1Image = recentProduct1?.image_url;
+
+  const recent2Link = recentProduct2 ? `/product/${recentProduct2.id}` : "/products?category=Microsoft%20Office";
+  const recent2Badge = recentProduct2
+    ? (recentProduct2.discount_percent ? `SAVE ${recentProduct2.discount_percent}%` : "NEW ARRIVAL")
+    : "Big 65% Offer";
+  const recent2Title = recentProduct2
+    ? formatRecentTitle(recentProduct2.name).toUpperCase()
+    : "OFFICE BUNDLE SALE";
+  const recent2Image = recentProduct2?.image_url;
+
+  // Dynamic Hot Selling Product
+  const hotProduct = products.filter(p => !!p.is_hot).sort((a, b) => b.id - a.id)[0];
+  const hotName = hotProduct?.name || "Internet Download Manager";
+  const hotImage = hotProduct?.image_url || "https://www.digitalproductsbd.com/wp-content/uploads/IDM-min-600x600.webp";
+  const hotSub = hotProduct?.category_name || "5x FASTER DOWNLOAD";
+  const hotCurrentPrice = hotProduct ? parseFloat(hotProduct.price) : 120.00;
+
+  const hasHotDiscount = hotProduct && hotProduct.discount_percent !== null && hotProduct.discount_percent !== undefined && parseInt(hotProduct.discount_percent) > 0;
+  const hotDiscountPercent = hasHotDiscount ? parseInt(hotProduct.discount_percent) : 45;
+  const hotOriginalPrice = hotProduct ? (hasHotDiscount ? (hotCurrentPrice / (1 - hotDiscountPercent / 100)) : (hotCurrentPrice * 1.45)) : 244.00;
+
+  // Split description sentences for checkmarks
+  let hotBullets = [];
+  if (hotProduct && hotProduct.description) {
+    hotBullets = hotProduct.description
+      .split(/[.\n]+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 12)
+      .slice(0, 3);
+  }
+  if (hotBullets.length === 0) {
+    hotBullets = [
+      "Fast Download (5x Faster)" + (hotProduct ? "" : " and resume support"),
+      "Lifetime Serial Key Activation Guarantee",
+      "Synchronized official updates and support"
+    ];
+  }
 
   // Carousel Slides Content
   const slides = [
@@ -150,10 +206,10 @@ export default function Home() {
 
   return (
     <div className="w-full bg-[#f8fafc] text-slate-800 py-6 text-left">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-full mx-auto px-4 sm:px-6">
 
         {/* ================= HERO & PROMOTIONS SECTION ================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
 
           {/* Left: Dynamic Carousel Slider */}
           <div className="lg:col-span-2 relative rounded-3xl overflow-hidden shadow-xs h-[420px] group bg-slate-900">
@@ -227,86 +283,120 @@ export default function Home() {
           {/* Right Column: Promos and Featured */}
           <div className="flex flex-col gap-6 h-[420px]">
 
-            {/* Promo 1: IDM Highlight Box */}
-            <div className="bg-white border border-slate-200/80 rounded-3xl p-5 flex flex-col justify-between flex-1 shadow-xs hover:border-slate-350 transition-colors">
+            {/* Promo 1: Dynamic Hot Selling Highlight Box */}
+            <div
+              onClick={() => {
+                if (hotProduct) {
+                  navigate(`/product/${hotProduct.id}`);
+                } else {
+                  navigate('/products?category=Windows');
+                }
+              }}
+              className="bg-white border border-slate-200/80 rounded-3xl p-5 flex flex-col justify-between flex-1 shadow-xs hover:border-slate-350 transition-colors cursor-pointer text-left"
+            >
               <div className="flex justify-between items-start gap-3">
                 <div className="flex gap-3">
                   <div className="w-12 h-12 bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
                     <img
-                      src="https://www.digitalproductsbd.com/wp-content/uploads/IDM-min-600x600.webp"
-                      alt="IDM logo"
+                      src={hotImage}
+                      alt={hotName}
                       className="w-10 h-10 object-cover"
                     />
                   </div>
-                  <div>
-                    <h2 className="text-sm font-extrabold text-slate-900">Internet Download Manager</h2>
-                    <span className="text-[10px] bg-red-150 text-red-655 font-extrabold px-2 py-0.5 rounded-full mt-1 inline-block">
-                      5x FASTER DOWNLOAD
+                  <div className="text-left">
+                    <h2 className="text-sm font-extrabold text-slate-900 line-clamp-1">{hotName}</h2>
+                    <span className="text-[10px] bg-red-150 text-red-655 font-extrabold px-2 py-0.5 rounded-full mt-1 inline-block uppercase tracking-wider">
+                      {hotSub}
                     </span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs text-slate-400 line-through block">244.00৳</span>
-                  <span className="text-sm font-extrabold text-blue-600">120.00৳</span>
+                <div className="text-right shrink-0">
+                  <span className="text-xs text-slate-400 line-through block">{hotOriginalPrice.toFixed(0)}৳</span>
+                  <span className="text-sm font-extrabold text-blue-600">{hotCurrentPrice.toFixed(0)}৳</span>
                 </div>
               </div>
 
-              <ul className="my-2.5 space-y-1 text-[11px] text-slate-500 font-semibold">
-                <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Fast Download (5x Faster)</li>
-                <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> IDM Lifetime Serial Key</li>
-                <li className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Synchronized with your email</li>
+              <ul className="my-2.5 space-y-1 text-[11px] text-slate-500 font-semibold text-left">
+                {hotBullets.map((bullet, idx) => (
+                  <li key={idx} className="flex items-center gap-1.5 line-clamp-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span>{bullet}</span>
+                  </li>
+                ))}
               </ul>
 
               <div className="flex justify-between items-center border-t border-slate-100 pt-3">
                 <div className="flex items-center gap-1 text-slate-500 text-[10px] font-bold">
                   <Phone className="w-3 h-3" />
-                  <span>01610-555228</span>
+                  <span>01925-112444</span>
                 </div>
-                <Link
-                  to="/products?category=Windows"
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-extrabold px-4 py-2 rounded-xl transition-all shadow-xs"
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (hotProduct) {
+                      addToCart(hotProduct, 1);
+                      navigate('/checkout');
+                    } else {
+                      navigate('/products?category=Windows');
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-extrabold px-4 py-2 rounded-xl transition-all shadow-xs cursor-pointer border-none"
                 >
                   Buy Now
-                </Link>
+                </button>
               </div>
             </div>
 
             {/* Promo 2: Stacking Two Half-Banners */}
             <div className="grid grid-cols-2 gap-4 h-[180px]">
 
-              {/* Education Subscription */}
+              {/* Education Subscription / Recent Product 1 */}
               <Link
-                to="/products?category=Subscription"
+                to={recent1Link}
                 className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-3xl flex flex-col justify-between hover:shadow-md transition-all relative overflow-hidden group"
               >
                 <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full filter blur-xl -z-10 group-hover:scale-110 transition-transform" />
                 <div>
-                  {/* <span className="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-md">
-                    Up to 50%
-                  </span> */}
-                  <h3 className="text-xs font-black tracking-tight mt-2 leading-snug">
-                    EDUCATION SUBSCRIPTION
+                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-md">
+                    {recent1Badge}
+                  </span>
+                  <h3 className="text-xs font-black tracking-tight mt-2 leading-snug max-w-[65%]">
+                    {recent1Title}
                   </h3>
                 </div>
+                {recent1Image && (
+                  <img
+                    src={recent1Image}
+                    alt={recent1Title}
+                    className="absolute bottom-3 right-3 w-20 h-20 object-cover rounded-2xl bg-white/15 p-1.5 shadow-md border border-white/10 group-hover:scale-110 transition-transform duration-300"
+                  />
+                )}
                 <span className="text-[10px] font-bold underline flex items-center gap-1">
                   View Details <ArrowRight className="w-3 h-3" />
                 </span>
               </Link>
 
-              {/* Big 65% Offer */}
+              {/* Big 65% Offer / Recent Product 2 */}
               <Link
-                to="/products?category=Microsoft%20Office"
+                to={recent2Link}
                 className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-3xl flex flex-col justify-between hover:shadow-md transition-all relative overflow-hidden group"
               >
                 <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full filter blur-xl -z-10 group-hover:scale-110 transition-transform" />
                 <div>
-                  {/* <span className="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-md">
-                    Big 65% Offer
-                  </span> */}
-                  <h3 className="text-xs font-black tracking-tight mt-2 leading-snug">
-                    OFFICE BUNDLE SALE
+                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-md">
+                    {recent2Badge}
+                  </span>
+                  <h3 className="text-xs font-black tracking-tight mt-2 leading-snug max-w-[65%]">
+                    {recent2Title}
                   </h3>
                 </div>
+                {recent2Image && (
+                  <img
+                    src={recent2Image}
+                    alt={recent2Title}
+                    className="absolute bottom-3 right-3 w-20 h-20 object-contain rounded-2xl bg-white/15 p-1.5 shadow-md border border-white/10 group-hover:scale-110 transition-transform duration-300"
+                  />
+                )}
                 <span className="text-[10px] font-bold underline flex items-center gap-1">
                   View Details <ArrowRight className="w-3 h-3" />
                 </span>
@@ -339,14 +429,15 @@ export default function Home() {
           ) : bestSellers.length === 0 ? (
             <div className="py-10 text-center text-slate-400">No best seller items found.</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {bestSellers.map((prod) => {
                 const currentPrice = parseFloat(prod.price);
                 const isOutOfStock = prod.stock === 0;
 
-                // Mock original price and discount percent
-                const originalPrice = Math.round(currentPrice * 1.45);
-                const discountPercent = Math.round((1 - (currentPrice / originalPrice)) * 100);
+                // Real original price and discount percent if specified
+                const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseInt(prod.discount_percent) > 0;
+                const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
+                const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
 
                 return (
                   <div
@@ -355,7 +446,7 @@ export default function Home() {
                     className="border border-slate-150 rounded-2xl p-3 bg-slate-50 flex flex-col justify-between hover:shadow-md hover:border-slate-300 transition-all cursor-pointer relative group"
                   >
                     {/* Discount Badge */}
-                    {!isOutOfStock && (
+                    {!isOutOfStock && hasDiscount && (
                       <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
                         -{discountPercent}%
                       </div>
@@ -403,7 +494,7 @@ export default function Home() {
                     <div className="mt-3 pt-2 border-t border-slate-150">
                       <div className="flex items-baseline gap-1.5 mb-2.5">
                         <span className="text-xs font-black text-blue-600">{currentPrice.toFixed(0)}৳</span>
-                        {!isOutOfStock && (
+                        {!isOutOfStock && hasDiscount && (
                           <span className="text-[10px] text-slate-400 line-through">{originalPrice.toFixed(0)}৳</span>
                         )}
                       </div>
@@ -465,6 +556,11 @@ export default function Home() {
                 const currentPrice = parseFloat(prod.price);
                 const isOutOfStock = prod.stock === 0;
 
+                // Real original price and discount percent if specified
+                const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseInt(prod.discount_percent) > 0;
+                const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
+                const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
+
                 // Fake eye view count based on id
                 const views = 200 + (prod.id * 83) % 300;
 
@@ -472,10 +568,17 @@ export default function Home() {
                   <div
                     key={prod.id}
                     onClick={() => handleProductClick(prod.id)}
-                    className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:shadow-md hover:border-slate-350 transition-all cursor-pointer flex flex-col group"
+                    className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:shadow-md hover:border-slate-350 transition-all cursor-pointer flex flex-col group relative"
                   >
                     {/* Image */}
                     <div className="aspect-square w-full bg-slate-50 border-b border-slate-100 flex items-center justify-center overflow-hidden relative">
+                      {/* Discount Badge */}
+                      {!isOutOfStock && hasDiscount && (
+                        <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                          -{discountPercent}%
+                        </div>
+                      )}
+
                       {prod.image_url ? (
                         <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover transition-transform group-hover:scale-103 duration-350" />
                       ) : (
@@ -504,7 +607,12 @@ export default function Home() {
                             <Eye className="w-3.5 h-3.5 text-slate-400" />
                             <span>{views}</span>
                           </div>
-                          <span className="text-blue-600 text-sm font-black">{currentPrice.toFixed(0)}৳</span>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-blue-600 text-sm font-black">{currentPrice.toFixed(0)}৳</span>
+                            {!isOutOfStock && hasDiscount && (
+                              <span className="text-[10px] text-slate-400 line-through font-normal">{originalPrice.toFixed(0)}৳</span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -539,7 +647,7 @@ export default function Home() {
           <div className="flex items-center justify-between border-b border-slate-200 pb-3.5 mb-6">
             <h2 className="text-md font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
               <span className="w-1.5 h-4 bg-blue-600 rounded-sm" />
-              Subscription
+              OTT Subscription
             </h2>
             <Link
               to="/products?category=Subscription"
@@ -559,6 +667,11 @@ export default function Home() {
                 const currentPrice = parseFloat(prod.price);
                 const isOutOfStock = prod.stock === 0;
 
+                // Real original price and discount percent if specified
+                const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseInt(prod.discount_percent) > 0;
+                const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
+                const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
+
                 // Fake eye view count based on id
                 const views = 150 + (prod.id * 97) % 300;
 
@@ -566,10 +679,17 @@ export default function Home() {
                   <div
                     key={prod.id}
                     onClick={() => handleProductClick(prod.id)}
-                    className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:shadow-md hover:border-slate-350 transition-all cursor-pointer flex flex-col group"
+                    className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:shadow-md hover:border-slate-350 transition-all cursor-pointer flex flex-col group relative"
                   >
                     {/* Image */}
                     <div className="aspect-square w-full bg-slate-50 border-b border-slate-100 flex items-center justify-center overflow-hidden relative">
+                      {/* Discount Badge */}
+                      {!isOutOfStock && hasDiscount && (
+                        <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                          -{discountPercent}%
+                        </div>
+                      )}
+
                       {prod.image_url ? (
                         <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover transition-transform group-hover:scale-103 duration-350" />
                       ) : (
@@ -598,7 +718,12 @@ export default function Home() {
                             <Eye className="w-3.5 h-3.5 text-slate-400" />
                             <span>{views}</span>
                           </div>
-                          <span className="text-blue-600 text-sm font-black">{currentPrice.toFixed(0)}৳</span>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-blue-600 text-sm font-black">{currentPrice.toFixed(0)}৳</span>
+                            {!isOutOfStock && hasDiscount && (
+                              <span className="text-[10px] text-slate-400 line-through font-normal">{originalPrice.toFixed(0)}৳</span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -781,7 +906,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="space-y-4 max-w-3xl mx-auto">
+          <div className="space-y-4 max-w-7xl mx-auto">
             {faqs.map((faq, idx) => {
               const isOpen = activeFaq === idx;
               return (

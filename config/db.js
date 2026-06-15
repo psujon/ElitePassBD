@@ -80,6 +80,15 @@ async function createTables() {
       image_url TEXT,
       stock INT DEFAULT 0,
       category_id INT DEFAULT NULL,
+      tags TEXT DEFAULT NULL,
+      additional_info TEXT DEFAULT NULL,
+      faqs TEXT DEFAULT NULL,
+      packages TEXT DEFAULT NULL,
+      device_options TEXT DEFAULT NULL,
+      activation_options TEXT DEFAULT NULL,
+      discount_percent INT DEFAULT NULL,
+      is_hot TINYINT DEFAULT 0,
+      is_highlighted TINYINT DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
@@ -257,6 +266,24 @@ async function updateSchema() {
     if (selectedActivationCols.length === 0) {
       await pool.query("ALTER TABLE order_items ADD COLUMN selected_activation VARCHAR(255) DEFAULT NULL");
       console.log("Added column 'selected_activation' to 'order_items' table.");
+    }
+
+    const [discountCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'discount_percent'");
+    if (discountCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN discount_percent INT DEFAULT NULL");
+      console.log("Added column 'discount_percent' to 'products' table.");
+    }
+
+    const [isHotCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'is_hot'");
+    if (isHotCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN is_hot TINYINT DEFAULT 0");
+      console.log("Added column 'is_hot' to 'products' table.");
+    }
+
+    const [isHighlightedCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'is_highlighted'");
+    if (isHighlightedCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN is_highlighted TINYINT DEFAULT 0");
+      console.log("Added column 'is_highlighted' to 'products' table.");
     }
   } catch (error) {
     console.error("Error updating database schema:", error.message);

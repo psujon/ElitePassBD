@@ -33,7 +33,7 @@ export default function Navbar({ onCartClick }) {
 
   return (
     <nav className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-slate-900 px-4 sm:px-6 py-4">
-      <div className="max-w-7xl mx-auto flex justify-between items-center">
+      <div className="max-w-full mx-auto flex justify-between items-center">
         {/* Brand Logo */}
         <Link to="/" className="flex items-center space-x-2 text-xl font-bold tracking-tight text-white">
           <span className="text-violet-500 font-extrabold text-2xl glow-primary">
@@ -48,7 +48,7 @@ export default function Navbar({ onCartClick }) {
           </Link>
 
           {/* Products Dropdown */}
-          <div 
+          <div
             className="relative"
             onMouseEnter={() => setIsDropdownOpen(true)}
             onMouseLeave={() => setIsDropdownOpen(false)}
@@ -103,7 +103,7 @@ export default function Navbar({ onCartClick }) {
                     <span>Admin</span>
                   </Link>
                 )}
-                
+
                 <Link
                   to="/dashboard"
                   className="flex items-center space-x-1 text-sm font-medium text-slate-300 hover:text-white transition-colors"
@@ -202,7 +202,7 @@ export default function Navbar({ onCartClick }) {
           >
             About Us
           </Link>
-          
+
           <Link
             to="/contact"
             onClick={() => setIsMobileMenuOpen(false)}
@@ -225,7 +225,7 @@ export default function Navbar({ onCartClick }) {
                     <span>Admin Panel</span>
                   </Link>
                 )}
-                
+
                 <Link
                   to="/dashboard"
                   onClick={() => setIsMobileMenuOpen(false)}

@@ -4,7 +4,7 @@ import { Shield, Sparkles, Zap, Headphones } from 'lucide-react';
 export default function AboutUs() {
   return (
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] text-slate-800 py-12 text-left animate-fade-in">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-8">
+      <div className="max-w-full mx-auto px-4 sm:px-6 space-y-8">
         {/* Title Section */}
         <div className="text-center space-y-3">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">

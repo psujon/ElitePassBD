@@ -84,7 +84,7 @@ exports.getMyOrders = async (req, res) => {
   try {
     // Fetch user orders
     const [orders] = await db.query(
-      'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC',
+      'SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC',
       [userId]
     );
 
@@ -157,7 +157,7 @@ exports.getAllOrders = async (req, res) => {
       `SELECT o.*, u.name as user_name, u.email as user_email 
        FROM orders o
        JOIN users u ON o.user_id = u.id
-       ORDER BY o.created_at DESC`
+       ORDER BY o.id DESC`
     );
 
     const ordersWithItems = [];

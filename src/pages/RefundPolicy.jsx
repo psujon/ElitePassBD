@@ -4,7 +4,7 @@ import { HelpCircle } from 'lucide-react';
 export default function RefundPolicy() {
   return (
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] text-slate-800 py-12 text-left animate-fade-in">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-8">
+      <div className="max-w-full mx-auto px-4 sm:px-6 space-y-8">
         {/* Title */}
         <div className="space-y-2.5 text-center sm:text-left">
           <h1 className="text-3xl font-extrabold text-slate-900">Refund Policy</h1>

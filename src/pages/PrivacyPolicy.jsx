@@ -4,7 +4,7 @@ import { Shield, Lock, Eye, FileText } from 'lucide-react';
 export default function PrivacyPolicy() {
   return (
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] text-slate-800 py-12 text-left animate-fade-in">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
+      <div className="max-w-full mx-auto px-4 sm:px-6">
         <div className="bg-white rounded-3xl p-8 md:p-10 border border-slate-200/80 shadow-xs">
           <div className="flex items-center space-x-3 mb-6">
             <div className="p-3 bg-violet-50 text-violet-600 border border-violet-100/60 rounded-2xl">

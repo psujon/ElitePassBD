@@ -10,6 +10,7 @@ import { CartProvider } from './context/CartContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import CartDrawer from './components/CartDrawer';
+import MobileBottomNav from './components/MobileBottomNav';
 
 // Pages
 import Home from './pages/Home';
@@ -46,7 +47,7 @@ function AppContent() {
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen container mx-auto pb-16 md:pb-0">
       {/* Global Navbar */}
       <Navbar onCartClick={() => setIsCartOpen(true)} />
 
@@ -106,6 +107,9 @@ function AppContent() {
 
       {/* Global Footer */}
       <Footer />
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav onCartClick={() => setIsCartOpen(true)} />
     </div>
   );
 }

@@ -29,6 +29,7 @@ export default function AdminDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Modal State for Product Create/Edit
   const [showProductModal, setShowProductModal] = useState(false);
@@ -45,7 +46,10 @@ export default function AdminDashboard() {
     faqs: [],
     packages: [],
     device_options: '',
-    activation_options: ''
+    activation_options: '',
+    discount_percent: '',
+    is_hot: false,
+    is_highlighted: false
   });
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null); // null means adding new
@@ -128,7 +132,10 @@ export default function AdminDashboard() {
         faqs: parseJSON(product.faqs, []),
         packages: parseJSON(product.packages, []),
         device_options: product.device_options || '',
-        activation_options: product.activation_options || ''
+        activation_options: product.activation_options || '',
+        discount_percent: product.discount_percent !== null && product.discount_percent !== undefined ? product.discount_percent : '',
+        is_hot: !!product.is_hot,
+        is_highlighted: !!product.is_highlighted
       });
     } else {
       setEditingProduct(null);
@@ -144,7 +151,10 @@ export default function AdminDashboard() {
         faqs: [],
         packages: [],
         device_options: '',
-        activation_options: ''
+        activation_options: '',
+        discount_percent: '',
+        is_hot: false,
+        is_highlighted: false
       });
     }
     setFormError('');
@@ -344,6 +354,34 @@ export default function AdminDashboard() {
     );
   });
 
+  // Pagination calculation
+  const itemsPerPage = 10;
+  const totalProductPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const activePage = Math.min(currentPage, totalProductPages || 1);
+  const displayedProducts = filteredProducts.slice(
+    (activePage - 1) * itemsPerPage,
+    activePage * itemsPerPage
+  );
+
+  const getPageNumbers = (current, total) => {
+    const pages = [];
+    const maxVisible = 5;
+    if (total <= maxVisible) {
+      for (let i = 1; i <= total; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      let start = Math.max(2, current - 1);
+      let end = Math.min(total - 1, current + 1);
+      if (current <= 2) end = 3;
+      if (current >= total - 1) start = total - 2;
+      if (start > 2) pages.push('...');
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (end < total - 1) pages.push('...');
+      pages.push(total);
+    }
+    return pages;
+  };
+
   if (loading) {
     return (
       <div className="h-[80vh] flex items-center justify-center">
@@ -533,8 +571,20 @@ export default function AdminDashboard() {
           {/* PRODUCTS TAB */}
           {activeTab === 'products' && (
             <div className="space-y-4 animate-fade-in text-left">
-              <div className="flex justify-between items-center pt-2">
-                <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700">Products Catalog ({products.length})</h3>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-left">
+                  <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700">Products Catalog ({products.length})</h3>
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={productSearchQuery}
+                    onChange={(e) => {
+                      setProductSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-xl px-3 py-1.5 text-xs text-slate-700 w-48 shadow-xs normal-case"
+                  />
+                </div>
                 <button
                   onClick={() => handleOpenProductModal()}
                   className="flex items-center space-x-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-98"
@@ -546,33 +596,22 @@ export default function AdminDashboard() {
 
               <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xxs tracking-wider border-b border-slate-200/60 whitespace-nowrap">
+                  <table className="w-full text-left text-xs border-collapse table-auto">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xxs tracking-wider border-b border-slate-200/60">
                       <tr>
-                        <th className="p-4">ID</th>
-                        <th className="p-4">
-                          <div className="flex items-center space-x-2">
-                            <span>Item Details</span>
-                            <input
-                              type="text"
-                              placeholder="Search..."
-                              value={productSearchQuery}
-                              onChange={(e) => setProductSearchQuery(e.target.value)}
-                              className="bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded px-2 py-0.5 text-[10px] font-normal text-slate-700 w-36 normal-case"
-                            />
-                          </div>
-                        </th>
-                        <th className="p-4">Category</th>
-                        <th className="p-4">Description</th>
-                        <th className="p-4">Price</th>
-                        <th className="p-4">Stock</th>
-                        <th className="p-4">Tags</th>
-                        <th className="p-4">Devices</th>
-                        <th className="p-4">Activation</th>
-                        <th className="p-4">Additional Info</th>
-                        <th className="p-4">Packages</th>
-                        <th className="p-4">FAQs</th>
-                        <th className="p-4 text-right">Actions</th>
+                        <th className="pl-4 pr-2 py-3 whitespace-nowrap">ID</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Item Details</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Category</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Description</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Price</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Stock</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Tags</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Devices</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Activation</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Additional Info</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Packages</th>
+                        <th className="px-2 py-3 whitespace-nowrap">FAQs</th>
+                        <th className="pl-2 pr-4 py-3 text-right whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -583,25 +622,37 @@ export default function AdminDashboard() {
                           </td>
                         </tr>
                       ) : (
-                        filteredProducts.map((prod) => (
-                          <tr key={prod.id} className="hover:bg-slate-50/40 transition-colors border-b border-slate-100 text-slate-700 font-medium text-xs whitespace-nowrap">
+                        displayedProducts.map((prod) => (
+                          <tr key={prod.id} className="hover:bg-slate-50/40 transition-colors border-b border-slate-100 text-slate-700 font-medium text-xs">
                             {/* 1. ID */}
-                            <td className="p-4 font-bold text-slate-800">#{prod.id}</td>
+                            <td className="pl-4 pr-2 py-3 font-bold text-slate-800 whitespace-nowrap">{prod.id}</td>
 
                             {/* 2. Item Details (Image & Name) */}
-                            <td className="p-4">
-                              <div className="flex items-center space-x-2.5">
+                            <td className="px-2 py-3">
+                              <div className="flex items-center space-x-2 shrink-0">
                                 {prod.image_url ? (
                                   <img src={prod.image_url} alt={prod.name} className="w-8 h-8 object-cover rounded-lg bg-slate-100 border border-slate-200/50 shrink-0" />
                                 ) : (
                                   <div className="w-8 h-8 bg-slate-100 border border-slate-200/50 rounded-lg flex items-center justify-center text-[9px] text-slate-400 shrink-0 font-bold">No Img</div>
                                 )}
-                                <span className="font-bold text-slate-850 truncate max-w-[150px]">{prod.name}</span>
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-slate-850 whitespace-normal break-words max-w-[110px]" title={prod.name}>
+                                    {prod.name}
+                                  </span>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    {!!prod.is_hot && (
+                                      <span className="text-[9px] bg-orange-100 text-orange-600 border border-orange-200 px-1 rounded font-bold">HOT</span>
+                                    )}
+                                    {!!prod.is_highlighted && (
+                                      <span className="text-[9px] bg-amber-100 text-amber-600 border border-amber-200 px-1 rounded font-bold">FEATURED</span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </td>
 
                             {/* 3. Category */}
-                            <td className="p-4">
+                            <td className="px-2 py-3 whitespace-nowrap">
                               {prod.category_name ? (
                                 <span className="bg-violet-50 text-violet-600 border border-violet-100/60 px-2 py-0.5 rounded-lg text-[10px] font-bold">{prod.category_name}</span>
                               ) : (
@@ -610,15 +661,15 @@ export default function AdminDashboard() {
                             </td>
 
                             {/* 4. Description */}
-                            <td className="p-4 max-w-[200px] truncate text-slate-500 text-[11px]" title={prod.description}>
+                            <td className="px-2 py-3 max-w-[130px] whitespace-normal break-words line-clamp-2 text-slate-500 text-[11px]" title={prod.description}>
                               {prod.description}
                             </td>
 
                             {/* 5. Price */}
-                            <td className="p-4 font-bold text-slate-850">৳{parseFloat(prod.price).toFixed(2)}</td>
+                            <td className="px-2 py-3 font-bold text-slate-850 whitespace-nowrap">৳{parseFloat(prod.price).toFixed(2)}</td>
 
                             {/* 6. Stock */}
-                            <td className="p-4">
+                            <td className="px-2 py-3 whitespace-nowrap">
                               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${prod.stock === 0 ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-slate-100 text-slate-700'
                                 }`}>
                                 {prod.stock} left
@@ -626,11 +677,11 @@ export default function AdminDashboard() {
                             </td>
 
                             {/* 7. Tags */}
-                            <td className="p-4">
+                            <td className="px-2 py-3">
                               {prod.tags ? (
-                                <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                <div className="flex flex-wrap gap-1 max-w-[100px]">
                                   {prod.tags.split(',').map((tag, idx) => (
-                                    <span key={idx} className="bg-slate-100 text-slate-605 border border-slate-200/50 px-1.5 py-0.5 rounded text-[9px] font-bold">{tag.trim()}</span>
+                                    <span key={idx} className="bg-slate-100 text-slate-605 border border-slate-200/50 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap">{tag.trim()}</span>
                                   ))}
                                 </div>
                               ) : (
@@ -639,11 +690,11 @@ export default function AdminDashboard() {
                             </td>
 
                             {/* 8. Devices */}
-                            <td className="p-4">
+                            <td className="px-2 py-3">
                               {prod.device_options ? (
-                                <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                <div className="flex flex-wrap gap-1 max-w-[100px]">
                                   {prod.device_options.split(',').map((device, idx) => (
-                                    <span key={idx} className="bg-blue-50 text-blue-600 border border-blue-100/60 px-1.5 py-0.5 rounded text-[9px] font-bold">{device.trim()}</span>
+                                    <span key={idx} className="bg-blue-50 text-blue-600 border border-blue-100/60 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap">{device.trim()}</span>
                                   ))}
                                 </div>
                               ) : (
@@ -652,11 +703,11 @@ export default function AdminDashboard() {
                             </td>
 
                             {/* 9. Activation */}
-                            <td className="p-4">
+                            <td className="px-2 py-3">
                               {prod.activation_options ? (
-                                <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                <div className="flex flex-wrap gap-1 max-w-[100px]">
                                   {prod.activation_options.split(',').map((opt, idx) => (
-                                    <span key={idx} className="bg-emerald-50 text-emerald-600 border border-emerald-100/60 px-1.5 py-0.5 rounded text-[9px] font-bold">{opt.trim()}</span>
+                                    <span key={idx} className="bg-emerald-50 text-emerald-600 border border-emerald-100/60 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap">{opt.trim()}</span>
                                   ))}
                                 </div>
                               ) : (
@@ -665,18 +716,18 @@ export default function AdminDashboard() {
                             </td>
 
                             {/* 10. Additional Info */}
-                            <td className="p-4 max-w-[180px] truncate text-slate-500 text-[11px]" title={prod.additional_info}>
+                            <td className="px-2 py-3 max-w-[110px] whitespace-normal break-words line-clamp-2 text-slate-500 text-[11px]" title={prod.additional_info}>
                               {prod.additional_info || <span className="text-slate-450 italic">-</span>}
                             </td>
 
                             {/* 11. Packages */}
-                            <td className="p-4">
+                            <td className="px-2 py-3">
                               {prod.packages && prod.packages.length > 0 ? (
-                                <div className="space-y-1 max-w-[150px]">
+                                <div className="space-y-1 max-w-[100px] whitespace-normal">
                                   {prod.packages.map((pkg, idx) => (
-                                    <div key={idx} className="text-[10px] text-slate-600 flex justify-between gap-2 border-b border-slate-100 pb-0.5">
-                                      <span className="text-slate-500">{pkg.duration}</span>
-                                      <span className="font-extrabold text-violet-605">৳{parseFloat(pkg.price).toFixed(0)}</span>
+                                    <div key={idx} className="text-[10px] text-slate-600 flex justify-between gap-1 border-b border-slate-100 pb-0.5">
+                                      <span className="text-slate-500 truncate">{pkg.duration}</span>
+                                      <span className="font-extrabold text-violet-605 whitespace-nowrap">৳{parseFloat(pkg.price).toFixed(0)}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -686,7 +737,7 @@ export default function AdminDashboard() {
                             </td>
 
                             {/* 12. FAQs */}
-                            <td className="p-4">
+                            <td className="px-2 py-3 whitespace-nowrap">
                               {prod.faqs && prod.faqs.length > 0 ? (
                                 <span className="text-[10px] text-slate-650 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded font-bold cursor-help" title={prod.faqs.map(f => `Q: ${f.q}\nA: ${f.a}`).join('\n\n')}>
                                   {prod.faqs.length} FAQs
@@ -697,7 +748,7 @@ export default function AdminDashboard() {
                             </td>
 
                             {/* 13. Actions */}
-                            <td className="p-4 text-right space-x-1.5">
+                            <td className="flex flex-col gap-3 items-center justify-center py-3">
                               <button
                                 onClick={() => handleOpenProductModal(prod)}
                                 className="p-2 bg-slate-50 hover:bg-violet-55 hover:text-violet-650 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer inline-block"
@@ -717,6 +768,64 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {totalProductPages > 1 && (
+                  <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4 bg-slate-50/50">
+                    <div className="text-xxs text-slate-500 font-semibold uppercase tracking-wider">
+                      Showing <span className="font-extrabold text-slate-750">{(activePage - 1) * itemsPerPage + 1}</span> to{' '}
+                      <span className="font-extrabold text-slate-750">
+                        {Math.min(activePage * itemsPerPage, filteredProducts.length)}
+                      </span>{' '}
+                      of <span className="font-extrabold text-slate-750">{filteredProducts.length}</span> items
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={activePage === 1}
+                        className={`px-3 py-1.5 rounded-lg border text-xxs font-bold uppercase tracking-wider transition-all cursor-pointer select-none ${activePage === 1
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          : 'bg-white text-slate-650 border-slate-200 hover:bg-slate-50 hover:text-slate-805'
+                          }`}
+                      >
+                        Prev
+                      </button>
+
+                      {getPageNumbers(activePage, totalProductPages).map((page, idx) => {
+                        if (page === '...') {
+                          return (
+                            <span key={idx} className="px-2 text-xxs font-bold text-slate-400">
+                              ...
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-7 h-7 rounded-lg text-xxs font-extrabold transition-all cursor-pointer select-none flex items-center justify-center ${activePage === page
+                              ? 'bg-red text-black border border-black shadow-xs shadow-violet-500/10'
+                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-805'
+                              }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalProductPages))}
+                        disabled={activePage === totalProductPages}
+                        className={`px-3 py-1.5 rounded-lg border text-xxs font-bold uppercase tracking-wider transition-all cursor-pointer select-none ${activePage === totalProductPages
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          : 'bg-white text-slate-650 border-slate-200 hover:bg-slate-50 hover:text-slate-805'
+                          }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1081,13 +1190,13 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Category (Optional)</label>
                   <select
                     value={productForm.category_id}
                     onChange={(e) => setProductForm({ ...productForm, category_id: e.target.value })}
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-805 cursor-pointer"
                   >
                     <option value="">No Category / Uncategorized</option>
                     {categories.map((cat) => (
@@ -1103,8 +1212,20 @@ export default function AdminDashboard() {
                     value={productForm.price}
                     onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
                     placeholder="1200"
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-805 placeholder-slate-400"
                     required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Discount (%) (Optional)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={productForm.discount_percent}
+                    onChange={(e) => setProductForm({ ...productForm, discount_percent: e.target.value })}
+                    placeholder="e.g. 10"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-805 placeholder-slate-400"
                   />
                 </div>
                 <div>
@@ -1114,7 +1235,7 @@ export default function AdminDashboard() {
                     value={productForm.stock}
                     onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
                     placeholder="50"
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-850 placeholder-slate-400"
                     required
                   />
                 </div>
@@ -1128,7 +1249,7 @@ export default function AdminDashboard() {
                     value={productForm.tags}
                     onChange={(e) => setProductForm({ ...productForm, tags: e.target.value })}
                     placeholder="e.g. AI tools, video editing"
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-850 placeholder-slate-400"
                   />
                 </div>
                 <div>
@@ -1138,7 +1259,7 @@ export default function AdminDashboard() {
                     value={productForm.device_options}
                     onChange={(e) => setProductForm({ ...productForm, device_options: e.target.value })}
                     placeholder="e.g. Phone, PC/MAC, Phone + PC"
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-850 placeholder-slate-400"
                   />
                 </div>
                 <div>
@@ -1148,8 +1269,32 @@ export default function AdminDashboard() {
                     value={productForm.activation_options}
                     onChange={(e) => setProductForm({ ...productForm, activation_options: e.target.value })}
                     placeholder="e.g. Readymade ID, Personal Email"
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-850 placeholder-slate-400"
                   />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2.5">
+                <span className="block text-xxs font-bold text-slate-500 uppercase tracking-wider">Product Badges / Special Labels</span>
+                <div className="flex flex-wrap gap-6 text-xs text-slate-700 font-semibold">
+                  <label className="flex items-center space-x-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={productForm.is_hot}
+                      onChange={(e) => setProductForm({ ...productForm, is_hot: e.target.checked })}
+                      className="w-4 h-4 rounded text-violet-600 focus:ring-violet-500 border-slate-300 cursor-pointer"
+                    />
+                    <span>🔥 Hot Selling</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={productForm.is_highlighted}
+                      onChange={(e) => setProductForm({ ...productForm, is_highlighted: e.target.checked })}
+                      className="w-4 h-4 rounded text-violet-600 focus:ring-violet-500 border-slate-300 cursor-pointer"
+                    />
+                    <span>⭐ Highlighted Product</span>
+                  </label>
                 </div>
               </div>
 

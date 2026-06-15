@@ -54,7 +54,7 @@ export default function ContactSupport() {
 
   return (
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] text-slate-800 py-12 text-left animate-fade-in">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+      <div className="max-w-full mx-auto px-4 sm:px-6">
         <div className="mb-10 text-center">
           <span className="text-xxs font-bold text-violet-600 bg-violet-50 border border-violet-100/60 px-3 py-1 rounded-full uppercase tracking-wider">
             Help Desk

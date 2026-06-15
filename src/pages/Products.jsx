@@ -84,15 +84,15 @@ export default function Products() {
     const matchesSearch = prod.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prod.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPrice = maxPrice ? parseFloat(prod.price) <= parseFloat(maxPrice) : true;
-    const matchesCategory = selectedCategory === 'All' || 
+    const matchesCategory = selectedCategory === 'All' ||
       (prod.category_name && prod.category_name.toLowerCase() === selectedCategory.toLowerCase());
     return matchesSearch && matchesPrice && matchesCategory;
   });
 
   return (
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f8fafc] text-slate-800 py-10 text-left">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        
+      <div className="max-w-full mx-auto px-4 sm:px-6">
+
         {/* Header Title */}
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -139,7 +139,7 @@ export default function Products() {
 
         {/* Main Grid Layout */}
         <div className="flex flex-col md:flex-row gap-8">
-          
+
           {/* Sidebar Filters */}
           <div className="w-full md:w-64 shrink-0 text-left">
             {/* Mobile Categories Tags Scroll */}
@@ -150,11 +150,10 @@ export default function Products() {
               <div className="flex flex-row overflow-x-auto gap-2 pb-2 scrollbar-none snap-x scroll-smooth">
                 <button
                   onClick={() => handleCategorySelect('All')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all cursor-pointer ${
-                    selectedCategory === 'All'
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all cursor-pointer ${selectedCategory === 'All'
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800'
-                  }`}
+                    }`}
                 >
                   All Products
                 </button>
@@ -162,11 +161,10 @@ export default function Products() {
                   <button
                     key={cat.id}
                     onClick={() => handleCategorySelect(cat.name)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all cursor-pointer ${
-                      selectedCategory.toLowerCase() === cat.name.toLowerCase()
+                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all cursor-pointer ${selectedCategory.toLowerCase() === cat.name.toLowerCase()
                         ? 'bg-blue-600 text-white shadow-sm'
                         : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800'
-                    }`}
+                      }`}
                   >
                     {cat.name}
                   </button>
@@ -182,16 +180,14 @@ export default function Products() {
               <div className="space-y-1.5">
                 <button
                   onClick={() => handleCategorySelect('All')}
-                  className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${
-                    selectedCategory === 'All'
+                  className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${selectedCategory === 'All'
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
-                  }`}
+                    }`}
                 >
                   <span>All Products</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold transition-colors ${
-                    selectedCategory === 'All' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-700'
-                  }`}>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold transition-colors ${selectedCategory === 'All' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-700'
+                    }`}>
                     {products.length}
                   </span>
                 </button>
@@ -203,16 +199,14 @@ export default function Products() {
                     <button
                       key={cat.id}
                       onClick={() => handleCategorySelect(cat.name)}
-                      className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${
-                        isActive
+                      className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${isActive
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
-                      }`}
+                        }`}
                     >
                       <span>{cat.name}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold transition-colors ${
-                        isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-700'
-                      }`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold transition-colors ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-700'
+                        }`}>
                         {count}
                       </span>
                     </button>
@@ -244,10 +238,11 @@ export default function Products() {
                 {filteredProducts.map((prod) => {
                   const currentPrice = parseFloat(prod.price);
                   const isOutOfStock = prod.stock === 0;
-                  
-                  // Mock original price and discount percent
-                  const originalPrice = Math.round(currentPrice * 1.45);
-                  const discountPercent = Math.round((1 - (currentPrice / originalPrice)) * 100);
+
+                  // Real original price and discount percent if specified
+                  const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseInt(prod.discount_percent) > 0;
+                  const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
+                  const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
 
                   return (
                     <div
@@ -256,7 +251,7 @@ export default function Products() {
                       className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden flex flex-col h-full cursor-pointer group shadow-xs hover:shadow-md hover:-translate-y-1 transition-all duration-300 relative"
                     >
                       {/* Discount Badge */}
-                      {!isOutOfStock && (
+                      {!isOutOfStock && hasDiscount && (
                         <div className="absolute top-3 left-3 z-10 bg-red-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md shadow-xs">
                           -{discountPercent}%
                         </div>
@@ -271,7 +266,7 @@ export default function Products() {
                             className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                           />
                         ) : (
-                          <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">No Image</span>
+                          <span className="text-slate-450 text-xs font-bold uppercase tracking-wider">No Image</span>
                         )}
 
                         {isOutOfStock && (
@@ -309,7 +304,7 @@ export default function Products() {
                           <span className="text-sm font-extrabold text-blue-600">
                             {currentPrice.toFixed(2)}৳
                           </span>
-                          {!isOutOfStock && (
+                          {!isOutOfStock && hasDiscount && (
                             <span className="text-xs text-slate-400 line-through">
                               {originalPrice.toFixed(2)}৳
                             </span>

@@ -33,7 +33,7 @@ export default function Footer() {
 
   return (
     <footer className="bg-white border-t border-slate-200 py-12 px-4 sm:px-6 mt-auto text-slate-800 text-left relative z-30">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-full mx-auto">
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-10">

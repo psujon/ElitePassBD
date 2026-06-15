@@ -36,7 +36,7 @@ exports.getAllProducts = async (req, res) => {
       SELECT p.*, c.name AS category_name 
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
-      ORDER BY p.created_at DESC
+      ORDER BY p.id DESC
     `);
     res.json(products.map(formatProduct));
   } catch (error) {
@@ -67,10 +67,11 @@ exports.getProductById = async (req, res) => {
 
 // Create product (Admin)
 exports.createProduct = async (req, res) => {
-  console.log('CREATE PRODUCT REQUEST BODY:', req.body);
-  const { 
+  // console.log('CREATE PRODUCT REQUEST BODY:', req.body);
+  const {
     name, description, price, image_url, stock, category_id,
-    tags, additional_info, faqs, packages, device_options, activation_options 
+    tags, additional_info, faqs, packages, device_options, activation_options,
+    discount_percent, is_hot, is_highlighted
   } = req.body;
 
   if (!name || !description || price === undefined || stock === undefined) {
@@ -81,12 +82,16 @@ exports.createProduct = async (req, res) => {
     const [result] = await db.query(
       `INSERT INTO products (
         name, description, price, image_url, stock, category_id, 
-        tags, additional_info, faqs, packages, device_options, activation_options
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        tags, additional_info, faqs, packages, device_options, activation_options,
+        discount_percent, is_hot, is_highlighted
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name, description, parseFloat(price), image_url || '', parseInt(stock), category_id || null,
         tags || null, additional_info || null, stringifyField(faqs), stringifyField(packages),
-        device_options || null, activation_options || null
+        device_options || null, activation_options || null,
+        discount_percent === undefined || discount_percent === '' || discount_percent === null ? null : parseInt(discount_percent),
+        is_hot ? 1 : 0,
+        is_highlighted ? 1 : 0
       ]
     );
 
@@ -103,10 +108,11 @@ exports.createProduct = async (req, res) => {
 // Update product (Admin)
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-  console.log('UPDATE PRODUCT REQUEST BODY:', req.body);
-  const { 
+  // console.log('UPDATE PRODUCT REQUEST BODY:', req.body);
+  const {
     name, description, price, image_url, stock, category_id,
-    tags, additional_info, faqs, packages, device_options, activation_options 
+    tags, additional_info, faqs, packages, device_options, activation_options,
+    discount_percent, is_hot, is_highlighted
   } = req.body;
 
   if (!name || !description || price === undefined || stock === undefined) {
@@ -117,12 +123,16 @@ exports.updateProduct = async (req, res) => {
     const [result] = await db.query(
       `UPDATE products SET 
         name = ?, description = ?, price = ?, image_url = ?, stock = ?, category_id = ?, 
-        tags = ?, additional_info = ?, faqs = ?, packages = ?, device_options = ?, activation_options = ? 
+        tags = ?, additional_info = ?, faqs = ?, packages = ?, device_options = ?, activation_options = ?,
+        discount_percent = ?, is_hot = ?, is_highlighted = ?
       WHERE id = ?`,
       [
         name, description, parseFloat(price), image_url || '', parseInt(stock), category_id || null,
         tags || null, additional_info || null, stringifyField(faqs), stringifyField(packages),
         device_options || null, activation_options || null,
+        discount_percent === undefined || discount_percent === '' || discount_percent === null ? null : parseInt(discount_percent),
+        is_hot ? 1 : 0,
+        is_highlighted ? 1 : 0,
         id
       ]
     );
@@ -143,7 +153,7 @@ exports.deleteProduct = async (req, res) => {
   const { id } = req.params;
   try {
     const [result] = await db.query('DELETE FROM products WHERE id = ?', [id]);
-    
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Product not found to delete.' });
     }
@@ -153,8 +163,8 @@ exports.deleteProduct = async (req, res) => {
     console.error('Delete product error:', error);
     // If the product is linked in order items, we might get a foreign key constraint error.
     if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-      return res.status(400).json({ 
-        message: 'Cannot delete product because it has associated customer orders. Set its stock to 0 instead.' 
+      return res.status(400).json({
+        message: 'Cannot delete product because it has associated customer orders. Set its stock to 0 instead.'
       });
     }
     res.status(500).json({ message: 'Database error occurred while deleting product.' });
