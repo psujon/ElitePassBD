@@ -518,7 +518,7 @@ export default function Home() {
                             onClick={(e) => handleOrderNow(e, prod)}
                             className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
                           >
-                            Buy
+                            Buy Now
                           </button>
                         </div>
                       )}
@@ -630,7 +630,7 @@ export default function Home() {
                           disabled={isOutOfStock}
                           className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                         >
-                          Order Now
+                          Buy Now
                         </button>
                       </div>
                     </div>
@@ -741,7 +741,7 @@ export default function Home() {
                           disabled={isOutOfStock}
                           className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                         >
-                          Order Now
+                          Buy Now
                         </button>
                       </div>
                     </div>

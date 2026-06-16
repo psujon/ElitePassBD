@@ -25,7 +25,7 @@ export default function Register() {
       setLoading(true);
       setError('');
       await api.post('/auth/register', { name, email, password, whatsappNumber });
-      
+
       setSuccess('Account created successfully! Redirecting to login...');
       setTimeout(() => {
         navigate('/login');
@@ -43,12 +43,12 @@ export default function Register() {
       <div className="max-w-md w-full mx-auto px-4">
         <div className="bg-white border border-slate-200/80 rounded-2xl p-8 shadow-xs animate-fade-in">
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-extrabold text-slate-805 tracking-tight">
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
               Create Account
             </h2>
-            <p className="text-slate-500 text-xs mt-2">
+            {/* <p className="text-slate-900 text-xs mt-2">
               Register to track purchases and products
-            </p>
+            </p> */}
           </div>
 
           {error && (

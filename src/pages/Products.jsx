@@ -151,8 +151,8 @@ export default function Products() {
                 <button
                   onClick={() => handleCategorySelect('All')}
                   className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all cursor-pointer ${selectedCategory === 'All'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800'
                     }`}
                 >
                   All Products
@@ -162,8 +162,8 @@ export default function Products() {
                     key={cat.id}
                     onClick={() => handleCategorySelect(cat.name)}
                     className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all cursor-pointer ${selectedCategory.toLowerCase() === cat.name.toLowerCase()
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800'
                       }`}
                   >
                     {cat.name}
@@ -181,8 +181,8 @@ export default function Products() {
                 <button
                   onClick={() => handleCategorySelect('All')}
                   className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${selectedCategory === 'All'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
                     }`}
                 >
                   <span>All Products</span>
@@ -200,8 +200,8 @@ export default function Products() {
                       key={cat.id}
                       onClick={() => handleCategorySelect(cat.name)}
                       className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${isActive
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
                         }`}
                     >
                       <span>{cat.name}</span>
@@ -331,7 +331,7 @@ export default function Products() {
                               onClick={(e) => handleOrderNow(e, prod)}
                               className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98]"
                             >
-                              Buy
+                              Buy Now
                             </button>
                           </div>
                         )}

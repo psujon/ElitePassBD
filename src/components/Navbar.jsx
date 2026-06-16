@@ -71,8 +71,8 @@ export default function Navbar({ onCartClick }) {
         </Link>
 
         {/* Desktop Navigation Links */}
-        <div className="hidden md:flex items-center space-x-6">
-          <Link to="/" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+        <div className="hidden md:flex items-center space-x-3">
+          <Link to="/" className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200">
             Home
           </Link>
 
@@ -84,13 +84,13 @@ export default function Navbar({ onCartClick }) {
           >
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="text-sm font-medium text-slate-300 hover:text-white transition-colors flex items-center space-x-1 py-1 focus:outline-none cursor-pointer"
+              className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200 flex items-center space-x-1 focus:outline-none cursor-pointer"
             >
               <span>Products</span>
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
             {isDropdownOpen && (
-              <div className="absolute left-0 mt-1 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-lg py-2 z-50 animate-fade-in before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-3">
+              <div className="absolute left-0 mt-1.5 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-lg py-2 z-50 animate-fade-in before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-3">
                 {categories.length === 0 ? (
                   <span className="block px-4 py-2 text-xs text-slate-500">No categories</span>
                 ) : (
@@ -99,7 +99,7 @@ export default function Navbar({ onCartClick }) {
                       key={cat.id}
                       to={`/products?category=${encodeURIComponent(cat.name)}`}
                       onClick={handleDropdownItemClick}
-                      className="block px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+                      className="block px-4 py-2 mx-1.5 my-0.5 text-xs font-semibold text-slate-300 hover:bg-violet-500/10 hover:text-violet-400 rounded-lg transition-all duration-200"
                     >
                       {cat.name}
                     </Link>
@@ -109,10 +109,10 @@ export default function Navbar({ onCartClick }) {
             )}
           </div>
 
-          <Link to="/about" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+          <Link to="/about" className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200">
             About Us
           </Link>
-          <Link to="/contact" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+          <Link to="/contact" className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200">
             Contact
           </Link>
         </div>
@@ -120,13 +120,13 @@ export default function Navbar({ onCartClick }) {
         {/* Right Action Items */}
         <div className="flex items-center space-x-4">
           {/* User Links (Desktop Only) */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-2">
             {user ? (
               <>
                 {isAdmin && (
                   <Link
                     to="/admin"
-                    className="flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 bg-red-950/40 text-red-400 border border-red-900 rounded-full hover:bg-red-900/40 transition-colors"
+                    className="flex items-center space-x-1 text-xs font-semibold px-2.5 py-1 bg-red-950/40 text-red-400 border border-red-900 rounded-full hover:bg-red-900/40 hover:text-red-300 transition-colors"
                   >
                     <ShieldAlert className="w-3 h-3" />
                     <span>Admin</span>
@@ -135,7 +135,7 @@ export default function Navbar({ onCartClick }) {
 
                 <Link
                   to="/dashboard"
-                  className="flex items-center space-x-1 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                  className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200 flex items-center space-x-1.5"
                   title="My Account"
                 >
                   <User className="w-4 h-4 text-violet-400" />
@@ -144,7 +144,7 @@ export default function Navbar({ onCartClick }) {
 
                 <button
                   onClick={handleLogout}
-                  className="text-slate-400 hover:text-red-400 transition-colors p-1 cursor-pointer"
+                  className="px-3.5 py-2 text-slate-450 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-200 flex items-center justify-center cursor-pointer"
                   title="Logout"
                 >
                   <LogOut className="w-4 h-4" />
@@ -153,9 +153,9 @@ export default function Navbar({ onCartClick }) {
             ) : (
               <Link
                 to="/login"
-                className="text-sm font-medium text-slate-300 hover:text-white transition-colors flex items-center space-x-1"
+                className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200 flex items-center space-x-1.5"
               >
-                <User className="w-4 h-4" />
+                <User className="w-4 h-4 text-violet-400" />
                 <span>My Account</span>
               </Link>
             )}
@@ -192,21 +192,21 @@ export default function Navbar({ onCartClick }) {
 
       {/* Mobile Menu Dropdown */}
       {isMobileMenuOpen && (
-        <div className="md:hidden mt-4 pt-4 border-t border-slate-900 flex flex-col space-y-4 animate-fade-in">
+        <div className="md:hidden mt-4 pt-4 border-t border-slate-900 flex flex-col space-y-2.5 animate-fade-in">
           <Link
             to="/"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="text-sm font-medium text-slate-300 hover:text-white transition-colors py-1"
+            className="px-3 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200 block"
           >
             Home
           </Link>
 
           {/* Products Section in Mobile Menu */}
-          <div className="flex flex-col space-y-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <div className="flex flex-col space-y-1.5 px-3">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider pl-1">
               Products
             </span>
-            <div className="flex flex-col space-y-2 pl-3 border-l border-slate-900">
+            <div className="flex flex-col space-y-1.5 pl-3 border-l border-slate-900">
               {categories.length === 0 ? (
                 <span className="text-xs text-slate-500">No categories</span>
               ) : (
@@ -215,7 +215,7 @@ export default function Navbar({ onCartClick }) {
                     key={cat.id}
                     to={`/products?category=${encodeURIComponent(cat.name)}`}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-sm font-medium text-slate-400 hover:text-white transition-colors"
+                    className="px-3 py-1.5 text-sm font-semibold text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-all duration-200 block"
                   >
                     {cat.name}
                   </Link>
@@ -227,7 +227,7 @@ export default function Navbar({ onCartClick }) {
           <Link
             to="/about"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="text-sm font-medium text-slate-300 hover:text-white transition-colors py-1"
+            className="px-3 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200 block"
           >
             About Us
           </Link>
@@ -235,20 +235,20 @@ export default function Navbar({ onCartClick }) {
           <Link
             to="/contact"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="text-sm font-medium text-slate-300 hover:text-white transition-colors py-1"
+            className="px-3 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200 block"
           >
             Contact
           </Link>
 
           {/* User Links in Mobile Menu */}
-          <div className="border-t border-slate-900 pt-4 flex flex-col space-y-3">
+          <div className="border-t border-slate-900 pt-3 flex flex-col space-y-2">
             {user ? (
               <>
                 {isAdmin && (
                   <Link
                     to="/admin"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center space-x-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors py-1"
+                    className="flex items-center space-x-2 px-3 py-2 text-sm font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all duration-200"
                   >
                     <ShieldAlert className="w-4 h-4" />
                     <span>Admin Panel</span>
@@ -258,7 +258,7 @@ export default function Navbar({ onCartClick }) {
                 <Link
                   to="/dashboard"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center space-x-2 text-sm font-medium text-slate-300 hover:text-white transition-colors py-1"
+                  className="flex items-center space-x-2 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200"
                 >
                   <User className="w-4 h-4 text-violet-400" />
                   <span>My Account</span>
@@ -269,7 +269,7 @@ export default function Navbar({ onCartClick }) {
                     setIsMobileMenuOpen(false);
                     handleLogout();
                   }}
-                  className="flex items-center space-x-2 text-sm font-medium text-slate-400 hover:text-red-400 transition-colors py-1 text-left w-full cursor-pointer"
+                  className="flex items-center space-x-2 px-3 py-2 text-sm font-semibold text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-200 text-left w-full cursor-pointer border-none bg-transparent"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Logout</span>
@@ -279,7 +279,7 @@ export default function Navbar({ onCartClick }) {
               <Link
                 to="/login"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center space-x-2 text-sm font-medium text-slate-300 hover:text-white transition-colors py-1"
+                className="flex items-center space-x-2 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200"
               >
                 <User className="w-4 h-4 text-violet-400" />
                 <span>My Account</span>
