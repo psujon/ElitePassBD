@@ -78,14 +78,7 @@ function AppContent() {
           />
 
           {/* Checkout Page */}
-          <Route
-            path="/checkout"
-            element={
-              <ProtectedRoute>
-                <Checkout />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/checkout" element={<Checkout />} />
 
           {/* Admin Product CRUD & Order Updates */}
           <Route

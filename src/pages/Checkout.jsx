@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
@@ -21,12 +21,23 @@ export default function Checkout() {
   const { cartItems, cartTotal, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isGuestCheckout = location.state?.isGuest;
+
+  // Protect page: if not logged in and not doing guest checkout, redirect to login
+  useEffect(() => {
+    if (!user && !isGuestCheckout) {
+      navigate('/login', { state: { from: location } });
+    }
+  }, [user, isGuestCheckout, navigate, location]);
 
   // State fields
   const [address, setAddress] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [phone, setPhone] = useState(user?.whatsapp_number || '');
-  const [deliveryEmail, setDeliveryEmail] = useState(user?.email || '');
+  const [deliveryEmail, setDeliveryEmail] = useState('');
+  const [guestName, setGuestName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('bkash');
   const [bkashNumber, setBkashNumber] = useState('');
   const [bkashTxId, setBkashTxId] = useState('');
@@ -41,29 +52,31 @@ export default function Checkout() {
     }
   }, [cartItems, orderSuccess, navigate]);
 
-  // Pre-fill phone if user info loads late
+  // Pre-fill if user info loads late
   useEffect(() => {
-    if (user?.whatsapp_number && !phone) {
-      setPhone(user.whatsapp_number);
+    if (user) {
+      if (user.whatsapp_number && !phone) {
+        setPhone(user.whatsapp_number);
+      }
     }
   }, [user, phone]);
-
-  useEffect(() => {
-    if (user?.email && !deliveryEmail) {
-      setDeliveryEmail(user.email);
-    }
-  }, [user, deliveryEmail]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!address || !phone || !deliveryEmail) {
-      setError('Please provide shipping address, phone number, and email for delivery keys.');
+    if (!phone || !deliveryEmail) {
+      setError('Please provide phone number, and email for delivery keys.');
       return;
     }
 
-    if (paymentMethod === 'bkash' && (!bkashNumber || !bkashTxId)) {
-      setError('Please provide your bKash number and transaction ID.');
+    if (!user && !guestName) {
+      setError('Please provide your full name.');
+      return;
+    }
+
+    if (['bkash', 'nagad', 'rocket'].includes(paymentMethod) && (!bkashNumber || !bkashTxId)) {
+      const methodName = paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket';
+      setError(`Please provide your ${methodName} number and transaction ID.`);
       return;
     }
 
@@ -81,15 +94,25 @@ export default function Checkout() {
           selected_activation: item.selected_activation || null
         })),
         total_amount: cartTotal,
-        shipping_address: `Delivery Email: ${deliveryEmail} | Address: ${address}`,
+        shipping_address: address,
         phone: phone,
-        payment_method: paymentMethod === 'bkash'
-          ? `bKash (No: ${bkashNumber}, TxID: ${bkashTxId})`
+        payment_method: ['bkash', 'nagad', 'rocket'].includes(paymentMethod)
+          ? `${paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} (No: ${bkashNumber}, TxID: ${bkashTxId})`
           : paymentMethod,
-        additional_notes: additionalNotes
+        additional_notes: additionalNotes,
+        delivery_email: deliveryEmail
       };
 
-      const res = await api.post('/orders', orderPayload);
+      let res;
+      if (user) {
+        res = await api.post('/orders', orderPayload);
+      } else {
+        res = await api.post('/orders/guest', {
+          ...orderPayload,
+          guest_name: guestName,
+          guest_email: deliveryEmail
+        });
+      }
 
       setOrderSuccess({
         orderId: res.orderId,
@@ -128,7 +151,9 @@ export default function Checkout() {
               <div className="flex justify-between">
                 <span className="text-slate-500">Payment Method:</span>
                 <span className="text-pink-600 font-bold">
-                  {paymentMethod === 'bkash' ? `bKash (No: ${bkashNumber}, TxID: ${bkashTxId})` : paymentMethod}
+                  {['bkash', 'nagad', 'rocket'].includes(paymentMethod)
+                    ? `${paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} (No: ${bkashNumber}, TxID: ${bkashTxId})`
+                    : paymentMethod}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -209,24 +234,46 @@ export default function Checkout() {
                   <label className="block text-xxs font-bold text-slate-450 uppercase tracking-wider mb-1.5">
                     Your Full Name
                   </label>
-                  <input
-                    type="text"
-                    value={user?.name || ''}
-                    disabled
-                    className="w-full text-sm bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-500 cursor-not-allowed opacity-80"
-                  />
+                  {user ? (
+                    <input
+                      type="text"
+                      value={user.name}
+                      disabled
+                      className="w-full text-sm bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-500 cursor-not-allowed opacity-80"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      placeholder="Enter your full name"
+                      className="w-full text-sm bg-slate-50 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl px-4 py-2.5 text-slate-800"
+                      required
+                    />
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-xxs font-bold text-slate-455 uppercase tracking-wider mb-1.5">
                     Email Address
                   </label>
-                  <input
-                    type="text"
-                    value={user?.email || ''}
-                    disabled
-                    className="w-full text-sm bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-500 cursor-not-allowed opacity-80"
-                  />
+                  {user ? (
+                    <input
+                      type="text"
+                      value={user.email}
+                      disabled
+                      className="w-full text-sm bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-500 cursor-not-allowed opacity-80"
+                    />
+                  ) : (
+                    <input
+                      type="email"
+                      value={deliveryEmail}
+                      onChange={(e) => setDeliveryEmail(e.target.value)}
+                      placeholder=""
+                      className="w-full text-sm bg-slate-50 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl px-4 py-2.5 text-slate-800"
+                      required
+                    />
+                  )}
                 </div>
               </div>
 
@@ -239,7 +286,7 @@ export default function Checkout() {
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g. +88017XXXXXXXX"
+                    placeholder=""
                     className="w-full text-sm bg-slate-50 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-colors"
                     required
                   />
@@ -250,25 +297,27 @@ export default function Checkout() {
                 </p>
               </div>
 
-              <div>
-                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Email (For Delivery Keys)
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={deliveryEmail}
-                    onChange={(e) => setDeliveryEmail(e.target.value)}
-                    placeholder="Enter email address where we should deliver keys..."
-                    className="w-full text-sm bg-slate-50 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-colors"
-                    required
-                  />
-                  <Mail className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
+              {user && (
+                <div>
+                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Email (For Delivery Keys)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      value={deliveryEmail}
+                      onChange={(e) => setDeliveryEmail(e.target.value)}
+                      placeholder=""
+                      className="w-full text-sm bg-slate-50 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-colors"
+                      required
+                    />
+                    <Mail className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
+                  </div>
+                  <p className="text-slate-455 text-xs mt-1.5">
+                    Your digital codes / subscription activation keys will be sent to this email address.
+                  </p>
                 </div>
-                <p className="text-slate-455 text-xs mt-1.5">
-                  Your digital codes / subscription activation keys will be sent to this email address.
-                </p>
-              </div>
+              )}
 
               <div>
                 <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
@@ -279,9 +328,8 @@ export default function Checkout() {
                     rows="3"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Enter house no, street name, area/city details..."
+                    placeholder=""
                     className="w-full text-sm bg-slate-50 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-colors resize-none"
-                    required
                   />
                   <MapPin className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
                 </div>
@@ -309,28 +357,7 @@ export default function Checkout() {
                   <span>Payment Method</span>
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Cash on Delivery */}
-                  <label className={`flex items-start space-x-3 p-4 rounded-xl border cursor-pointer transition-all ${paymentMethod === 'Cash on Delivery'
-                    ? 'border-violet-500 bg-violet-50/50'
-                    : 'border-slate-200 bg-slate-50/30 hover:border-slate-350'
-                    }`}>
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="Cash on Delivery"
-                      disabled={true}
-                      checked={paymentMethod === 'Cash on Delivery'}
-                      onChange={() => setPaymentMethod('Cash on Delivery')}
-                      className="mt-1 accent-violet-600"
-                    />
-                    <div className="text-left">
-                      <span className="block text-sm font-bold text-slate-800">Cash on Delivery</span>
-                      <span className="block text-xs text-slate-500 mt-0.5">Pay upon key activation or receipt</span>
-                    </div>
-                  </label>
-
-                  {/* Bkash / Online Pay (Simulated) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <label className={`flex items-start space-x-3 p-4 rounded-xl border cursor-pointer transition-all ${paymentMethod === 'bkash'
                     ? 'border-pink-500 bg-pink-50/50'
                     : 'border-slate-200 bg-slate-50/30 hover:border-slate-355'
@@ -345,30 +372,69 @@ export default function Checkout() {
                     />
                     <div className="text-left">
                       <span className="block text-sm font-bold text-slate-800 flex items-center">
-                        <span>bKash / Nagad</span>
+                        <span>bKash</span>
                         <span className="ml-2 text-[8px] px-1 py-0.5 bg-pink-100 text-pink-600 rounded-md border border-pink-200 font-extrabold uppercase tracking-wide">Popular</span>
+                      </span>
+                      <span className="block text-xs text-slate-500 mt-0.5">Manual verification</span>
+                    </div>
+                  </label>
+                  <label className={`flex items-start space-x-3 p-4 rounded-xl border cursor-pointer transition-all ${paymentMethod === 'nagad'
+                    ? 'border-pink-500 bg-pink-50/50'
+                    : 'border-slate-200 bg-slate-50/30 hover:border-slate-355'
+                    }`}>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="nagad"
+                      checked={paymentMethod === 'nagad'}
+                      onChange={() => setPaymentMethod('nagad')}
+                      className="mt-1 accent-pink-600"
+                    />
+                    <div className="text-left">
+                      <span className="block text-sm font-bold text-slate-800 flex items-center">
+                        <span>Nagad</span>
+                      </span>
+                      <span className="block text-xs text-slate-500 mt-0.5">Manual verification</span>
+                    </div>
+                  </label>
+                  <label className={`flex items-start space-x-3 p-4 rounded-xl border cursor-pointer transition-all ${paymentMethod === 'rocket'
+                    ? 'border-pink-500 bg-pink-50/50'
+                    : 'border-slate-200 bg-slate-50/30 hover:border-slate-355'
+                    }`}>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="rocket"
+                      checked={paymentMethod === 'rocket'}
+                      onChange={() => setPaymentMethod('rocket')}
+                      className="mt-1 accent-pink-600"
+                    />
+                    <div className="text-left">
+                      <span className="block text-sm font-bold text-slate-800 flex items-center">
+                        <span>Rocket</span>
                       </span>
                       <span className="block text-xs text-slate-500 mt-0.5">Manual verification</span>
                     </div>
                   </label>
                 </div>
 
-                {/* bKash additional fields */}
-                {paymentMethod === 'bkash' && (
+                {['bkash', 'nagad', 'rocket'].includes(paymentMethod) && (
                   <div className="p-4 bg-pink-50 border border-pink-150 rounded-xl space-y-4 animate-fade-in">
                     <div className="p-3 bg-pink-100/50 border border-pink-200 rounded-lg text-xs text-pink-700">
-                      <p className="font-extrabold text-left">Simulated bKash Payment Instructions:</p>
+                      <p className="font-extrabold text-left">
+                        Simulated {paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} Payment Instructions:
+                      </p>
                       <p className="mt-1 text-slate-600 text-left leading-relaxed">
-                        1. Send the total amount <strong>৳{cartTotal.toFixed(2)}</strong> to bKash Personal: <strong>017********</strong>.
+                        1. Send the total amount <strong>৳{cartTotal.toFixed(2)}</strong> to {paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} Personal: <strong>017********</strong>.
                         <br />
-                        2. Input your bKash sender number and the Transaction ID below.
+                        2. Input your {paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} sender number and the Transaction ID below.
                       </p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="text-left">
                         <label className="block text-left text-xxs font-bold text-pink-600 uppercase tracking-wider mb-1.5">
-                          bKash Number
+                          {paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} Number
                         </label>
                         <input
                           type="text"
@@ -376,7 +442,7 @@ export default function Checkout() {
                           onChange={(e) => setBkashNumber(e.target.value)}
                           placeholder="e.g. 017XXXXXXXX"
                           className="w-full text-sm bg-white border border-slate-200 focus:border-pink-500 focus:outline-none rounded-xl px-4 py-2.5 text-slate-850 placeholder-slate-400 transition-colors"
-                          required={paymentMethod === 'bkash'}
+                          required={['bkash', 'nagad', 'rocket'].includes(paymentMethod)}
                         />
                       </div>
 
@@ -390,7 +456,7 @@ export default function Checkout() {
                           onChange={(e) => setBkashTxId(e.target.value)}
                           placeholder="e.g. TRX8462846"
                           className="w-full text-sm bg-white border border-slate-200 focus:border-pink-500 focus:outline-none rounded-xl px-4 py-2.5 text-slate-850 placeholder-slate-400 transition-colors"
-                          required={paymentMethod === 'bkash'}
+                          required={['bkash', 'nagad', 'rocket'].includes(paymentMethod)}
                         />
                       </div>
                     </div>

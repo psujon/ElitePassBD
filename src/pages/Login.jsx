@@ -282,6 +282,16 @@ export default function Login() {
                   </div>
                   <span className="pl-4">Sign In with Google</span>
                 </button>
+
+                {location.state?.from?.pathname === '/checkout' && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/checkout', { state: { isGuest: true } })}
+                    className="w-full mt-3 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl text-sm transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-xs"
+                  >
+                    <span>Checkout as Guest</span>
+                  </button>
+                )}
               </form>
 
               <div className="mt-6 text-center text-xs text-slate-500">
@@ -354,7 +364,7 @@ export default function Login() {
             </>
           )}
 
-          {/* VIEW: VERIFY OTP */}
+          {/* VIEW: VERIFY OTP */}g
           {view === 'verify' && (
             <>
               <div className="text-center mb-6">

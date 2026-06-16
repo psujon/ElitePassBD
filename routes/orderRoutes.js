@@ -5,6 +5,7 @@ const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 
 // User specific order routes
 router.post('/', authenticateToken, orderController.createOrder);
+router.post('/guest', orderController.createGuestOrder);
 router.get('/my-orders', authenticateToken, orderController.getMyOrders);
 router.get('/track/:id', authenticateToken, orderController.trackOrder);
 

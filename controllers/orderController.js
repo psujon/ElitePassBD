@@ -8,8 +8,8 @@ exports.createOrder = async (req, res) => {
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'Cart items are required to place an order.' });
   }
-  if (!shipping_address || !phone) {
-    return res.status(400).json({ message: 'Shipping address and phone number are required.' });
+  if (!phone) {
+    return res.status(400).json({ message: 'Phone number are required.' });
   }
 
   // Get database pool to perform transaction
@@ -281,6 +281,164 @@ exports.updateOrderStatus = async (req, res) => {
     await connection.rollback();
     console.error('Update order status transaction failed:', error.message);
     res.status(400).json({ message: error.message || 'Failed to update order status.' });
+  } finally {
+    connection.release();
+  }
+};
+
+const nodemailer = require('nodemailer');
+const bcrypt = require('bcryptjs');
+
+const sendGuestAccountEmail = async (email, name, password) => {
+  try {
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = process.env.SMTP_PORT || 587;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (smtpHost && smtpUser && smtpPass) {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: parseInt(smtpPort),
+        secure: smtpPort === '465',
+        auth: {
+          user: smtpUser,
+          pass: smtpPass
+        },
+        tls: {
+          rejectUnauthorized: false
+        }
+      });
+
+      await transporter.sendMail({
+        from: `"${process.env.APP_NAME || 'ElitePassBD'}" <${smtpUser}>`,
+        to: email,
+        subject: 'Your Account Credentials - ElitePassBD',
+        text: `Hello ${name},\n\nAn account has been created for you. Here are your login details:\nName: [${name}], email: [${email}], password: [${password}]\n\nYou can log in and view your order status here.`,
+        html: `<h3>Welcome to ElitePassBD</h3>
+               <p>Hello <strong>${name}</strong>,</p>
+               <p>An account has been created for you. Here are your temporary login credentials to track your orders:</p>
+               <p><strong>Login Details:</strong><br>
+                  Name: [${name}]<br>
+                  email: [${email}]<br>
+                  password: [${password}]
+               </p>
+               <p>Please log in and update your password under your profile settings.</p>`
+      });
+      console.log(`Guest credentials email sent successfully to ${email}`);
+    } else {
+      console.log('----------------------------');
+      console.log(`MOCK SMTP: Guest Credentials -> Name: [${name}], email: [${email}], password: [${password}]`);
+      console.log('----------------------------');
+    }
+  } catch (error) {
+    console.error('Failed to send guest credentials email:', error);
+    console.log('----------------------------');
+    console.log(`FALLBACK: Guest Credentials -> Name: [${name}], email: [${email}], password: [${password}]`);
+    console.log('----------------------------');
+  }
+};
+
+exports.createGuestOrder = async (req, res) => {
+  const { items, total_amount, shipping_address, phone, payment_method, additional_notes, guest_name, guest_email } = req.body;
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: 'Cart items are required to place an order.' });
+  }
+
+  if (!guest_name || !guest_email) {
+    return res.status(400).json({ message: 'Guest name and email address are required.' });
+  }
+
+  const pool = db.getPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // 1. Check if email is already registered
+    const [existingUser] = await connection.query('SELECT id FROM users WHERE email = ?', [guest_email]);
+    let userId;
+    let isNewUser = false;
+    let randomPassword = '';
+
+    if (existingUser.length > 0) {
+      connection.release();
+      return res.status(400).json({ message: 'This email is already registered. Please log in to complete your checkout.' });
+    } else {
+      // Create new user
+      isNewUser = true;
+      randomPassword = Math.floor(100000 + Math.random() * 900000).toString();
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      const [userResult] = await connection.query(
+        'INSERT INTO users (name, email, password, role, whatsapp_number) VALUES (?, ?, ?, "user", ?)',
+        [guest_name, guest_email, hashedPassword, phone || null]
+      );
+      userId = userResult.insertId;
+    }
+
+    // 2. Insert order record
+    const [orderResult] = await connection.query(
+      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes) VALUES (?, ?, ?, ?, ?, ?)',
+      [userId, total_amount, shipping_address, phone || 'Not Provided', payment_method || 'Cash on Delivery', additional_notes || null]
+    );
+    const orderId = orderResult.insertId;
+
+    // 3. Insert order items & update product stock
+    for (const item of items) {
+      const { product_id, quantity, price, package_name, selected_device, selected_activation } = item;
+
+      if (!product_id || !quantity || !price) {
+        throw new Error('Invalid item details in cart.');
+      }
+
+      // Check stock and deduct it
+      const [stockCheck] = await connection.query(
+        'SELECT stock, name FROM products WHERE id = ? FOR UPDATE',
+        [product_id]
+      );
+
+      if (stockCheck.length === 0) {
+        throw new Error(`Product not found.`);
+      }
+
+      const currentStock = stockCheck[0].stock;
+      const productName = stockCheck[0].name;
+
+      if (currentStock < quantity) {
+        throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
+      }
+
+      // Deduct stock
+      await connection.query(
+        'UPDATE products SET stock = stock - ? WHERE id = ?',
+        [quantity, product_id]
+      );
+
+      // Insert order item
+      await connection.query(
+        'INSERT INTO order_items (order_id, product_id, quantity, price, package_name, selected_device, selected_activation) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [orderId, product_id, quantity, price, package_name || null, selected_device || null, selected_activation || null]
+      );
+    }
+
+    // Commit database changes
+    await connection.commit();
+
+    // 4. Send email credentials (asynchronous)
+    if (isNewUser) {
+      sendGuestAccountEmail(guest_email, guest_name, randomPassword);
+    }
+
+    res.status(201).json({
+      message: 'Order placed successfully! Check your email for login credentials.',
+      orderId: orderId
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Guest order transaction failed:', error.message);
+    res.status(400).json({ message: error.message || 'Failed to place order.' });
   } finally {
     connection.release();
   }
