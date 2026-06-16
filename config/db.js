@@ -154,6 +154,16 @@ async function createTables() {
     );
   `;
 
+  const passwordResetsTable = `
+    CREATE TABLE IF NOT EXISTS password_resets (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      email VARCHAR(255) NOT NULL,
+      otp VARCHAR(10) NOT NULL,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
   await pool.query(usersTable);
   await pool.query(categoriesTable);
   await pool.query(productsTable);
@@ -161,6 +171,7 @@ async function createTables() {
   await pool.query(orderItemsTable);
   await pool.query(reviewsTable);
   await pool.query(supportTicketsTable);
+  await pool.query(passwordResetsTable);
 
   // Seed default admin if not exists
   const [rows] = await pool.query('SELECT * FROM users WHERE role = "admin" LIMIT 1');

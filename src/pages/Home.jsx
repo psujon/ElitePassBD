@@ -209,7 +209,7 @@ export default function Home() {
       <div className="max-w-full mx-auto px-4 sm:px-6">
 
         {/* ================= HERO & PROMOTIONS SECTION ================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-15 md:mb-8">
 
           {/* Left: Dynamic Carousel Slider */}
           <div className="lg:col-span-2 relative rounded-3xl overflow-hidden shadow-xs h-[420px] group bg-slate-900">
@@ -348,7 +348,7 @@ export default function Home() {
             </div>
 
             {/* Promo 2: Stacking Two Half-Banners */}
-            <div className="grid grid-cols-2 gap-4 h-[180px]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[360px] md:h-[180px]">
 
               {/* Education Subscription / Recent Product 1 */}
               <Link

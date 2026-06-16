@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { ShoppingCart, User, LogOut, ShieldAlert, ChevronDown, Menu, X } from 'lucide-react';
 import { api } from '../utils/api';
+import logo from '../assets/logo.jpeg';
 
 export default function Navbar({ onCartClick }) {
   const { user, logout, isAdmin } = useAuth();
@@ -13,6 +14,27 @@ export default function Navbar({ onCartClick }) {
   const [categories, setCategories] = useState([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const dropdownTimeoutRef = useRef(null);
+
+  const handleMouseEnter = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+    }
+    setIsDropdownOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setIsDropdownOpen(false);
+    }, 150);
+  };
+
+  const handleDropdownItemClick = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+    }
+    setIsDropdownOpen(false);
+  };
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -24,6 +46,12 @@ export default function Navbar({ onCartClick }) {
       }
     };
     fetchCategories();
+
+    return () => {
+      if (dropdownTimeoutRef.current) {
+        clearTimeout(dropdownTimeoutRef.current);
+      }
+    };
   }, []);
 
   const handleLogout = () => {
@@ -32,12 +60,13 @@ export default function Navbar({ onCartClick }) {
   };
 
   return (
-    <nav className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-slate-900 px-4 sm:px-6 py-4">
+    <nav className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-slate-900 px-4 sm:px-6 py-1">
       <div className="max-w-full mx-auto flex justify-between items-center">
         {/* Brand Logo */}
         <Link to="/" className="flex items-center space-x-2 text-xl font-bold tracking-tight text-white">
-          <span className="text-violet-500 font-extrabold text-2xl glow-primary">
-            ElitePassBD
+          <img src={logo} alt="Logo" className="w-15 h-15 rounded-full object-cover border border-violet-500/20 shadow-sm" />
+          <span className="text-blue-500 font-extrabold text-2xl glow-primary">
+            Elite <span className="text-white">Pass</span>BD
           </span>
         </Link>
 
@@ -50,8 +79,8 @@ export default function Navbar({ onCartClick }) {
           {/* Products Dropdown */}
           <div
             className="relative"
-            onMouseEnter={() => setIsDropdownOpen(true)}
-            onMouseLeave={() => setIsDropdownOpen(false)}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
           >
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -61,7 +90,7 @@ export default function Navbar({ onCartClick }) {
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
             {isDropdownOpen && (
-              <div className="absolute left-0 mt-1 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-lg py-2 z-50 animate-fade-in">
+              <div className="absolute left-0 mt-1 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-lg py-2 z-50 animate-fade-in before:content-[''] before:absolute before:-top-3 before:left-0 before:right-0 before:h-3">
                 {categories.length === 0 ? (
                   <span className="block px-4 py-2 text-xs text-slate-500">No categories</span>
                 ) : (
@@ -69,7 +98,7 @@ export default function Navbar({ onCartClick }) {
                     <Link
                       key={cat.id}
                       to={`/products?category=${encodeURIComponent(cat.name)}`}
-                      onClick={() => setIsDropdownOpen(false)}
+                      onClick={handleDropdownItemClick}
                       className="block px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
                     >
                       {cat.name}
@@ -175,7 +204,7 @@ export default function Navbar({ onCartClick }) {
           {/* Products Section in Mobile Menu */}
           <div className="flex flex-col space-y-2">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Categories
+              Products
             </span>
             <div className="flex flex-col space-y-2 pl-3 border-l border-slate-900">
               {categories.length === 0 ? (
