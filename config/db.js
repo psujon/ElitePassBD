@@ -86,6 +86,7 @@ async function createTables() {
       packages TEXT DEFAULT NULL,
       device_options TEXT DEFAULT NULL,
       activation_options TEXT DEFAULT NULL,
+      activation_process VARCHAR(50) DEFAULT 'Manual',
       discount_percent INT DEFAULT NULL,
       is_hot TINYINT DEFAULT 0,
       is_highlighted TINYINT DEFAULT 0,
@@ -295,6 +296,12 @@ async function updateSchema() {
     if (isHighlightedCols.length === 0) {
       await pool.query("ALTER TABLE products ADD COLUMN is_highlighted TINYINT DEFAULT 0");
       console.log("Added column 'is_highlighted' to 'products' table.");
+    }
+
+    const [activationProcessCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'activation_process'");
+    if (activationProcessCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN activation_process VARCHAR(50) DEFAULT 'Manual'");
+      console.log("Added column 'activation_process' to 'products' table.");
     }
   } catch (error) {
     console.error("Error updating database schema:", error.message);

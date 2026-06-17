@@ -71,7 +71,7 @@ exports.createProduct = async (req, res) => {
   const {
     name, description, price, image_url, stock, category_id,
     tags, additional_info, faqs, packages, device_options, activation_options,
-    discount_percent, is_hot, is_highlighted
+    discount_percent, is_hot, is_highlighted, activation_process
   } = req.body;
 
   if (!name || !description || price === undefined || stock === undefined) {
@@ -83,15 +83,16 @@ exports.createProduct = async (req, res) => {
       `INSERT INTO products (
         name, description, price, image_url, stock, category_id, 
         tags, additional_info, faqs, packages, device_options, activation_options,
-        discount_percent, is_hot, is_highlighted
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        discount_percent, is_hot, is_highlighted, activation_process
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name, description, parseFloat(price), image_url || '', parseInt(stock), category_id || null,
         tags || null, additional_info || null, stringifyField(faqs), stringifyField(packages),
         device_options || null, activation_options || null,
         discount_percent === undefined || discount_percent === '' || discount_percent === null ? null : parseInt(discount_percent),
         is_hot ? 1 : 0,
-        is_highlighted ? 1 : 0
+        is_highlighted ? 1 : 0,
+        activation_process || 'Manual'
       ]
     );
 
@@ -112,7 +113,7 @@ exports.updateProduct = async (req, res) => {
   const {
     name, description, price, image_url, stock, category_id,
     tags, additional_info, faqs, packages, device_options, activation_options,
-    discount_percent, is_hot, is_highlighted
+    discount_percent, is_hot, is_highlighted, activation_process
   } = req.body;
 
   if (!name || !description || price === undefined || stock === undefined) {
@@ -124,7 +125,7 @@ exports.updateProduct = async (req, res) => {
       `UPDATE products SET 
         name = ?, description = ?, price = ?, image_url = ?, stock = ?, category_id = ?, 
         tags = ?, additional_info = ?, faqs = ?, packages = ?, device_options = ?, activation_options = ?,
-        discount_percent = ?, is_hot = ?, is_highlighted = ?
+        discount_percent = ?, is_hot = ?, is_highlighted = ?, activation_process = ?
       WHERE id = ?`,
       [
         name, description, parseFloat(price), image_url || '', parseInt(stock), category_id || null,
@@ -133,6 +134,7 @@ exports.updateProduct = async (req, res) => {
         discount_percent === undefined || discount_percent === '' || discount_percent === null ? null : parseInt(discount_percent),
         is_hot ? 1 : 0,
         is_highlighted ? 1 : 0,
+        activation_process || 'Manual',
         id
       ]
     );

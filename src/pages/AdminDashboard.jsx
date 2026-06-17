@@ -49,7 +49,8 @@ export default function AdminDashboard() {
     activation_options: '',
     discount_percent: '',
     is_hot: false,
-    is_highlighted: false
+    is_highlighted: false,
+    activation_process: 'Manual'
   });
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null); // null means adding new
@@ -135,7 +136,8 @@ export default function AdminDashboard() {
         activation_options: product.activation_options || '',
         discount_percent: product.discount_percent !== null && product.discount_percent !== undefined ? product.discount_percent : '',
         is_hot: !!product.is_hot,
-        is_highlighted: !!product.is_highlighted
+        is_highlighted: !!product.is_highlighted,
+        activation_process: product.activation_process || 'Manual'
       });
     } else {
       setEditingProduct(null);
@@ -154,7 +156,8 @@ export default function AdminDashboard() {
         activation_options: '',
         discount_percent: '',
         is_hot: false,
-        is_highlighted: false
+        is_highlighted: false,
+        activation_process: 'Manual'
       });
     }
     setFormError('');
@@ -704,16 +707,27 @@ export default function AdminDashboard() {
 
                             {/* 9. Activation */}
                             <td className="px-2 py-3">
-                              {prod.activation_options ? (
-                                <div className="flex flex-wrap gap-1 max-w-[100px]">
-                                  {prod.activation_options.split(',').map((opt, idx) => (
-                                    <span key={idx} className="bg-emerald-50 text-emerald-600 border border-emerald-100/60 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap">{opt.trim()}</span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-slate-450 italic">-</span>
-                              )}
-                            </td>
+                               <div className="flex flex-col gap-1.5 text-left">
+                                 {prod.activation_options ? (
+                                   <div className="flex flex-wrap gap-1 max-w-[100px]">
+                                     {prod.activation_options.split(',').map((opt, idx) => (
+                                       <span key={idx} className="bg-emerald-50 text-emerald-600 border border-emerald-100/60 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap">{opt.trim()}</span>
+                                     ))}
+                                   </div>
+                                 ) : (
+                                   <span className="text-slate-450 italic text-[10px]">-</span>
+                                 )}
+                                 <div className="text-[9px]">
+                                   <span className={`px-1.5 py-0.5 rounded-md font-extrabold border ${
+                                     prod.activation_process === 'Automatic'
+                                       ? 'bg-blue-50 text-blue-600 border-blue-150'
+                                       : 'bg-amber-55 bg-amber-50 text-amber-600 border-amber-150'
+                                   }`}>
+                                     {prod.activation_process || 'Manual'}
+                                   </span>
+                                 </div>
+                               </div>
+                             </td>
 
                             {/* 10. Additional Info */}
                             <td className="px-2 py-3 max-w-[110px] whitespace-normal break-words line-clamp-2 text-slate-500 text-[11px]" title={prod.additional_info}>
@@ -1165,7 +1179,7 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Product Name *</label>
                   <input
@@ -1185,8 +1199,36 @@ export default function AdminDashboard() {
                     value={productForm.image_url}
                     onChange={(e) => setProductForm({ ...productForm, image_url: e.target.value })}
                     placeholder="https://example.com/product.jpg"
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-805 placeholder-slate-400"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Activation Process</label>
+                  <div className="flex items-center space-x-4 py-2 border border-slate-250 bg-slate-50 rounded-lg px-3 h-[38px] text-xs">
+                    <label className="flex items-center space-x-1.5 cursor-pointer select-none font-semibold text-slate-700">
+                      <input
+                        type="radio"
+                        name="activation_process"
+                        value="Automatic"
+                        checked={productForm.activation_process === 'Automatic'}
+                        onChange={(e) => setProductForm({ ...productForm, activation_process: e.target.value })}
+                        className="w-4 h-4 text-violet-600 focus:ring-violet-500 border-slate-300 cursor-pointer"
+                      />
+                      <span>Automatic</span>
+                    </label>
+                    <label className="flex items-center space-x-1.5 cursor-pointer select-none font-semibold text-slate-700">
+                      <input
+                        type="radio"
+                        name="activation_process"
+                        value="Manual"
+                        checked={productForm.activation_process === 'Manual'}
+                        onChange={(e) => setProductForm({ ...productForm, activation_process: e.target.value })}
+                        className="w-4 h-4 text-violet-600 focus:ring-violet-500 border-slate-300 cursor-pointer"
+                      />
+                      <span>Manual</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 

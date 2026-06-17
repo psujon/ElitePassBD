@@ -136,7 +136,7 @@ export default function Checkout() {
             <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-emerald-50 text-emerald-600 mb-6 shadow-xs">
               <CheckCircle2 className="h-10 w-10" />
             </div>
-            <h2 className="text-2xl font-extrabold text-slate-850 tracking-tight">
+            <h2 className="text-2xl font-extrabold text-[#411f52] tracking-tight">
               Order Confirmed!
             </h2>
             <p className="text-slate-500 text-sm mt-3 leading-relaxed">
