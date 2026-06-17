@@ -180,7 +180,7 @@ export default function Login() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-left text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label className="block text-left text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                     Email Address
                   </label>
                   <div className="relative">
@@ -198,7 +198,7 @@ export default function Login() {
 
                 <div>
                   <div className="flex justify-between items-center mb-1.5">
-                    <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider">
+                    <label className="block text-xxs font-bold text-slate-500  tracking-wider">
                       Password
                     </label>
                   </div>
@@ -263,7 +263,7 @@ export default function Login() {
 
                 <div className="flex items-center my-4">
                   <div className="flex-grow border-t border-slate-150"></div>
-                  <span className="flex-shrink mx-3 text-slate-400 text-xxs font-bold uppercase tracking-wider">OR</span>
+                  <span className="flex-shrink mx-3 text-slate-400 text-xxs font-bold  tracking-wider">OR</span>
                   <div className="flex-grow border-t border-slate-150"></div>
                 </div>
 
@@ -323,7 +323,7 @@ export default function Login() {
 
               <form onSubmit={handleSendOTP} className="space-y-4">
                 <div>
-                  <label className="block text-left text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label className="block text-left text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                     Email Address
                   </label>
                   <div className="relative">
@@ -385,7 +385,7 @@ export default function Login() {
 
               <form onSubmit={handleVerifyOTP} className="space-y-4">
                 <div>
-                  <label className="block text-left text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label className="block text-left text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                     Verification Code
                   </label>
                   <div className="relative">
@@ -455,7 +455,7 @@ export default function Login() {
 
               <form onSubmit={handleResetPassword} className="space-y-4">
                 <div>
-                  <label className="block text-left text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label className="block text-left text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                     New Password
                   </label>
                   <div className="relative">
@@ -483,7 +483,7 @@ export default function Login() {
                 </div>
 
                 <div>
-                  <label className="block text-left text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label className="block text-left text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                     Confirm Password
                   </label>
                   <div className="relative">

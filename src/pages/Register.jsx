@@ -46,9 +46,7 @@ export default function Register() {
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
               Create Account
             </h2>
-            {/* <p className="text-slate-900 text-xs mt-2">
-              Register to track purchases and products
-            </p> */}
+
           </div>
 
           {error && (
@@ -65,7 +63,7 @@ export default function Register() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-left text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-left text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                 Full Name
               </label>
               <div className="relative">
@@ -82,7 +80,7 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="block text-left text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-left text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                 Email Address
               </label>
               <div className="relative">
@@ -99,7 +97,7 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="block text-left text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-left text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                 WhatsApp Number
               </label>
               <div className="relative">
@@ -116,7 +114,7 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="block text-left text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-left text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                 Password
               </label>
               <div className="relative">

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { ShoppingCart, User, LogOut, ShieldAlert, ChevronDown, Menu, X } from 'lucide-react';
+import { ShoppingCart, User, LogOut, ShieldAlert, ChevronDown, Menu, X, Search, Loader2 } from 'lucide-react';
 import { api } from '../utils/api';
 import logo from '../assets/logo.jpeg';
 
@@ -15,6 +15,13 @@ export default function Navbar({ onCartClick }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownTimeoutRef = useRef(null);
+
+  // Mobile search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchProducts, setSearchProducts] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchContainerRef = useRef(null);
 
   const handleMouseEnter = () => {
     if (dropdownTimeoutRef.current) {
@@ -54,6 +61,41 @@ export default function Navbar({ onCartClick }) {
     };
   }, []);
 
+  const handleSearchFocus = async () => {
+    setShowSearchResults(true);
+    if (searchProducts.length === 0) {
+      setIsSearching(true);
+      try {
+        const data = await api.get('/products');
+        setSearchProducts(data || []);
+      } catch (err) {
+        console.error('Navbar search products fetch failed:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        setShowSearchResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const filteredProducts = searchProducts.filter((prod) => {
+    if (!searchQuery) return false;
+    return (
+      prod.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (prod.description && prod.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  });
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -63,9 +105,9 @@ export default function Navbar({ onCartClick }) {
     <nav className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-slate-900 px-4 sm:px-6 py-1">
       <div className="max-w-full mx-auto flex justify-between items-center">
         {/* Brand Logo */}
-        <Link to="/" className="flex items-center space-x-2 text-xl font-bold tracking-tight text-white">
-          <img src={logo} alt="Logo" className="w-15 h-15 rounded-full object-cover border border-violet-500/20 shadow-sm" />
-          <span className="text-blue-500 font-extrabold text-2xl glow-primary">
+        <Link to="/" className="flex items-center space-x-1.5 xs:space-x-2 text-xl font-bold tracking-tight text-white">
+          <img src={logo} alt="Logo" className="w-10 h-10 xs:w-12 xs:h-12 md:w-15 md:h-15 rounded-full object-cover border border-violet-500/20 shadow-sm" />
+          <span className="text-blue-500 font-extrabold text-sm xs:text-base sm:text-xl md:text-2xl glow-primary">
             Elite <span className="text-white">Pass</span>BD
           </span>
         </Link>
@@ -118,7 +160,69 @@ export default function Navbar({ onCartClick }) {
         </div>
 
         {/* Right Action Items */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-4">
+          {/* Mobile Search Box */}
+          <div ref={searchContainerRef} className="relative block md:hidden w-28 xs:w-36 sm:w-44">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onFocus={handleSearchFocus}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 focus:border-violet-500 focus:outline-none rounded-full pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 transition-all focus:ring-1 focus:ring-violet-500/50"
+              />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            </div>
+
+            {/* Mobile Search Results Dropdown */}
+            {showSearchResults && searchQuery && (
+              <div className="absolute right-0 mt-2 w-60 xs:w-72 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-2 z-50 max-h-80 overflow-y-auto animate-fade-in">
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+                  </div>
+                ) : filteredProducts.length === 0 ? (
+                  <div className="px-4 py-3 text-xs text-slate-500 text-center">
+                    No products found
+                  </div>
+                ) : (
+                  filteredProducts.map((prod) => (
+                    <button
+                      key={prod.id}
+                      onClick={() => {
+                        setSearchQuery('');
+                        setShowSearchResults(false);
+                        navigate(`/product/${prod.id}`);
+                      }}
+                      className="flex items-center gap-2.5 p-2 mx-1.5 my-0.5 rounded-lg hover:bg-violet-500/10 text-left transition-colors w-[calc(100%-12px)] cursor-pointer"
+                    >
+                      {prod.image_url ? (
+                        <img
+                          src={prod.image_url}
+                          alt={prod.name}
+                          className="w-8 h-8 rounded-md object-cover bg-slate-800 border border-slate-700 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0 text-[9px] text-slate-500 uppercase">
+                          No Img
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-slate-200 truncate hover:text-violet-400 transition-colors">
+                          {prod.name}
+                        </div>
+                        <div className="text-[10px] text-violet-400 font-bold mt-0.5">
+                          {parseFloat(prod.price).toFixed(2)}৳
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           {/* User Links (Desktop Only) */}
           <div className="hidden md:flex items-center space-x-2">
             {user ? (
