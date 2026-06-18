@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import { useCart } from '../context/CartContext';
-import { 
-  Star, ShoppingBag, Plus, Minus, Loader2, ChevronDown, 
-  Tag, Info, HelpCircle, ArrowLeft, Layers, Heart, CheckCircle2 
+import {
+  Star, ShoppingBag, Plus, Minus, Loader2, ChevronDown,
+  Tag, Info, HelpCircle, ArrowLeft, Layers, Heart, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -16,7 +16,7 @@ export default function ProductDetails() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Reviews state
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -44,11 +44,37 @@ export default function ProductDetails() {
     fetchProductDetails();
   }, [id]);
 
+  // Sync package selection when activation choice changes
+  useEffect(() => {
+    if (product && product.packages && product.packages.length > 0) {
+      const activations = product.activation_options
+        ? product.activation_options.split(',').map(a => a.trim()).filter(Boolean)
+        : [];
+
+      const filtered = product.packages.filter(pkg => {
+        if (activations.length > 0 && selectedActivation) {
+          if (!pkg.activation) return true;
+          return pkg.activation.toLowerCase() === selectedActivation.toLowerCase();
+        }
+        return true;
+      });
+
+      if (filtered.length > 0) {
+        const isStillAvailable = filtered.some(p => p.duration === selectedPackage?.duration && p.activation === selectedPackage?.activation);
+        if (!isStillAvailable) {
+          setSelectedPackage(filtered[0]);
+        }
+      } else {
+        setSelectedPackage(null);
+      }
+    }
+  }, [selectedActivation, product]);
+
   const fetchProductDetails = async () => {
     try {
       setLoading(true);
       setError('');
-      
+
       const prodData = await api.get(`/products/${id}`);
       setProduct(prodData);
 
@@ -139,18 +165,9 @@ export default function ProductDetails() {
   };
 
   // Compute average rating
-  const avgRating = reviews.length > 0 
+  const avgRating = reviews.length > 0
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
     : 0;
-
-  // Resolve prices for display
-  const displayPrice = selectedPackage 
-    ? parseFloat(selectedPackage.price) 
-    : product ? parseFloat(product.price) : 0;
-
-  const priceRange = product && product.packages && product.packages.length > 0
-    ? `৳${Math.min(...product.packages.map(p => parseFloat(p.price)))} - ৳${Math.max(...product.packages.map(p => parseFloat(p.price)))}`
-    : product ? `৳${parseFloat(product.price).toFixed(2)}` : '৳0.00';
 
   if (loading) {
     return (
@@ -187,10 +204,28 @@ export default function ProductDetails() {
     ? product.tags.split(',').map(t => t.trim()).filter(Boolean)
     : [];
 
+  const filteredPackages = product.packages
+    ? product.packages.filter(pkg => {
+      if (parsedActivations.length > 0 && selectedActivation) {
+        if (!pkg.activation) return true;
+        return pkg.activation.toLowerCase() === selectedActivation.toLowerCase();
+      }
+      return true;
+    })
+    : [];
+
+  const displayPrice = selectedPackage
+    ? parseFloat(selectedPackage.price)
+    : product ? parseFloat(product.price) : 0;
+
+  const priceRange = filteredPackages.length > 0
+    ? `৳${Math.min(...filteredPackages.map(p => parseFloat(p.price)))} - ৳${Math.max(...filteredPackages.map(p => parseFloat(p.price)))}`
+    : product ? `৳${parseFloat(product.price).toFixed(2)}` : '৳0.00';
+
   return (
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] text-slate-800 py-8 text-left animate-fade-in">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        
+      <div className="max-w-full mx-auto px-4 sm:px-6">
+
         {/* Back navigation */}
         <button
           onClick={() => navigate('/')}
@@ -202,20 +237,20 @@ export default function ProductDetails() {
 
         {/* Main product configuration layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-16">
-          
+
           {/* Left Column: Image Box */}
           <div className="lg:col-span-5 space-y-4">
             <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden aspect-square flex items-center justify-center p-6 relative group shadow-xs">
               {product.image_url ? (
-                <img 
-                  src={product.image_url} 
-                  alt={product.name} 
+                <img
+                  src={product.image_url}
+                  alt={product.name}
                   className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-102"
                 />
               ) : (
                 <span className="text-slate-400 text-sm font-semibold uppercase tracking-wider">No Product Image</span>
               )}
-              
+
               {product.stock === 0 && (
                 <div className="absolute inset-0 bg-white/85 backdrop-blur-xs flex items-center justify-center">
                   <span className="px-4 py-1.5 bg-red-50 text-red-655 border border-red-200/85 text-xs font-bold rounded-full">
@@ -228,15 +263,14 @@ export default function ProductDetails() {
 
           {/* Right Column: Selections and Buy Card */}
           <div className="lg:col-span-7 text-left space-y-6">
-            
+
             {/* Header Product Info */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-3">
-                <span className={`inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${
-                  product.stock === 0 
-                    ? 'bg-red-50 text-red-600 border-red-100' 
-                    : 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                }`}>
+                <span className={`inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${product.stock === 0
+                  ? 'bg-red-50 text-red-600 border-red-100'
+                  : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                  }`}>
                   {product.stock === 0 ? 'Out of Stock' : 'In Stock & Ready'}
                 </span>
                 {product.category_name && (
@@ -255,13 +289,12 @@ export default function ProductDetails() {
               <div className="flex items-center space-x-4">
                 <div className="flex space-x-0.5">
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <Star 
-                      key={star} 
-                      className={`w-4 h-4 ${
-                        star <= Math.round(avgRating || 5) 
-                          ? 'fill-amber-400 text-amber-400' 
-                          : 'text-slate-200'
-                      }`} 
+                    <Star
+                      key={star}
+                      className={`w-4 h-4 ${star <= Math.round(avgRating || 5)
+                        ? 'fill-amber-400 text-amber-400'
+                        : 'text-slate-200'
+                        }`}
                     />
                   ))}
                 </div>
@@ -269,7 +302,7 @@ export default function ProductDetails() {
                   {reviews.length > 0 ? `${avgRating} / 5.0 (${reviews.length} customer reviews)` : 'No reviews yet'}
                 </span>
               </div>
-              
+
               {/* Price display */}
               <div className="pt-2">
                 <span className="text-xxs text-slate-450 uppercase font-bold tracking-wider block">Option Price</span>
@@ -287,28 +320,8 @@ export default function ProductDetails() {
             </div>
 
             <div className="border-t border-slate-200/80 pt-6 space-y-6">
-              
-              {/* 1. Package options month wise */}
-              {product.packages && product.packages.length > 0 && (
-                <div className="space-y-2.5">
-                  <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Select Package / Validity</span>
-                  <div className="flex flex-wrap gap-2">
-                    {product.packages.map((pkg, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setSelectedPackage(pkg)}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                          selectedPackage?.duration === pkg.duration
-                            ? 'bg-violet-600 border-transparent text-white shadow-sm'
-                            : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-350 shadow-xs'
-                        }`}
-                      >
-                        {pkg.duration} - ৳{parseFloat(pkg.price).toFixed(0)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+
+
 
               {/* 2. Device selection if present */}
               {parsedDevices.length > 0 && (
@@ -319,11 +332,10 @@ export default function ProductDetails() {
                       <button
                         key={dev}
                         onClick={() => setSelectedDevice(dev)}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                          selectedDevice === dev
-                            ? 'bg-violet-600 border-transparent text-white shadow-sm'
-                            : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-350 shadow-xs'
-                        }`}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${selectedDevice === dev
+                          ? 'bg-violet-600 border-transparent text-white shadow-sm'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-350 shadow-xs'
+                          }`}
                       >
                         {dev}
                       </button>
@@ -341,13 +353,33 @@ export default function ProductDetails() {
                       <button
                         key={act}
                         onClick={() => setSelectedActivation(act)}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                          selectedActivation === act
-                            ? 'bg-violet-600 border-transparent text-white shadow-sm'
-                            : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-350 shadow-xs'
-                        }`}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${selectedActivation === act
+                          ? 'bg-violet-600 border-transparent text-white shadow-sm'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-350 shadow-xs'
+                          }`}
                       >
                         {act}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 1. Package options month wise */}
+              {filteredPackages && filteredPackages.length > 0 && (
+                <div className="space-y-2.5">
+                  <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Select Package / Validity</span>
+                  <div className="flex flex-wrap gap-2">
+                    {filteredPackages.map((pkg, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedPackage(pkg)}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${selectedPackage?.duration === pkg.duration && selectedPackage?.activation === pkg.activation
+                          ? 'bg-violet-600 border-transparent text-white shadow-sm'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-350 shadow-xs'
+                          }`}
+                      >
+                        {pkg.duration} - ৳{parseFloat(pkg.price).toFixed(0)}
                       </button>
                     ))}
                   </div>
@@ -384,7 +416,7 @@ export default function ProductDetails() {
                     <ShoppingBag className="w-4 h-4 text-violet-600" />
                     <span>Add to Cart</span>
                   </button>
-                  
+
                   <button
                     onClick={handleBuyNow}
                     disabled={product.stock === 0}
@@ -433,21 +465,19 @@ export default function ProductDetails() {
           <div className="flex border-b border-slate-200/80 bg-slate-50">
             <button
               onClick={() => setActiveTab('description')}
-              className={`px-6 py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
-                activeTab === 'description'
-                  ? 'text-violet-600 border-violet-500 bg-white'
-                  : 'text-slate-550 border-transparent hover:text-slate-800'
-              }`}
+              className={`px-6 py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${activeTab === 'description'
+                ? 'text-violet-600 border-violet-500 bg-white'
+                : 'text-slate-550 border-transparent hover:text-slate-800'
+                }`}
             >
               Description
             </button>
             <button
               onClick={() => setActiveTab('additional')}
-              className={`px-6 py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
-                activeTab === 'additional'
-                  ? 'text-violet-600 border-violet-500 bg-white'
-                  : 'text-slate-550 border-transparent hover:text-slate-800'
-              }`}
+              className={`px-6 py-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${activeTab === 'additional'
+                ? 'text-violet-600 border-violet-500 bg-white'
+                : 'text-slate-550 border-transparent hover:text-slate-800'
+                }`}
             >
               Additional Information
             </button>
@@ -478,13 +508,13 @@ export default function ProductDetails() {
               <HelpCircle className="w-5 h-5 text-violet-500" />
               <h2 className="text-xl font-extrabold text-slate-850 tracking-tight">Frequently Asked Questions</h2>
             </div>
-            
+
             <div className="space-y-3">
               {product.faqs.map((faq, idx) => {
                 const isOpen = openFaqIndex === idx;
                 return (
-                  <div 
-                    key={idx} 
+                  <div
+                    key={idx}
                     className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden transition-all duration-200 shadow-xs"
                   >
                     <button
@@ -494,7 +524,7 @@ export default function ProductDetails() {
                       <span>{faq.q}</span>
                       <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-250 ${isOpen ? 'rotate-180 text-violet-500' : ''}`} />
                     </button>
-                    
+
                     {isOpen && (
                       <div className="px-6 pb-5 pt-1 text-xs text-slate-500 border-t border-slate-100 bg-slate-50/35 leading-relaxed whitespace-pre-wrap">
                         {faq.a}
@@ -533,12 +563,12 @@ export default function ProductDetails() {
                         {new Date(rev.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
                     </div>
-                    
+
                     <div className="flex space-x-0.5">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <Star 
-                          key={star} 
-                          className={`w-3 h-3 ${star <= rev.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} 
+                        <Star
+                          key={star}
+                          className={`w-3 h-3 ${star <= rev.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}
                         />
                       ))}
                     </div>
@@ -584,7 +614,7 @@ export default function ProductDetails() {
                     ) : (
                       <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">No Image</span>
                     )}
-                    
+
                     {prod.stock === 0 && (
                       <div className="absolute inset-0 bg-white/85 backdrop-blur-xs flex items-center justify-center">
                         <span className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200/85 text-[10px] font-bold rounded-full">

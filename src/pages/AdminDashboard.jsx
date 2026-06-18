@@ -740,7 +740,14 @@ export default function AdminDashboard() {
                                 <div className="space-y-1 max-w-[100px] whitespace-normal">
                                   {prod.packages.map((pkg, idx) => (
                                     <div key={idx} className="text-[10px] text-slate-600 flex justify-between gap-1 border-b border-slate-100 pb-0.5">
-                                      <span className="text-slate-500 truncate">{pkg.duration}</span>
+                                      <span className="text-slate-500 truncate">
+                                        {pkg.activation && (
+                                          <span className="bg-emerald-55 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded px-1 py-0.5 text-[8px] font-bold mr-1 inline-block">
+                                            {pkg.activation}
+                                          </span>
+                                        )}
+                                        {pkg.duration}
+                                      </span>
                                       <span className="font-extrabold text-violet-605 whitespace-nowrap">৳{parseFloat(pkg.price).toFixed(0)}</span>
                                     </div>
                                   ))}
@@ -1372,7 +1379,7 @@ export default function AdminDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        const updatedPkgs = [...productForm.packages, { duration: '', price: '' }];
+                        const updatedPkgs = [...productForm.packages, { activation: '', duration: '', price: '' }];
                         setProductForm({ ...productForm, packages: updatedPkgs });
                       }}
                       className="px-2.5 py-1 bg-violet-50 hover:bg-violet-600 text-violet-600 hover:text-white border border-violet-200 hover:border-transparent rounded text-[10px] font-bold transition-all cursor-pointer"
@@ -1385,45 +1392,79 @@ export default function AdminDashboard() {
                     <p className="text-[11px] text-slate-450 italic">No packages defined. Base price will apply.</p>
                   ) : (
                     <div className="space-y-2">
-                      {productForm.packages.map((pkg, idx) => (
-                        <div key={idx} className="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            value={pkg.duration}
-                            onChange={(e) => {
-                              const updated = [...productForm.packages];
-                              updated[idx].duration = e.target.value;
-                              setProductForm({ ...productForm, packages: updated });
-                            }}
-                            placeholder="e.g. 1 Month, 6 Months"
-                            className="flex-1 text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-850"
-                            required
-                          />
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={pkg.price}
-                            onChange={(e) => {
-                              const updated = [...productForm.packages];
-                              updated[idx].price = e.target.value;
-                              setProductForm({ ...productForm, packages: updated });
-                            }}
-                            placeholder="Price in ৳"
-                            className="w-28 text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-855"
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = productForm.packages.filter((_, i) => i !== idx);
-                              setProductForm({ ...productForm, packages: updated });
-                            }}
-                            className="p-1.5 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white border border-red-200 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                      {productForm.packages.map((pkg, idx) => {
+                        const activationOpts = productForm.activation_options
+                          ? productForm.activation_options.split(',').map(o => o.trim()).filter(Boolean)
+                          : [];
+                        return (
+                          <div key={idx} className="flex items-center space-x-2">
+                            {activationOpts.length > 0 ? (
+                              <select
+                                value={pkg.activation || ''}
+                                onChange={(e) => {
+                                  const updated = [...productForm.packages];
+                                  updated[idx].activation = e.target.value;
+                                  setProductForm({ ...productForm, packages: updated });
+                                }}
+                                className="w-32 text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2 py-1.5 text-slate-855 cursor-pointer shrink-0"
+                                required
+                              >
+                                <option value="">Activation...</option>
+                                {activationOpts.map((opt, oIdx) => (
+                                  <option key={oIdx} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                value={pkg.activation || ''}
+                                onChange={(e) => {
+                                  const updated = [...productForm.packages];
+                                  updated[idx].activation = e.target.value;
+                                  setProductForm({ ...productForm, packages: updated });
+                                }}
+                                placeholder="Activation..."
+                                className="w-32 text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-855 shrink-0"
+                              />
+                            )}
+                            <input
+                              type="text"
+                              value={pkg.duration}
+                              onChange={(e) => {
+                                const updated = [...productForm.packages];
+                                updated[idx].duration = e.target.value;
+                                setProductForm({ ...productForm, packages: updated });
+                              }}
+                              placeholder="e.g. 1 Month, 6 Months"
+                              className="flex-1 text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-850"
+                              required
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={pkg.price}
+                              onChange={(e) => {
+                                const updated = [...productForm.packages];
+                                updated[idx].price = e.target.value;
+                                setProductForm({ ...productForm, packages: updated });
+                              }}
+                              placeholder="Price in ৳"
+                              className="w-28 text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-855"
+                              required
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = productForm.packages.filter((_, i) => i !== idx);
+                                setProductForm({ ...productForm, packages: updated });
+                              }}
+                              className="p-1.5 bg-red-55 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white border border-red-200 rounded-lg transition-colors cursor-pointer shrink-0"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

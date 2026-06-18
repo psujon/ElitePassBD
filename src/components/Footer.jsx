@@ -22,7 +22,7 @@ export default function Footer() {
     if (!message.trim()) return;
 
     // Construct WhatsApp link with support phone number
-    const phoneNumber = '8801610555228';
+    const phoneNumber = '8801925112444';
     const encodedText = encodeURIComponent(message.trim());
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedText}`;
 
@@ -157,7 +157,7 @@ export default function Footer() {
       </div>
 
       {/* ================= FLOATING WHATSAPP CHATBOX WIDGET ================= */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+      <div className="fixed bottom-18 right-6 z-50 flex flex-col items-end">
 
         {/* Chat window bubble */}
         {isChatOpen && (

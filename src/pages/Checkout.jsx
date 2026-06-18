@@ -231,7 +231,7 @@ export default function Checkout() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xxs font-bold text-slate-450 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xxs font-bold text-slate-450 tracking-wider mb-1.5">
                     Your Full Name
                   </label>
                   {user ? (
@@ -254,7 +254,7 @@ export default function Checkout() {
                 </div>
 
                 <div>
-                  <label className="block text-xxs font-bold text-slate-455 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xxs font-bold text-slate-455  tracking-wider mb-1.5">
                     Email Address
                   </label>
                   {user ? (
@@ -278,7 +278,7 @@ export default function Checkout() {
               </div>
 
               <div>
-                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                <label className="block text-xxs font-bold text-slate-500 tracking-wider mb-1.5">
                   Contact Number (WhatsApp preferred)
                 </label>
                 <div className="relative">
@@ -299,7 +299,7 @@ export default function Checkout() {
 
               {user && (
                 <div>
-                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                     Email (For Delivery Keys)
                   </label>
                   <div className="relative">
@@ -320,7 +320,7 @@ export default function Checkout() {
               )}
 
               <div>
-                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                <label className="block text-xxs font-bold text-slate-500 tracking-wider mb-1.5">
                   Shipping / Delivery Address
                 </label>
                 <div className="relative">
@@ -336,7 +336,7 @@ export default function Checkout() {
               </div>
 
               <div>
-                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                <label className="block text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
                   Additional Notes
                 </label>
                 <div className="relative">
@@ -433,7 +433,7 @@ export default function Checkout() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="text-left">
-                        <label className="block text-left text-xxs font-bold text-pink-600 uppercase tracking-wider mb-1.5">
+                        <label className="block text-left text-xxs font-bold text-pink-600  tracking-wider mb-1.5">
                           {paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} Number
                         </label>
                         <input
@@ -447,8 +447,8 @@ export default function Checkout() {
                       </div>
 
                       <div className="text-left">
-                        <label className="block text-left text-xxs font-bold text-pink-600 uppercase tracking-wider mb-1.5">
-                          Transaction ID (TxID)
+                        <label className="block text-left text-xxs font-bold text-pink-600  tracking-wider mb-1.5">
+                          Transaction ID
                         </label>
                         <input
                           type="text"

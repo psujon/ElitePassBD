@@ -72,8 +72,17 @@ export default function Home() {
 
   // Filter products for sections
   const bestSellers = products.filter(p => p.tags && p.tags.toLowerCase().includes('best sellers')).slice(0, 4);
-  const windowsProducts = products.filter(p => p.category_name && p.category_name.toLowerCase() === 'windows').slice(0, 4);
-  const subscriptionProducts = products.filter(p => p.category_name && p.category_name.toLowerCase() === 'subscription').slice(0, 4);
+
+  // Group products by category dynamically
+  const productsByCategory = products.reduce((acc, product) => {
+    if (product.category_name) {
+      if (!acc[product.category_name]) {
+        acc[product.category_name] = [];
+      }
+      acc[product.category_name].push(product);
+    }
+    return acc;
+  }, {});
 
   // Helper to format recent titles
   const formatRecentTitle = (name, maxLen = 35) => {
@@ -353,53 +362,49 @@ export default function Home() {
               {/* Education Subscription / Recent Product 1 */}
               <Link
                 to={recent1Link}
-                className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-3xl flex flex-col justify-between hover:shadow-md transition-all relative overflow-hidden group"
+                className="relative rounded-3xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group flex flex-col justify-end p-5 h-full min-h-[180px] bg-slate-900 border border-slate-200/50"
               >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full filter blur-xl -z-10 group-hover:scale-110 transition-transform" />
-                <div>
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-md">
-                    {recent1Badge}
-                  </span>
-                  <h3 className="text-xs font-black tracking-tight mt-2 leading-snug max-w-[65%]">
+                {recent1Image ? (
+                  <>
+                    <img
+                      src={recent1Image}
+                      alt={recent1Title}
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-104 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent" />
+                  </>
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-tr from-red-650 to-red-800" />
+                )}
+                <div className="relative z-10 text-left">
+                  <h3 className="text-sm font-black tracking-tight text-white leading-snug drop-shadow-md">
                     {recent1Title}
                   </h3>
                 </div>
-                {recent1Image && (
-                  <img
-                    src={recent1Image}
-                    alt={recent1Title}
-                    className="absolute bottom-3 right-3 w-20 h-20 object-cover rounded-2xl bg-white/15 p-1.5 shadow-md border border-white/10 group-hover:scale-110 transition-transform duration-300"
-                  />
-                )}
-                <span className="text-[10px] font-bold underline flex items-center gap-1">
-                  View Details <ArrowRight className="w-3 h-3" />
-                </span>
               </Link>
 
               {/* Big 65% Offer / Recent Product 2 */}
               <Link
                 to={recent2Link}
-                className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-3xl flex flex-col justify-between hover:shadow-md transition-all relative overflow-hidden group"
+                className="relative rounded-3xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group flex flex-col justify-end p-5 h-full min-h-[180px] bg-slate-900 border border-slate-200/50"
               >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full filter blur-xl -z-10 group-hover:scale-110 transition-transform" />
-                <div>
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-white/20 text-white px-2 py-0.5 rounded-md">
-                    {recent2Badge}
-                  </span>
-                  <h3 className="text-xs font-black tracking-tight mt-2 leading-snug max-w-[65%]">
+                {recent2Image ? (
+                  <>
+                    <img
+                      src={recent2Image}
+                      alt={recent2Title}
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-104 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent" />
+                  </>
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-tr from-blue-650 to-blue-800" />
+                )}
+                <div className="relative z-10 text-left">
+                  <h3 className="text-sm font-black tracking-tight text-white leading-snug drop-shadow-md">
                     {recent2Title}
                   </h3>
                 </div>
-                {recent2Image && (
-                  <img
-                    src={recent2Image}
-                    alt={recent2Title}
-                    className="absolute bottom-3 right-3 w-20 h-20 object-contain rounded-2xl bg-white/15 p-1.5 shadow-md border border-white/10 group-hover:scale-110 transition-transform duration-300"
-                  />
-                )}
-                <span className="text-[10px] font-bold underline flex items-center gap-1">
-                  View Details <ArrowRight className="w-3 h-3" />
-                </span>
               </Link>
 
             </div>
@@ -531,226 +536,116 @@ export default function Home() {
         </div>
 
 
-        {/* ================= SECTION 2: MICROSOFT WINDOWS ================= */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-3.5 mb-6">
-            <h2 className="text-md font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-1.5 h-4 bg-blue-600 rounded-sm" />
-              Microsoft Windows
-            </h2>
-            <Link
-              to="/products?category=Windows"
-              className="text-xxs text-white font-bold bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 rounded-full transition-all shadow-xs"
-            >
-              VIEW ALL
-            </Link>
-          </div>
+        {/* ================= DYNAMIC CATEGORY SECTIONS ================= */}
+        {Object.entries(productsByCategory).map(([categoryName, catProducts]) => {
+          const displayedProducts = catProducts.slice(0, 4);
+          if (displayedProducts.length === 0) return null;
 
-          {loading ? (
-            <div className="py-10 text-center text-slate-400">Loading products...</div>
-          ) : windowsProducts.length === 0 ? (
-            <div className="py-10 text-center text-slate-400">No products found in Windows.</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-              {windowsProducts.map((prod) => {
-                const currentPrice = parseFloat(prod.price);
-                const isOutOfStock = prod.stock === 0;
+          return (
+            <div key={categoryName} className="mb-12">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3.5 mb-6">
+                <h2 className="text-md font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-1.5 h-4 bg-blue-600 rounded-sm" />
+                  {categoryName}
+                </h2>
+                <Link
+                  to={`/products?category=${encodeURIComponent(categoryName)}`}
+                  className="text-xxs text-white font-bold bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 rounded-full transition-all shadow-xs"
+                >
+                  VIEW ALL
+                </Link>
+              </div>
 
-                // Real original price and discount percent if specified
-                const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseInt(prod.discount_percent) > 0;
-                const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
-                const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                {displayedProducts.map((prod) => {
+                  const currentPrice = parseFloat(prod.price);
+                  const isOutOfStock = prod.stock === 0;
 
-                // Fake eye view count based on id
-                const views = 200 + (prod.id * 83) % 300;
+                  // Real original price and discount percent if specified
+                  const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseInt(prod.discount_percent) > 0;
+                  const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
+                  const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
 
-                return (
-                  <div
-                    key={prod.id}
-                    onClick={() => handleProductClick(prod.id)}
-                    className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:shadow-md hover:border-slate-350 transition-all cursor-pointer flex flex-col group relative"
-                  >
-                    {/* Image */}
-                    <div className="aspect-square w-full bg-slate-50 border-b border-slate-100 flex items-center justify-center overflow-hidden relative">
-                      {/* Discount Badge */}
-                      {!isOutOfStock && hasDiscount && (
-                        <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
-                          -{discountPercent}%
-                        </div>
-                      )}
+                  // Fake eye view count based on id
+                  const views = 150 + (prod.id * 97) % 300;
 
-                      {prod.image_url ? (
-                        <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover transition-transform group-hover:scale-103 duration-350" />
-                      ) : (
-                        <span className="text-xs text-slate-400 font-bold uppercase">No Image</span>
-                      )}
-
-                      {isOutOfStock && (
-                        <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex items-center justify-center">
-                          <span className="px-2.5 py-1 bg-red-50 text-red-655 text-[10px] font-extrabold rounded-full border border-red-200">
-                            Out of Stock
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Metadata & Actions */}
-                    <div className="p-4 flex-1 flex flex-col justify-between">
-                      <div>
-                        <h3 className="text-xs font-black text-slate-800 line-clamp-2 leading-snug min-h-[2.5rem]">
-                          {prod.name}
-                        </h3>
-
-                        {/* Views & Price line */}
-                        <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-bold">
-                          <div className="flex items-center gap-1">
-                            <Eye className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{views}</span>
+                  return (
+                    <div
+                      key={prod.id}
+                      onClick={() => handleProductClick(prod.id)}
+                      className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:shadow-md hover:border-slate-350 transition-all cursor-pointer flex flex-col group relative"
+                    >
+                      {/* Image */}
+                      <div className="aspect-square w-full bg-slate-50 border-b border-slate-100 flex items-center justify-center overflow-hidden relative">
+                        {/* Discount Badge */}
+                        {!isOutOfStock && hasDiscount && (
+                          <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                            -{discountPercent}%
                           </div>
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-blue-600 text-sm font-black">{currentPrice.toFixed(0)}৳</span>
-                            {!isOutOfStock && hasDiscount && (
-                              <span className="text-[10px] text-slate-400 line-through font-normal">{originalPrice.toFixed(0)}৳</span>
-                            )}
+                        )}
+
+                        {prod.image_url ? (
+                          <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover transition-transform group-hover:scale-103 duration-350" />
+                        ) : (
+                          <span className="text-xs text-slate-400 font-bold uppercase">No Image</span>
+                        )}
+
+                        {isOutOfStock && (
+                          <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex items-center justify-center">
+                            <span className="px-2.5 py-1 bg-red-50 text-red-655 text-[10px] font-extrabold rounded-full border border-red-200">
+                              Out of Stock
+                            </span>
                           </div>
-                        </div>
+                        )}
                       </div>
 
-                      {/* Action buttons */}
-                      <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100">
-                        <button
-                          onClick={(e) => handleAddToCart(e, prod)}
-                          disabled={isOutOfStock}
-                          className="bg-slate-900 hover:bg-slate-950 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          <ShoppingCart className="w-3 h-3" /> Cart
-                        </button>
-                        <button
-                          onClick={(e) => handleOrderNow(e, prod)}
-                          disabled={isOutOfStock}
-                          className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          Buy Now
-                        </button>
+                      {/* Metadata & Actions */}
+                      <div className="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h3 className="text-xs font-black text-slate-800 line-clamp-2 leading-snug min-h-[2.5rem]">
+                            {prod.name}
+                          </h3>
+
+                          {/* Views & Price line */}
+                          <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-bold">
+                            <div className="flex items-center gap-1">
+                              <Eye className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{views}</span>
+                            </div>
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-blue-600 text-sm font-black">{currentPrice.toFixed(0)}৳</span>
+                              {!isOutOfStock && hasDiscount && (
+                                <span className="text-[10px] text-slate-400 line-through font-normal">{originalPrice.toFixed(0)}৳</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100">
+                          <button
+                            onClick={(e) => handleAddToCart(e, prod)}
+                            disabled={isOutOfStock}
+                            className="bg-slate-900 hover:bg-slate-950 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                          >
+                            <ShoppingCart className="w-3 h-3" /> Cart
+                          </button>
+                          <button
+                            onClick={(e) => handleOrderNow(e, prod)}
+                            disabled={isOutOfStock}
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                          >
+                            Buy Now
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          )}
-        </div>
-
-
-        {/* ================= SECTION 3: SUBSCRIPTION ================= */}
-        <div className="mb-16">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-3.5 mb-6">
-            <h2 className="text-md font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-1.5 h-4 bg-blue-600 rounded-sm" />
-              OTT Subscription
-            </h2>
-            <Link
-              to="/products?category=Subscription"
-              className="text-xxs text-white font-bold bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 rounded-full transition-all shadow-xs"
-            >
-              VIEW ALL
-            </Link>
-          </div>
-
-          {loading ? (
-            <div className="py-10 text-center text-slate-400">Loading products...</div>
-          ) : subscriptionProducts.length === 0 ? (
-            <div className="py-10 text-center text-slate-400">No products found in Subscriptions.</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-              {subscriptionProducts.map((prod) => {
-                const currentPrice = parseFloat(prod.price);
-                const isOutOfStock = prod.stock === 0;
-
-                // Real original price and discount percent if specified
-                const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseInt(prod.discount_percent) > 0;
-                const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
-                const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
-
-                // Fake eye view count based on id
-                const views = 150 + (prod.id * 97) % 300;
-
-                return (
-                  <div
-                    key={prod.id}
-                    onClick={() => handleProductClick(prod.id)}
-                    className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:shadow-md hover:border-slate-350 transition-all cursor-pointer flex flex-col group relative"
-                  >
-                    {/* Image */}
-                    <div className="aspect-square w-full bg-slate-50 border-b border-slate-100 flex items-center justify-center overflow-hidden relative">
-                      {/* Discount Badge */}
-                      {!isOutOfStock && hasDiscount && (
-                        <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
-                          -{discountPercent}%
-                        </div>
-                      )}
-
-                      {prod.image_url ? (
-                        <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover transition-transform group-hover:scale-103 duration-350" />
-                      ) : (
-                        <span className="text-xs text-slate-400 font-bold uppercase">No Image</span>
-                      )}
-
-                      {isOutOfStock && (
-                        <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex items-center justify-center">
-                          <span className="px-2.5 py-1 bg-red-50 text-red-655 text-[10px] font-extrabold rounded-full border border-red-200">
-                            Out of Stock
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Metadata & Actions */}
-                    <div className="p-4 flex-1 flex flex-col justify-between">
-                      <div>
-                        <h3 className="text-xs font-black text-slate-800 line-clamp-2 leading-snug min-h-[2.5rem]">
-                          {prod.name}
-                        </h3>
-
-                        {/* Views & Price line */}
-                        <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-bold">
-                          <div className="flex items-center gap-1">
-                            <Eye className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{views}</span>
-                          </div>
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-blue-600 text-sm font-black">{currentPrice.toFixed(0)}৳</span>
-                            {!isOutOfStock && hasDiscount && (
-                              <span className="text-[10px] text-slate-400 line-through font-normal">{originalPrice.toFixed(0)}৳</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100">
-                        <button
-                          onClick={(e) => handleAddToCart(e, prod)}
-                          disabled={isOutOfStock}
-                          className="bg-slate-900 hover:bg-slate-950 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          <ShoppingCart className="w-3 h-3" /> Cart
-                        </button>
-                        <button
-                          onClick={(e) => handleOrderNow(e, prod)}
-                          disabled={isOutOfStock}
-                          className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          Buy Now
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+          );
+        })}
 
 
         {/* ================= SECTION 4: WHY CHOOSE US ================= */}
