@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { api } from '../utils/api';
-import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown } from 'lucide-react';
+import { api, API_BASE_URL } from '../utils/api';
+import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database } from 'lucide-react';
 
 const parseJSON = (str, fallback) => {
   if (!str) return fallback;
@@ -54,6 +54,7 @@ export default function AdminDashboard() {
   });
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null); // null means adding new
+  const [backingUp, setBackingUp] = useState(false);
   const [categoryForm, setCategoryForm] = useState({
     name: ''
   });
@@ -343,6 +344,51 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDownloadBackup = async () => {
+    try {
+      setBackingUp(true);
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`${API_BASE_URL}/admin/backup`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate backup. Access denied or server error.');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      const contentDisposition = response.headers.get('content-disposition');
+      let filename = 'elitepass_db_backup.sql';
+      if (contentDisposition) {
+        const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+        if (matches && matches[1]) {
+          filename = matches[1];
+        }
+      }
+      
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Database backup downloaded successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to download database backup.');
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
   const filteredProducts = products.filter((prod) => {
     if (!productSearchQuery) return true;
     const query = productSearchQuery.toLowerCase();
@@ -474,6 +520,17 @@ export default function AdminDashboard() {
                 {ticketStats.pending}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('backup')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'backup'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+          >
+            <Database className={`w-4 h-4 shrink-0 ${activeTab === 'backup' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <span>Database Backup</span>
           </button>
         </div>
       </div>
@@ -1161,6 +1218,44 @@ export default function AdminDashboard() {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DATABASE BACKUP TAB */}
+          {activeTab === 'backup' && (
+            <div className="space-y-6 animate-fade-in text-left max-w-2xl">
+              <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700 pt-2">Database Backup Console</h3>
+              
+              <div className="bg-white border border-slate-200/80 p-8 rounded-2xl shadow-xs text-center space-y-6">
+                <div className="w-16 h-16 rounded-full bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-650 mx-auto shadow-xs">
+                  <Database className="w-8 h-8" />
+                </div>
+                
+                <div className="space-y-2 max-w-md mx-auto">
+                  <h4 className="text-base font-extrabold text-slate-900">Download Full Database Backup</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                    Generate and download a complete SQL schema and data dump of the database. 
+                    This backup can be used to restore database tables, products, categories, users, and orders in case of data migration or recovery.
+                  </p>
+                </div>
+                
+                <div className="pt-4 border-t border-slate-100">
+                  <button
+                    onClick={handleDownloadBackup}
+                    disabled={backingUp}
+                    className="flex items-center space-x-2 px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-98 mx-auto disabled:opacity-50"
+                  >
+                    {backingUp ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Generating Backup SQL...</span>
+                      </>
+                    ) : (
+                      <span>Download SQL Backup</span>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

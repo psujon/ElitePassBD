@@ -41,6 +41,68 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/tickets', ticketRoutes);
 
+// Database Backup API Route (Admins Only)
+const { authenticateToken, authorizeAdmin } = require('./middleware/auth');
+const db = require('./config/db');
+
+app.get('/api/admin/backup', authenticateToken, authorizeAdmin, async (req, res, next) => {
+  try {
+    const pool = db.getPool();
+    const [tables] = await pool.query('SHOW TABLES');
+    const dbName = process.env.DB_NAME;
+    const keyName = `Tables_in_${dbName}`;
+
+    let sqlDump = `-- ElitePassBD Database Backup\n`;
+    sqlDump += `-- Date: ${new Date().toISOString()}\n\n`;
+    sqlDump += `SET FOREIGN_KEY_CHECKS=0;\n\n`;
+
+    for (const tableRow of tables) {
+      const tableName = tableRow[keyName] || Object.values(tableRow)[0];
+
+      // Get Create Table statement
+      const [createTableResult] = await pool.query(`SHOW CREATE TABLE \`${tableName}\``);
+      const createTableSql = createTableResult[0]['Create Table'];
+
+      sqlDump += `-- Table structure for table \`${tableName}\`\n`;
+      sqlDump += `DROP TABLE IF EXISTS \`${tableName}\`;\n`;
+      sqlDump += `${createTableSql};\n\n`;
+
+      // Get Rows
+      const [rows] = await pool.query(`SELECT * FROM \`${tableName}\``);
+      if (rows.length > 0) {
+        sqlDump += `-- Dumping data for table \`${tableName}\`\n`;
+        for (const row of rows) {
+          const columns = Object.keys(row).map(c => `\`${c}\``).join(', ');
+          const values = Object.values(row).map(val => {
+            if (val === null) return 'NULL';
+            if (typeof val === 'number') return val;
+            if (val instanceof Date) {
+              const formattedDate = val.toISOString().slice(0, 19).replace('T', ' ');
+              return `'${formattedDate}'`;
+            }
+            if (typeof val === 'object') return `'${JSON.stringify(val).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+
+            // Escape backslashes first, then escape single quotes
+            const escaped = val.toString().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return `'${escaped}'`;
+          }).join(', ');
+
+          sqlDump += `INSERT INTO \`${tableName}\` (${columns}) VALUES (${values});\n`;
+        }
+        sqlDump += `\n`;
+      }
+    }
+
+    sqlDump += `SET FOREIGN_KEY_CHECKS=1;\n`;
+
+    res.setHeader('Content-Type', 'application/sql');
+    res.setHeader('Content-Disposition', `attachment; filename=backup-${dbName}-${new Date().toISOString().slice(0, 10)}.sql`);
+    res.send(sqlDump);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'E-commerce API is running.' });
