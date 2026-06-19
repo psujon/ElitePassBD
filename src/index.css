@@ -96,3 +96,22 @@ body {
 .track-line-inactive {
   background: #1e293b;
 }
+
+/* ReactQuill Premium Overrides */
+.ql-toolbar.ql-snow {
+  border: 1px solid #cbd5e1 !important;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+  background-color: #f8fafc;
+}
+.ql-container.ql-snow {
+  border: 1px solid #cbd5e1 !important;
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  min-height: 150px;
+}
+.ql-editor {
+  min-height: 150px;
+}

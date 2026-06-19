@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { api, API_BASE_URL } from '../utils/api';
 import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database } from 'lucide-react';
 
@@ -348,23 +350,23 @@ export default function AdminDashboard() {
     try {
       setBackingUp(true);
       const token = localStorage.getItem('token');
-      
+
       const response = await fetch(`${API_BASE_URL}/admin/backup`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to generate backup. Access denied or server error.');
       }
-      
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      
+
       const contentDisposition = response.headers.get('content-disposition');
       let filename = 'elitepass_db_backup.sql';
       if (contentDisposition) {
@@ -373,13 +375,13 @@ export default function AdminDashboard() {
           filename = matches[1];
         }
       }
-      
+
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      
+
       toast.success('Database backup downloaded successfully!');
     } catch (err) {
       console.error(err);
@@ -659,7 +661,7 @@ export default function AdminDashboard() {
                   <table className="w-full text-left text-xs border-collapse table-auto">
                     <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xxs tracking-wider border-b border-slate-200/60">
                       <tr>
-                        <th className="pl-4 pr-2 py-3 whitespace-nowrap">ID</th>
+                        {/* <th className="pl-4 pr-2 py-3 whitespace-nowrap">ID</th> */}
                         <th className="px-2 py-3 whitespace-nowrap">Item Details</th>
                         <th className="px-2 py-3 whitespace-nowrap">Category</th>
                         <th className="px-2 py-3 whitespace-nowrap">Description</th>
@@ -685,7 +687,7 @@ export default function AdminDashboard() {
                         displayedProducts.map((prod) => (
                           <tr key={prod.id} className="hover:bg-slate-50/40 transition-colors border-b border-slate-100 text-slate-700 font-medium text-xs">
                             {/* 1. ID */}
-                            <td className="pl-4 pr-2 py-3 font-bold text-slate-800 whitespace-nowrap">{prod.id}</td>
+                            {/* <td className="pl-4 pr-2 py-3 font-bold text-slate-800 whitespace-nowrap">{prod.id}</td> */}
 
                             {/* 2. Item Details (Image & Name) */}
                             <td className="px-2 py-3">
@@ -714,7 +716,7 @@ export default function AdminDashboard() {
                             {/* 3. Category */}
                             <td className="px-2 py-3 whitespace-nowrap">
                               {prod.category_name ? (
-                                <span className="bg-violet-50 text-violet-600 border border-violet-100/60 px-2 py-0.5 rounded-lg text-[10px] font-bold">{prod.category_name}</span>
+                                <span className="bg-violet-50 text-violet-600 border border-violet-100/60 px-2 py-0.5 rounded-lg text-[10px] font-bold wrap-break-word">{prod.category_name}</span>
                               ) : (
                                 <span className="text-slate-450 italic text-[10px]">-</span>
                               )}
@@ -764,27 +766,26 @@ export default function AdminDashboard() {
 
                             {/* 9. Activation */}
                             <td className="px-2 py-3">
-                               <div className="flex flex-col gap-1.5 text-left">
-                                 {prod.activation_options ? (
-                                   <div className="flex flex-wrap gap-1 max-w-[100px]">
-                                     {prod.activation_options.split(',').map((opt, idx) => (
-                                       <span key={idx} className="bg-emerald-50 text-emerald-600 border border-emerald-100/60 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap">{opt.trim()}</span>
-                                     ))}
-                                   </div>
-                                 ) : (
-                                   <span className="text-slate-450 italic text-[10px]">-</span>
-                                 )}
-                                 <div className="text-[9px]">
-                                   <span className={`px-1.5 py-0.5 rounded-md font-extrabold border ${
-                                     prod.activation_process === 'Automatic'
-                                       ? 'bg-blue-50 text-blue-600 border-blue-150'
-                                       : 'bg-amber-55 bg-amber-50 text-amber-600 border-amber-150'
-                                   }`}>
-                                     {prod.activation_process || 'Manual'}
-                                   </span>
-                                 </div>
-                               </div>
-                             </td>
+                              <div className="flex flex-col gap-1.5 text-left">
+                                {prod.activation_options ? (
+                                  <div className="flex flex-wrap gap-1 max-w-[100px]">
+                                    {prod.activation_options.split(',').map((opt, idx) => (
+                                      <span key={idx} className="bg-emerald-50 text-emerald-600 border border-emerald-100/60 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap">{opt.trim()}</span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-450 italic text-[10px]">-</span>
+                                )}
+                                <div className="text-[9px]">
+                                  <span className={`px-1.5 py-0.5 rounded-md font-extrabold border ${prod.activation_process === 'Automatic'
+                                    ? 'bg-blue-50 text-blue-600 border-blue-150'
+                                    : 'bg-amber-55 bg-amber-50 text-amber-600 border-amber-150'
+                                    }`}>
+                                    {prod.activation_process || 'Manual'}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
 
                             {/* 10. Additional Info */}
                             <td className="px-2 py-3 max-w-[110px] whitespace-normal break-words line-clamp-2 text-slate-500 text-[11px]" title={prod.additional_info}>
@@ -1227,20 +1228,20 @@ export default function AdminDashboard() {
           {activeTab === 'backup' && (
             <div className="space-y-6 animate-fade-in text-left max-w-2xl">
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700 pt-2">Database Backup Console</h3>
-              
+
               <div className="bg-white border border-slate-200/80 p-8 rounded-2xl shadow-xs text-center space-y-6">
                 <div className="w-16 h-16 rounded-full bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-650 mx-auto shadow-xs">
                   <Database className="w-8 h-8" />
                 </div>
-                
+
                 <div className="space-y-2 max-w-md mx-auto">
                   <h4 className="text-base font-extrabold text-slate-900">Download Full Database Backup</h4>
                   <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                    Generate and download a complete SQL schema and data dump of the database. 
+                    Generate and download a complete SQL schema and data dump of the database.
                     This backup can be used to restore database tables, products, categories, users, and orders in case of data migration or recovery.
                   </p>
                 </div>
-                
+
                 <div className="pt-4 border-t border-slate-100">
                   <button
                     onClick={handleDownloadBackup}
@@ -1445,24 +1446,27 @@ export default function AdminDashboard() {
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                 <div>
                   <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Description *</label>
-                  <textarea
-                    rows="5"
-                    value={productForm.description}
-                    onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                    placeholder="Details, features, activation region..."
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
-                    required
-                  />
+                  <div className="bg-white rounded-lg overflow-hidden">
+                    <ReactQuill
+                      theme="snow"
+                      value={productForm.description || ''}
+                      onChange={(content) => setProductForm({ ...productForm, description: content })}
+                      placeholder=""
+                      className="text-xs text-slate-800"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Additional Information Box</label>
-                  <textarea
-                    rows="5"
-                    value={productForm.additional_info}
-                    onChange={(e) => setProductForm({ ...productForm, additional_info: e.target.value })}
-                    placeholder="E.g. full period warranty, official accounts, 28 days validity..."
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
-                  />
+                  <div className="bg-white rounded-lg overflow-hidden">
+                    <ReactQuill
+                      theme="snow"
+                      value={productForm.additional_info || ''}
+                      onChange={(content) => setProductForm({ ...productForm, additional_info: content })}
+                      placeholder=""
+                      className="text-xs text-slate-800"
+                    />
+                  </div>
                 </div>
               </div>
 

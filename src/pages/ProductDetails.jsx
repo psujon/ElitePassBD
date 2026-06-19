@@ -484,19 +484,19 @@ export default function ProductDetails() {
           </div>
 
           {/* Tab Content */}
-          <div className="p-6 sm:p-8 space-y-4">
+          <div className="p-6 sm:p-8 space-y-4 text-slate-600">
             {activeTab === 'description' ? (
-              <div className="prose max-w-none text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-                {product.description}
-              </div>
+              <div 
+                className="prose max-w-none text-sm text-slate-600 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: product.description || '' }}
+              />
             ) : (
-              <div className="prose max-w-none text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-                {product.additional_info ? (
-                  product.additional_info
-                ) : (
-                  <p className="italic text-slate-400">No additional information available for this product.</p>
-                )}
-              </div>
+              <div 
+                className="prose max-w-none text-sm text-slate-600 leading-relaxed"
+                dangerouslySetInnerHTML={{ 
+                  __html: product.additional_info || '<p class="italic text-slate-400">No additional information available for this product.</p>' 
+                }}
+              />
             )}
           </div>
         </div>
