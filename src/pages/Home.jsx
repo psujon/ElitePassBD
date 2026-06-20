@@ -653,77 +653,81 @@ export default function Home() {
 
 
         {/* ================= SECTION 4: WHY CHOOSE US ================= */}
-        <div className="bg-slate-50 border border-slate-150 rounded-3xl p-8 mb-12 shadow-xs text-center">
-          <h2 className="text-xl font-black text-slate-900 tracking-tight">
+        <div className="relative bg-slate-50/60 border border-slate-200/60 rounded-3xl p-8 md:p-10 mb-12 shadow-xxs overflow-hidden text-center">
+          {/* Ambient background glow */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-blue-50/30 via-transparent to-transparent opacity-80 pointer-events-none" />
+
+          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-2 relative z-10">
+            <span className="w-2 h-5 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-md" />
             Why Choose ElitePassBD?
           </h2>
-          <p className="text-slate-500 text-xs mt-2 max-w-lg mx-auto">
+          <p className="text-slate-500 text-xs mt-2 max-w-lg mx-auto font-medium relative z-10">
             We're committed to providing the best software purchasing experience with guaranteed authenticity and support.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 relative z-10">
             {/* Card 1 */}
-            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl flex flex-col items-center shadow-xxs">
-              <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3 shadow-xs">
-                <ShieldCheck className="w-5 h-5" />
+            <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-blue-500/8 hover:border-blue-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50/30 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-blue-600 group-hover:to-indigo-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-blue-500/25 group-hover:rotate-[8deg]">
+                <ShieldCheck className="w-6 h-6" />
               </div>
-              <h3 className="text-xs font-black text-slate-950">100% Genuine Licenses</h3>
-              <p className="text-[11px] text-slate-500 mt-2 font-medium">
+              <h3 className="text-xs font-black text-slate-900 group-hover:text-blue-600 transition-colors">100% Genuine Licenses</h3>
+              <p className="text-[11px] text-slate-500 mt-2 font-medium leading-relaxed">
                 All our licenses are sourced from official channels. No cracks, no torrents - just authentic software.
               </p>
             </div>
 
             {/* Card 2 */}
-            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl flex flex-col items-center shadow-xxs">
-              <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3 shadow-xs">
-                <Zap className="w-5 h-5" />
+            <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-orange-500/8 hover:border-orange-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50/30 border border-amber-100 flex items-center justify-center text-amber-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-amber-400 group-hover:to-orange-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-orange-500/25 group-hover:rotate-[8deg]">
+                <Zap className="w-6 h-6" />
               </div>
-              <h3 className="text-xs font-black text-slate-950">Instant Email Delivery</h3>
-              <p className="text-[11px] text-slate-500 mt-2 font-medium">
+              <h3 className="text-xs font-black text-slate-900 group-hover:text-orange-500 transition-colors">Instant Email Delivery</h3>
+              <p className="text-[11px] text-slate-500 mt-2 font-medium leading-relaxed">
                 Receive your license key and download link within minutes of purchase. No waiting required.
               </p>
             </div>
 
             {/* Card 3 */}
-            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl flex flex-col items-center shadow-xxs">
-              <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3 shadow-xs">
-                <Key className="w-5 h-5" />
+            <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-emerald-500/8 hover:border-emerald-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/30 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-emerald-400 group-hover:to-teal-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-emerald-500/25 group-hover:rotate-[8deg]">
+                <Key className="w-6 h-6" />
               </div>
-              <h3 className="text-xs font-black text-slate-950">Secure Activation</h3>
-              <p className="text-[11px] text-slate-500 mt-2 font-medium">
+              <h3 className="text-xs font-black text-slate-900 group-hover:text-emerald-650 transition-colors">Secure Activation</h3>
+              <p className="text-[11px] text-slate-500 mt-2 font-medium leading-relaxed">
                 One-time purchase for lasting use. No recurring fees or subscription renewals for perpetual licenses.
               </p>
             </div>
 
             {/* Card 4 */}
-            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl flex flex-col items-center shadow-xxs">
-              <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3 shadow-xs">
-                <Lock className="w-5 h-5" />
+            <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-indigo-500/8 hover:border-indigo-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50/30 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-indigo-500 group-hover:to-violet-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-indigo-500/25 group-hover:rotate-[8deg]">
+                <Lock className="w-6 h-6" />
               </div>
-              <h3 className="text-xs font-black text-slate-950">Secure Payment</h3>
-              <p className="text-[11px] text-slate-500 mt-2 font-medium">
+              <h3 className="text-xs font-black text-slate-900 group-hover:text-indigo-600 transition-colors">Secure Payment</h3>
+              <p className="text-[11px] text-slate-500 mt-2 font-medium leading-relaxed">
                 Multiple payment options including bKash, Nagad, cards, and international methods like Payoneer.
               </p>
             </div>
 
             {/* Card 5 */}
-            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl flex flex-col items-center shadow-xxs">
-              <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3 shadow-xs">
-                <RotateCcw className="w-5 h-5" />
+            <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-rose-500/8 hover:border-rose-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-50 to-red-50/30 border border-rose-100 flex items-center justify-center text-rose-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-rose-400 group-hover:to-red-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-rose-500/25 group-hover:rotate-[8deg]">
+                <RotateCcw className="w-6 h-6" />
               </div>
-              <h3 className="text-xs font-black text-slate-950">Money-Back Guarantee</h3>
-              <p className="text-[11px] text-slate-500 mt-2 font-medium">
+              <h3 className="text-xs font-black text-slate-900 group-hover:text-rose-500 transition-colors">Money-Back Guarantee</h3>
+              <p className="text-[11px] text-slate-500 mt-2 font-medium leading-relaxed">
                 Not satisfied? Get a full refund within 7 days if you face any activation issues.
               </p>
             </div>
 
             {/* Card 6 */}
-            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl flex flex-col items-center shadow-xxs">
-              <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3 shadow-xs">
-                <Headphones className="w-5 h-5" />
+            <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-purple-500/8 hover:border-purple-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-50 to-fuchsia-50/30 border border-purple-100 flex items-center justify-center text-purple-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-purple-500 group-hover:to-fuchsia-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-purple-500/25 group-hover:rotate-[8deg]">
+                <Headphones className="w-6 h-6" />
               </div>
-              <h3 className="text-xs font-black text-slate-950">24/7 Support</h3>
-              <p className="text-[11px] text-slate-500 mt-2 font-medium">
+              <h3 className="text-xs font-black text-slate-900 group-hover:text-purple-600 transition-colors">24/7 Support</h3>
+              <p className="text-[11px] text-slate-500 mt-2 font-medium leading-relaxed">
                 Our team is always ready to help with activation, installation, or any questions you have.
               </p>
             </div>
@@ -732,62 +736,66 @@ export default function Home() {
 
 
         {/* ================= SECTION 5: HOW IT WORKS ================= */}
-        <div className="bg-slate-50 border border-slate-150 rounded-3xl p-8 mb-12 shadow-xs text-center">
-          <h2 className="text-xl font-black text-slate-900 tracking-tight">
+        <div className="relative bg-slate-50/60 border border-slate-200/60 rounded-3xl p-8 md:p-10 mb-12 shadow-xxs overflow-hidden text-center">
+          {/* Ambient background glow */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-indigo-50/30 via-transparent to-transparent opacity-80 pointer-events-none" />
+
+          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-2 relative z-10">
+            <span className="w-2 h-5 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-md" />
             How It Works
           </h2>
-          <p className="text-slate-500 text-xs mt-2 mx-auto max-w-sm">
+          <p className="text-slate-500 text-xs mt-2 mx-auto max-w-sm font-medium relative z-10">
             Get your software license in just 3 simple steps
           </p>
 
-          <div className="relative flex flex-col md:flex-row justify-between gap-8 mt-12 px-4">
+          <div className="relative flex flex-col md:flex-row justify-between gap-8 mt-12 px-4 relative z-10">
 
             {/* Flowchart connecting line (desktop only) */}
-            <div className="hidden md:block absolute top-10 left-16 right-16 h-0.5 bg-slate-200 -z-10" />
+            <div className="hidden md:block absolute top-12 left-24 right-24 h-[3px] bg-gradient-to-r from-blue-400/30 via-indigo-400/40 to-purple-400/30 -z-10" />
 
             {/* Step 1 */}
-            <div className="flex-1 flex flex-col items-center">
+            <div className="flex-1 bg-white border border-slate-100 p-6 rounded-2xl flex flex-col items-center group hover:shadow-xl hover:shadow-blue-500/5 hover:-translate-y-1.5 transition-all duration-300 ease-out cursor-pointer">
               <div className="relative mb-6">
-                <span className="absolute -top-3.5 -right-3.5 bg-blue-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-slate-50 shadow-sm">
+                <span className="absolute -top-3 -right-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 group-hover:shadow-blue-500/30 z-10">
                   1
                 </span>
-                <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-600 shadow-sm">
-                  <Search className="w-6 h-6" />
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:border-blue-500/40 group-hover:shadow-md group-hover:rotate-6">
+                  <Search className="w-6 h-6 transition-transform duration-300" />
                 </div>
               </div>
-              <h3 className="text-xs font-black text-slate-900">Choose Your Software</h3>
+              <h3 className="text-xs font-black text-slate-900 group-hover:text-blue-600 transition-colors">Choose Your Software</h3>
               <p className="text-[11px] text-slate-500 mt-2 leading-relaxed font-semibold max-w-xs">
                 Browse our catalog and select the software license you need. Compare options and find the best deal.
               </p>
             </div>
 
             {/* Step 2 */}
-            <div className="flex-1 flex flex-col items-center">
+            <div className="flex-1 bg-white border border-slate-100 p-6 rounded-2xl flex flex-col items-center group hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1.5 transition-all duration-300 ease-out cursor-pointer">
               <div className="relative mb-6">
-                <span className="absolute -top-3.5 -right-3.5 bg-blue-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-slate-50 shadow-sm">
+                <span className="absolute -top-3 -right-3 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 group-hover:shadow-indigo-500/30 z-10">
                   2
                 </span>
-                <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-600 shadow-sm">
-                  <Lock className="w-6 h-6" />
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:border-indigo-500/40 group-hover:shadow-md group-hover:rotate-6">
+                  <Lock className="w-6 h-6 transition-transform duration-300" />
                 </div>
               </div>
-              <h3 className="text-xs font-black text-slate-900">Complete Payment</h3>
+              <h3 className="text-xs font-black text-slate-900 group-hover:text-indigo-600 transition-colors">Complete Payment</h3>
               <p className="text-[11px] text-slate-500 mt-2 leading-relaxed font-semibold max-w-xs">
                 Pay securely using bKash, Nagad, credit card, or other methods. Your transaction is protected.
               </p>
             </div>
 
             {/* Step 3 */}
-            <div className="flex-1 flex flex-col items-center">
+            <div className="flex-1 bg-white border border-slate-100 p-6 rounded-2xl flex flex-col items-center group hover:shadow-xl hover:shadow-violet-500/5 hover:-translate-y-1.5 transition-all duration-300 ease-out cursor-pointer">
               <div className="relative mb-6">
-                <span className="absolute -top-3.5 -right-3.5 bg-blue-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-slate-50 shadow-sm">
+                <span className="absolute -top-3 -right-3 bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 group-hover:shadow-violet-500/30 z-10">
                   3
                 </span>
-                <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-600 shadow-sm">
-                  <Zap className="w-6 h-6" />
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-100 flex items-center justify-center text-violet-600 shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:border-violet-500/40 group-hover:shadow-md group-hover:rotate-6">
+                  <Zap className="w-6 h-6 transition-transform duration-300 animate-pulse" />
                 </div>
               </div>
-              <h3 className="text-xs font-black text-slate-900">Receive & Activate</h3>
+              <h3 className="text-xs font-black text-slate-900 group-hover:text-violet-650 transition-colors">Receive & Activate</h3>
               <p className="text-[11px] text-slate-500 mt-2 leading-relaxed font-semibold max-w-xs">
                 Get your license key and download link via email instantly. Follow our simple activation guide.
               </p>
