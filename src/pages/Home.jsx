@@ -23,6 +23,17 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
+const getProductDisplayPrice = (prod) => {
+  if (!prod) return 0;
+  if (prod.packages && prod.packages.length > 0) {
+    const prices = prod.packages.map(p => parseFloat(p.price)).filter(p => !isNaN(p));
+    if (prices.length > 0) {
+      return Math.min(...prices);
+    }
+  }
+  return parseFloat(prod.price) || 0;
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
@@ -66,8 +77,7 @@ export default function Home() {
 
   const handleOrderNow = (e, product) => {
     e.stopPropagation();
-    addToCart(product, 1);
-    navigate('/checkout');
+    navigate(`/product/${product.id}`);
   };
 
   // Filter products for sections
@@ -114,10 +124,10 @@ export default function Home() {
 
   // Dynamic Hot Selling Product
   const hotProduct = products.filter(p => !!p.is_hot).sort((a, b) => b.id - a.id)[0];
-  const hotName = hotProduct?.name || "Internet Download Manager";
-  const hotImage = hotProduct?.image_url || "https://www.digitalproductsbd.com/wp-content/uploads/IDM-min-600x600.webp";
-  const hotSub = hotProduct?.category_name || "5x FASTER DOWNLOAD";
-  const hotCurrentPrice = hotProduct ? parseFloat(hotProduct.price) : 120.00;
+  const hotName = hotProduct?.name;
+  const hotImage = hotProduct?.image_url;
+  const hotSub = hotProduct?.category_name;
+  const hotCurrentPrice = hotProduct ? getProductDisplayPrice(hotProduct) : 0.00;
 
   const hasHotDiscount = hotProduct && hotProduct.discount_percent !== null && hotProduct.discount_percent !== undefined && parseInt(hotProduct.discount_percent) > 0;
   const hotDiscountPercent = hasHotDiscount ? parseInt(hotProduct.discount_percent) : 45;
@@ -126,7 +136,8 @@ export default function Home() {
   // Split description sentences for checkmarks
   let hotBullets = [];
   if (hotProduct && hotProduct.description) {
-    hotBullets = hotProduct.description
+    const cleanDesc = hotProduct.description.replace(/<[^>]*>/g, '');
+    hotBullets = cleanDesc
       .split(/[.\n]+/)
       .map(s => s.trim())
       .filter(s => s.length > 12)
@@ -149,9 +160,6 @@ export default function Home() {
       phone: "01925-112444",
       accent: "from-blue-600 to-indigo-900",
       images: [
-        'https://www.digitalproductsbd.com/wp-content/uploads/Windows-11-Pro-min-600x600.webp',
-        'https://www.digitalproductsbd.com/wp-content/uploads/Office-365-Pro-Plus-min-600x600.webp',
-        'https://www.digitalproductsbd.com/wp-content/uploads/Windows-10-Pro-min-600x600.webp'
       ]
     },
     {
@@ -161,9 +169,6 @@ export default function Home() {
       phone: "01925-112444",
       accent: "from-violet-600 to-purple-950",
       images: [
-        'https://www.digitalproductsbd.com/wp-content/uploads/Adobe-Creative-Cloud-min-600x600.webp',
-        'https://www.digitalproductsbd.com/wp-content/uploads/Freepik-Premium-min-600x600.webp',
-        'https://www.hatchwise.com/wp-content/uploads/2024/05/image-12-1024x623-1.jpeg'
       ]
     }
   ];
@@ -218,10 +223,10 @@ export default function Home() {
       <div className="max-w-full mx-auto px-4 sm:px-6">
 
         {/* ================= HERO & PROMOTIONS SECTION ================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-15 md:mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-15 md:mb-8">
 
           {/* Left: Dynamic Carousel Slider */}
-          <div className="lg:col-span-2 relative rounded-3xl overflow-hidden shadow-xs h-[420px] group bg-slate-900">
+          <div className="relative rounded-3xl overflow-hidden shadow-xs h-[420px] group bg-slate-900">
             {slides.map((slide, idx) => (
               <div
                 key={slide.id}
@@ -290,7 +295,7 @@ export default function Home() {
           </div>
 
           {/* Right Column: Promos and Featured */}
-          <div className="flex flex-col gap-6 h-[420px]">
+          <div className="flex flex-col gap-6 lg:h-[420px]">
 
             {/* Promo 1: Dynamic Hot Selling Highlight Box */}
             <div
@@ -343,8 +348,7 @@ export default function Home() {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (hotProduct) {
-                      addToCart(hotProduct, 1);
-                      navigate('/checkout');
+                      navigate(`/product/${hotProduct.id}`);
                     } else {
                       navigate('/products?category=Windows');
                     }
@@ -415,7 +419,7 @@ export default function Home() {
 
 
         {/* ================= SECTION 1: THE BEST SELLERS ================= */}
-        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 mb-12 shadow-xs">
+        <div className="bg-white border border-slate-200/80 rounded-3xl mb-12 shadow-xs">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
             <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
               <span className="w-2 h-5 bg-blue-600 rounded-md" />
@@ -436,7 +440,7 @@ export default function Home() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {bestSellers.map((prod) => {
-                const currentPrice = parseFloat(prod.price);
+                const currentPrice = getProductDisplayPrice(prod);
                 const isOutOfStock = prod.stock === 0;
 
                 // Real original price and discount percent if specified
@@ -558,7 +562,7 @@ export default function Home() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
                 {displayedProducts.map((prod) => {
-                  const currentPrice = parseFloat(prod.price);
+                  const currentPrice = getProductDisplayPrice(prod);
                   const isOutOfStock = prod.stock === 0;
 
                   // Real original price and discount percent if specified

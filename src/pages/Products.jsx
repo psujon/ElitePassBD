@@ -5,6 +5,17 @@ import { Search, Loader2, Star, CheckCircle, AlertTriangle, ShoppingCart } from 
 import { useCart } from '../context/CartContext';
 import { toast } from 'react-hot-toast';
 
+const getProductDisplayPrice = (prod) => {
+  if (!prod) return 0;
+  if (prod.packages && prod.packages.length > 0) {
+    const prices = prod.packages.map(p => parseFloat(p.price)).filter(p => !isNaN(p));
+    if (prices.length > 0) {
+      return Math.min(...prices);
+    }
+  }
+  return parseFloat(prod.price) || 0;
+};
+
 export default function Products() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -67,8 +78,7 @@ export default function Products() {
 
   const handleOrderNow = (e, product) => {
     e.stopPropagation();
-    addToCart(product, 1);
-    navigate('/checkout');
+    navigate(`/product/${product.id}`);
   };
 
   const handleCategorySelect = (catName) => {
@@ -83,7 +93,7 @@ export default function Products() {
   const filteredProducts = products.filter((prod) => {
     const matchesSearch = prod.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prod.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPrice = maxPrice ? parseFloat(prod.price) <= parseFloat(maxPrice) : true;
+    const matchesPrice = maxPrice ? getProductDisplayPrice(prod) <= parseFloat(maxPrice) : true;
     const matchesCategory = selectedCategory === 'All' ||
       (prod.category_name && prod.category_name.toLowerCase() === selectedCategory.toLowerCase());
     return matchesSearch && matchesPrice && matchesCategory;
@@ -118,7 +128,7 @@ export default function Products() {
 
           <div className="flex w-full md:w-auto items-center gap-3 justify-end">
             <div className="relative flex items-center bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-1 text-sm text-slate-500 w-full md:w-48">
-              <span className="text-slate-400 mr-1.5">Max: ৳</span>
+              <span className="text-slate-400 mr-1.5">Max:</span>
               <input
                 type="number"
                 placeholder="Price limit"
@@ -236,7 +246,7 @@ export default function Products() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProducts.map((prod) => {
-                  const currentPrice = parseFloat(prod.price);
+                  const currentPrice = getProductDisplayPrice(prod);
                   const isOutOfStock = prod.stock === 0;
 
                   // Real original price and discount percent if specified
