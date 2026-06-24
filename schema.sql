@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_method VARCHAR(50) DEFAULT 'Cash on Delivery',
     cancel_reason VARCHAR(255) DEFAULT NULL,
     additional_notes TEXT DEFAULT NULL,
+    transaction_id VARCHAR(255) DEFAULT NULL,
+    payment_status ENUM('Pending', 'Paid', 'Failed', 'Cancelled') DEFAULT 'Pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -97,6 +99,20 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- 7. Product Licenses Table
+CREATE TABLE IF NOT EXISTS product_licenses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    activation_option VARCHAR(255) DEFAULT NULL,
+    package_option VARCHAR(255) DEFAULT NULL,
+    license_key VARCHAR(255) NOT NULL,
+    is_used TINYINT DEFAULT 0,
+    order_item_id INT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE SET NULL
 );
 
 -- Insert a default Admin account for testing (password is 'admin123' bcrypt hash: $2a$10$wK1F5lCqU.s5/D7fGv3Kfe.Z3FEX2VwE885g9qLDRX2yN60p2G9nK)

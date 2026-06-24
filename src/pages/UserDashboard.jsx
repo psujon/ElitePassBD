@@ -559,6 +559,17 @@ export default function UserDashboard() {
                             )}
 
                             <p className="text-xxs text-slate-500 mt-1.5">Qty: {item.quantity} × ৳{parseFloat(item.price).toFixed(2)}</p>
+
+                            {item.license_keys && item.license_keys.length > 0 && (
+                              <div className="mt-2.5 p-2.5 bg-emerald-50 border border-emerald-150 rounded-xl text-emerald-800 space-y-1">
+                                <span className="block text-[9px] font-black uppercase tracking-wider text-emerald-600">License Key(s) / Code(s):</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {item.license_keys.map((key, keyIdx) => (
+                                    <code key={keyIdx} className="block text-xxs font-mono bg-white px-2 py-1 border border-emerald-100 rounded select-all font-bold w-fit">{key}</code>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
                             <span className="font-extrabold text-slate-800">৳{(item.quantity * parseFloat(item.price)).toFixed(2)}</span>

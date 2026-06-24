@@ -14,7 +14,8 @@ import {
   Smartphone,
   DollarSign,
   Mail,
-  FileText
+  FileText,
+  Lock
 } from 'lucide-react';
 
 export default function Checkout() {
@@ -38,9 +39,7 @@ export default function Checkout() {
   const [phone, setPhone] = useState(user?.whatsapp_number || '');
   const [deliveryEmail, setDeliveryEmail] = useState('');
   const [guestName, setGuestName] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('bkash');
-  const [bkashNumber, setBkashNumber] = useState('');
-  const [bkashTxId, setBkashTxId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('online_payment');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [orderSuccess, setOrderSuccess] = useState(null);
@@ -74,12 +73,6 @@ export default function Checkout() {
       return;
     }
 
-    if (['bkash', 'nagad', 'rocket'].includes(paymentMethod) && (!bkashNumber || !bkashTxId)) {
-      const methodName = paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket';
-      setError(`Please provide your ${methodName} number and transaction ID.`);
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       setError('');
@@ -94,11 +87,9 @@ export default function Checkout() {
           selected_activation: item.selected_activation || null
         })),
         total_amount: cartTotal,
-        shipping_address: address,
+        shipping_address: address || "",
         phone: phone,
-        payment_method: ['bkash', 'nagad', 'rocket'].includes(paymentMethod)
-          ? `${paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} (No: ${bkashNumber}, TxID: ${bkashTxId})`
-          : paymentMethod,
+        payment_method: 'Online Payment',
         additional_notes: additionalNotes,
         delivery_email: deliveryEmail
       };
@@ -116,13 +107,22 @@ export default function Checkout() {
 
       setOrderSuccess({
         orderId: res.orderId,
-        message: res.message || 'Order placed successfully!'
+        message: 'Redirecting to payment gateway...'
       });
 
-      clearCart();
+      // Initiate EPS payment gateway redirect
+      const payRes = await api.post('/payments/initiate', { orderId: res.orderId });
+
+      if (payRes && payRes.redirectUrl) {
+        clearCart();
+        window.location.href = payRes.redirectUrl;
+      } else {
+        throw new Error('Failed to initiate payment gateway.');
+      }
     } catch (err) {
       console.error(err);
       setError(err.message || 'Failed to place order. Please check stock and try again.');
+      setOrderSuccess(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -133,59 +133,15 @@ export default function Checkout() {
       <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] py-20 flex flex-col justify-center items-center text-left animate-fade-in">
         <div className="max-w-md w-full mx-auto px-4">
           <div className="bg-white border border-slate-200/80 rounded-3xl p-8 text-center shadow-md">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-emerald-50 text-emerald-600 mb-6 shadow-xs">
-              <CheckCircle2 className="h-10 w-10" />
+            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-violet-50 text-violet-600 mb-6 shadow-xs">
+              <Loader2 className="h-10 w-10 animate-spin" />
             </div>
-            <h2 className="text-2xl font-extrabold text-[#411f52] tracking-tight">
-              Order Confirmed!
+            <h2 className="text-2xl font-extrabold text-[#411f52] tracking-tight animate-pulse">
+              Connecting Gateway...
             </h2>
             <p className="text-slate-500 text-sm mt-3 leading-relaxed">
-              Thank you for your purchase. Your order has been placed successfully.
+              Please wait while we redirect you to the secure EPS payment portal to complete your order. Do not close or refresh this page.
             </p>
-
-            <div className="my-6 p-4 bg-slate-50 rounded-2xl border border-slate-150 text-left space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Order ID:</span>
-                <span className="text-violet-600 font-extrabold">#{orderSuccess.orderId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Payment Method:</span>
-                <span className="text-pink-600 font-bold">
-                  {['bkash', 'nagad', 'rocket'].includes(paymentMethod)
-                    ? `${paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} (No: ${bkashNumber}, TxID: ${bkashTxId})`
-                    : paymentMethod}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Shipping To:</span>
-                <span className="text-slate-800 font-bold truncate max-w-[200px]">{address}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">WhatsApp/Phone:</span>
-                <span className="text-slate-800 font-bold">{phone}</span>
-              </div>
-              {additionalNotes && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Additional Notes:</span>
-                  <span className="text-slate-800 font-bold truncate max-w-[200px]">{additionalNotes}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <Link
-                to="/dashboard"
-                className="block w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl text-sm transition-all shadow-sm text-center"
-              >
-                Track Order in Dashboard
-              </Link>
-              <Link
-                to="/"
-                className="block w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 font-bold rounded-xl text-sm transition-colors border border-slate-200 text-center"
-              >
-                Continue Shopping
-              </Link>
-            </div>
           </div>
         </div>
       </div>
@@ -319,7 +275,7 @@ export default function Checkout() {
                 </div>
               )}
 
-              <div>
+              {/* <div>
                 <label className="block text-xxs font-bold text-slate-500 tracking-wider mb-1.5">
                   Shipping / Delivery Address
                 </label>
@@ -333,7 +289,7 @@ export default function Checkout() {
                   />
                   <MapPin className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
                 </div>
-              </div>
+              </div> */}
 
               <div>
                 <label className="block text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
@@ -353,115 +309,36 @@ export default function Checkout() {
 
               <div className="space-y-4 pt-2">
                 <h3 className="text-base font-bold text-slate-805 border-b border-slate-150 pb-3 flex items-center space-x-2">
-                  <CreditCard className="w-5 h-5 text-pink-600" />
+                  <CreditCard className="w-5 h-5 text-violet-600" />
                   <span>Payment Method</span>
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <label className={`flex items-start space-x-3 p-4 rounded-xl border cursor-pointer transition-all ${paymentMethod === 'bkash'
-                    ? 'border-pink-500 bg-pink-50/50'
-                    : 'border-slate-200 bg-slate-50/30 hover:border-slate-355'
-                    }`}>
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="bkash"
-                      checked={paymentMethod === 'bkash'}
-                      onChange={() => setPaymentMethod('bkash')}
-                      className="mt-1 accent-pink-600"
-                    />
-                    <div className="text-left">
-                      <span className="block text-sm font-bold text-slate-800 flex items-center">
-                        <span>bKash</span>
-                        <span className="ml-2 text-[8px] px-1 py-0.5 bg-pink-100 text-pink-600 rounded-md border border-pink-200 font-extrabold uppercase tracking-wide">Popular</span>
-                      </span>
-                      <span className="block text-xs text-slate-500 mt-0.5">Manual verification</span>
+                <div className="p-5 bg-violet-50/50 border border-violet-150 rounded-2xl space-y-3">
+                  <div className="flex items-start space-x-3 text-left">
+                    <div className="bg-violet-600 text-white p-2 rounded-xl mt-0.5 shrink-0">
+                      <Lock className="w-5 h-5" />
                     </div>
-                  </label>
-                  <label className={`flex items-start space-x-3 p-4 rounded-xl border cursor-pointer transition-all ${paymentMethod === 'nagad'
-                    ? 'border-pink-500 bg-pink-50/50'
-                    : 'border-slate-200 bg-slate-50/30 hover:border-slate-355'
-                    }`}>
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="nagad"
-                      checked={paymentMethod === 'nagad'}
-                      onChange={() => setPaymentMethod('nagad')}
-                      className="mt-1 accent-pink-600"
-                    />
-                    <div className="text-left">
-                      <span className="block text-sm font-bold text-slate-800 flex items-center">
-                        <span>Nagad</span>
-                      </span>
-                      <span className="block text-xs text-slate-500 mt-0.5">Manual verification</span>
-                    </div>
-                  </label>
-                  <label className={`flex items-start space-x-3 p-4 rounded-xl border cursor-pointer transition-all ${paymentMethod === 'rocket'
-                    ? 'border-pink-500 bg-pink-50/50'
-                    : 'border-slate-200 bg-slate-50/30 hover:border-slate-355'
-                    }`}>
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="rocket"
-                      checked={paymentMethod === 'rocket'}
-                      onChange={() => setPaymentMethod('rocket')}
-                      className="mt-1 accent-pink-600"
-                    />
-                    <div className="text-left">
-                      <span className="block text-sm font-bold text-slate-800 flex items-center">
-                        <span>Rocket</span>
-                      </span>
-                      <span className="block text-xs text-slate-500 mt-0.5">Manual verification</span>
-                    </div>
-                  </label>
-                </div>
-
-                {['bkash', 'nagad', 'rocket'].includes(paymentMethod) && (
-                  <div className="p-4 bg-pink-50 border border-pink-150 rounded-xl space-y-4 animate-fade-in">
-                    <div className="p-3 bg-pink-100/50 border border-pink-200 rounded-lg text-xs text-pink-700">
-                      <p className="font-extrabold text-left">
-                        Simulated {paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} Payment Instructions:
+                    <div>
+                      <h4 className="text-sm font-extrabold text-slate-800">Online Payment (Instant & Secure)</h4>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        You will be redirected to the secure **Easy Payment System (EPS)** gateway to pay. Supports:
                       </p>
-                      <p className="mt-1 text-slate-600 text-left leading-relaxed">
-                        1. Send the total amount <strong>৳{cartTotal.toFixed(2)}</strong> to {paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} Personal: <strong>017********</strong>.
-                        <br />
-                        2. Input your {paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} sender number and the Transaction ID below.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="text-left">
-                        <label className="block text-left text-xxs font-bold text-pink-600  tracking-wider mb-1.5">
-                          {paymentMethod === 'bkash' ? 'bKash' : paymentMethod === 'nagad' ? 'Nagad' : 'Rocket'} Number
-                        </label>
-                        <input
-                          type="text"
-                          value={bkashNumber}
-                          onChange={(e) => setBkashNumber(e.target.value)}
-                          placeholder="e.g. 017XXXXXXXX"
-                          className="w-full text-sm bg-white border border-slate-200 focus:border-pink-500 focus:outline-none rounded-xl px-4 py-2.5 text-slate-850 placeholder-slate-400 transition-colors"
-                          required={['bkash', 'nagad', 'rocket'].includes(paymentMethod)}
-                        />
-                      </div>
-
-                      <div className="text-left">
-                        <label className="block text-left text-xxs font-bold text-pink-600  tracking-wider mb-1.5">
-                          Transaction ID
-                        </label>
-                        <input
-                          type="text"
-                          value={bkashTxId}
-                          onChange={(e) => setBkashTxId(e.target.value)}
-                          placeholder="e.g. TRX8462846"
-                          className="w-full text-sm bg-white border border-slate-200 focus:border-pink-500 focus:outline-none rounded-xl px-4 py-2.5 text-slate-850 placeholder-slate-400 transition-colors"
-                          required={['bkash', 'nagad', 'rocket'].includes(paymentMethod)}
-                        />
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <span className="text-[10px] px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md font-extrabold">bKash</span>
+                        <span className="text-[10px] px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md font-extrabold">Nagad</span>
+                        <span className="text-[10px] px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md font-extrabold">Rocket</span>
+                        <span className="text-[10px] px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md font-extrabold">Visa/Mastercard</span>
+                        <span className="text-[10px] px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md font-extrabold">Internet Banking</span>
                       </div>
                     </div>
                   </div>
-                )}
+                  <div className="pt-3 border-t border-violet-100/70 flex items-center justify-between text-slate-500 text-[10px] tracking-wide">
+                    <span className="flex items-center space-x-1 font-bold">
+                      <span>🛡️ SECURE 256-BIT SSL CONNECTION</span>
+                    </span>
+                    <span className="font-extrabold text-violet-600 uppercase">Instant Activation</span>
+                  </div>
+                </div>
               </div>
 
               <button

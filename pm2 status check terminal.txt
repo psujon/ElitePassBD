@@ -13,3 +13,9 @@
 
 
 ./node_modules/pm2/bin/pm2 stop server.js --name "elitepass-backend"
+
+
+source /home/elitepas/nodevenv/nodeapp/22/bin/activate
+cd /home/elitepas/nodeapp
+node server.js
+

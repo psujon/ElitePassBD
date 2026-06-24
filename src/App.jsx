@@ -26,6 +26,9 @@ import ProductDetails from './pages/ProductDetails';
 import AboutUs from './pages/AboutUs';
 import RefundPolicy from './pages/RefundPolicy';
 import Products from './pages/Products';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentFail from './pages/PaymentFail';
+import PaymentCancel from './pages/PaymentCancel';
 
 
 // Protected Route Guard (For Logged in Users)
@@ -84,6 +87,11 @@ function AppContent() {
 
           {/* Checkout Page */}
           <Route path="/checkout" element={<Checkout />} />
+
+          {/* Payment Gateway Callbacks */}
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/fail" element={<PaymentFail />} />
+          <Route path="/payment/cancel" element={<PaymentCancel />} />
 
           {/* Admin Product CRUD & Order Updates */}
           <Route

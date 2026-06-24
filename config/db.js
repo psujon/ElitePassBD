@@ -106,6 +106,7 @@ async function createTables() {
       phone VARCHAR(20) NOT NULL,
       payment_method VARCHAR(50) DEFAULT 'Cash on Delivery',
       cancel_reason VARCHAR(255) DEFAULT NULL,
+      delivery_email VARCHAR(255) DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -165,6 +166,21 @@ async function createTables() {
     );
   `;
 
+  const productLicensesTable = `
+    CREATE TABLE IF NOT EXISTS product_licenses (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      product_id INT NOT NULL,
+      activation_option VARCHAR(255) DEFAULT NULL,
+      package_option VARCHAR(255) DEFAULT NULL,
+      license_key VARCHAR(255) NOT NULL,
+      is_used TINYINT DEFAULT 0,
+      order_item_id INT DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE SET NULL
+    );
+  `;
+
   await pool.query(usersTable);
   await pool.query(categoriesTable);
   await pool.query(productsTable);
@@ -173,6 +189,7 @@ async function createTables() {
   await pool.query(reviewsTable);
   await pool.query(supportTicketsTable);
   await pool.query(passwordResetsTable);
+  await pool.query(productLicensesTable);
 
   // Seed default admin if not exists
   const [rows] = await pool.query('SELECT * FROM users WHERE role = "admin" LIMIT 1');
@@ -192,6 +209,18 @@ async function createTables() {
 
 async function updateSchema() {
   try {
+    const [transCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'transaction_id'");
+    if (transCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN transaction_id VARCHAR(255) DEFAULT NULL");
+      console.log("Added column 'transaction_id' to 'orders' table.");
+    }
+
+    const [payStatusCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'payment_status'");
+    if (payStatusCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN payment_status ENUM('Pending', 'Paid', 'Failed', 'Cancelled') DEFAULT 'Pending'");
+      console.log("Added column 'payment_status' to 'orders' table.");
+    }
+
     const [userColumns] = await pool.query("SHOW COLUMNS FROM users LIKE 'whatsapp_number'");
     if (userColumns.length === 0) {
       await pool.query("ALTER TABLE users ADD COLUMN whatsapp_number VARCHAR(20) DEFAULT NULL");
@@ -208,6 +237,12 @@ async function updateSchema() {
     if (additionalNotesCols.length === 0) {
       await pool.query("ALTER TABLE orders ADD COLUMN additional_notes TEXT DEFAULT NULL");
       console.log("Added column 'additional_notes' to 'orders' table.");
+    }
+
+    const [deliveryEmailCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'delivery_email'");
+    if (deliveryEmailCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN delivery_email VARCHAR(255) DEFAULT NULL");
+      console.log("Added column 'delivery_email' to 'orders' table.");
     }
 
     const [prodColumns] = await pool.query("SHOW COLUMNS FROM products LIKE 'category_id'");
@@ -360,90 +395,6 @@ async function seedCategoriesAndProducts() {
         packages: JSON.stringify([{ duration: '1 Year', price: '950' }]),
         device_options: 'All Devices',
         activation_options: 'Shared Account'
-      },
-      {
-        name: 'Freepik Premium 1/12 Month',
-        description: 'High-quality vectors, stock photos, PSD, and templates with Freepik Premium subscription.',
-        price: 500.00,
-        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Freepik-Premium-min-600x600.webp',
-        stock: 0,
-        category_name: 'Subscription',
-        tags: 'Best Sellers, Graphic, Subscription, Designer',
-        additional_info: 'Premium assets download limit: 100 per day.',
-        faqs: JSON.stringify([{ q: 'Is it a personal email account?', a: 'No, this is a shared high-quality team access.' }]),
-        packages: JSON.stringify([{ duration: '1 Month', price: '500' }, { duration: '12 Months', price: '9800' }]),
-        device_options: 'Browser Only',
-        activation_options: 'Shared Access'
-      },
-      {
-        name: 'Windows 11 Pro Genuine Retail/OEM License Key',
-        description: 'Windows 11 Pro Retail/OEM License activation key. Lifetime valid, fast digital delivery.',
-        price: 799.00,
-        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Windows-11-Pro-min-600x600.webp',
-        stock: 20,
-        category_name: 'Windows',
-        tags: 'Best Sellers, Windows, Microsoft, OS',
-        additional_info: 'Single PC lifetime license. Bindable key. Supports both 32-bit and 64-bit.',
-        faqs: JSON.stringify([{ q: 'Is this upgradeable to future updates?', a: 'Yes, you will receive all official Microsoft updates.' }]),
-        packages: JSON.stringify([{ duration: 'Lifetime', price: '799' }]),
-        device_options: 'PC',
-        activation_options: 'OEM, Retail'
-      },
-      {
-        name: 'Windows 10 Pro Genuine Retail/OEM License Key',
-        description: 'Windows 10 Pro Retail/OEM License activation key. Fast delivery, lifetime activation.',
-        price: 699.00,
-        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Windows-10-Pro-min-600x600.webp',
-        stock: 25,
-        category_name: 'Windows',
-        tags: 'Best Sellers, Windows, Microsoft, OS',
-        additional_info: 'OEM/Retail online activation key. Global activation.',
-        faqs: JSON.stringify([{ q: 'Can I reactivate after reinstalling OS?', a: 'Yes, the key binds to your motherboard for digital activation.' }]),
-        packages: JSON.stringify([{ duration: 'Lifetime', price: '699' }]),
-        device_options: 'PC',
-        activation_options: 'OEM, Retail'
-      },
-      {
-        name: 'Autodesk Official Subscription',
-        description: 'Autodesk AutoCAD / Maya / 3ds Max student or commercial official subscription access.',
-        price: 300.00,
-        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Autodesk-Official-Subscription-min-600x600.webp',
-        stock: 12,
-        category_name: 'Creative Software',
-        tags: 'Creative, Autodesk, Engineering, Design',
-        additional_info: 'Activates on your own email. 1-year warranty.',
-        faqs: JSON.stringify([{ q: 'Is it official?', a: 'Yes, activated directly on Autodesk portal.' }]),
-        packages: JSON.stringify([{ duration: '1 Year', price: '300' }]),
-        device_options: 'PC, Mac',
-        activation_options: 'Personal Email'
-      },
-      {
-        name: 'Internet Download Manager (IDM) License Key',
-        description: 'Internet Download Manager (IDM) 1-Year or Lifetime registration serial license key.',
-        price: 244.00,
-        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/IDM-min-600x600.webp',
-        stock: 30,
-        category_name: 'Windows',
-        tags: 'Utility, Downloader, Windows',
-        additional_info: '5x faster downloads. Integrates with all major browsers.',
-        faqs: JSON.stringify([{ q: 'Is this lifetime?', a: 'We offer both 1-Year and Lifetime packages.' }]),
-        packages: JSON.stringify([{ duration: '1 Year', price: '120' }, { duration: 'Lifetime', price: '244' }]),
-        device_options: 'PC Only',
-        activation_options: 'Personal Registration'
-      },
-      {
-        name: 'Adobe Creative Cloud All Apps',
-        description: 'Adobe Creative Cloud All Apps subscription. Photoshop, Premiere, Illustrator on your own email.',
-        price: 244.00,
-        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Adobe-Creative-Cloud-min-600x600.webp',
-        stock: 15,
-        category_name: 'Creative Software',
-        tags: 'Creative, Adobe, Design, Photoshop',
-        additional_info: '100GB Cloud Storage included. Activates on your personal Adobe ID.',
-        faqs: JSON.stringify([{ q: 'How many devices can I log in?', a: 'Up to 2 devices simultaneously.' }]),
-        packages: JSON.stringify([{ duration: '1 Month', price: '120' }, { duration: '1 Year', price: '244' }]),
-        device_options: 'PC, Mac, iPad',
-        activation_options: 'Personal Account'
       }
     ];
 

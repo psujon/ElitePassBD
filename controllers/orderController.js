@@ -2,7 +2,7 @@ const db = require('../config/db');
 
 // Create Order (User)
 exports.createOrder = async (req, res) => {
-  const { items, total_amount, shipping_address, phone, payment_method, additional_notes } = req.body;
+  const { items, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email } = req.body;
   const userId = req.user.id;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -21,8 +21,8 @@ exports.createOrder = async (req, res) => {
 
     // 1. Insert order record
     const [orderResult] = await connection.query(
-      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery', additional_notes || null]
+      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [userId, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || null]
     );
     const orderId = orderResult.insertId;
 
@@ -98,6 +98,16 @@ exports.getMyOrders = async (req, res) => {
          WHERE oi.order_id = ?`,
         [order.id]
       );
+
+      // Fetch associated license keys for each order item
+      for (const item of items) {
+        const [licenses] = await db.query(
+          'SELECT license_key FROM product_licenses WHERE order_item_id = ?',
+          [item.id]
+        );
+        item.license_keys = licenses.map(l => l.license_key);
+      }
+
       ordersWithItems.push({
         ...order,
         items
@@ -139,6 +149,15 @@ exports.trackOrder = async (req, res) => {
       [order.id]
     );
 
+    // Fetch associated license keys for each order item
+    for (const item of items) {
+      const [licenses] = await db.query(
+        'SELECT license_key FROM product_licenses WHERE order_item_id = ?',
+        [item.id]
+      );
+      item.license_keys = licenses.map(l => l.license_key);
+    }
+
     res.json({
       ...order,
       items
@@ -169,6 +188,16 @@ exports.getAllOrders = async (req, res) => {
          WHERE oi.order_id = ?`,
         [order.id]
       );
+
+      // Fetch associated license keys for each order item
+      for (const item of items) {
+        const [licenses] = await db.query(
+          'SELECT license_key FROM product_licenses WHERE order_item_id = ?',
+          [item.id]
+        );
+        item.license_keys = licenses.map(l => l.license_key);
+      }
+
       ordersWithItems.push({
         ...order,
         items
@@ -328,19 +357,19 @@ const sendGuestAccountEmail = async (email, name, password) => {
       console.log(`Guest credentials email sent successfully to ${email}`);
     } else {
       console.log('----------------------------');
-      console.log(`MOCK SMTP: Guest Credentials -> Name: [${name}], email: [${email}], password: [${password}]`);
+      console.log(`MOCK SMTP: Guest Credentials -> Name: [${name}], email: [${email}], password: [REDACTED]`);
       console.log('----------------------------');
     }
   } catch (error) {
     console.error('Failed to send guest credentials email:', error);
     console.log('----------------------------');
-    console.log(`FALLBACK: Guest Credentials -> Name: [${name}], email: [${email}], password: [${password}]`);
+    console.log(`FALLBACK: Guest Credentials -> Name: [${name}], email: [${email}], password: [REDACTED]`);
     console.log('----------------------------');
   }
 };
 
 exports.createGuestOrder = async (req, res) => {
-  const { items, total_amount, shipping_address, phone, payment_method, additional_notes, guest_name, guest_email } = req.body;
+  const { items, total_amount, shipping_address, phone, payment_method, additional_notes, guest_name, guest_email, delivery_email } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'Cart items are required to place an order.' });
@@ -380,8 +409,8 @@ exports.createGuestOrder = async (req, res) => {
 
     // 2. Insert order record
     const [orderResult] = await connection.query(
-      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, total_amount, shipping_address, phone || 'Not Provided', payment_method || 'Cash on Delivery', additional_notes || null]
+      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [userId, total_amount, shipping_address, phone || 'Not Provided', payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || guest_email || null]
     );
     const orderId = orderResult.insertId;
 

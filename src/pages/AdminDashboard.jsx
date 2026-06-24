@@ -3,7 +3,7 @@ import { toast } from 'react-hot-toast';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { api, API_BASE_URL } from '../utils/api';
-import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database, KeyRound, LayoutDashboard } from 'lucide-react';
 
 const parseJSON = (str, fallback) => {
   if (!str) return fallback;
@@ -16,13 +16,14 @@ const parseJSON = (str, fallback) => {
 };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('products'); // 'products', 'orders', or 'tickets'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'products', 'orders', 'tickets', 'categories', 'backup', 'licenses'
 
   // Data lists
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [licenses, setLicenses] = useState([]);
   const [ticketStats, setTicketStats] = useState({
     total: 0,
     pending: 0,
@@ -65,6 +66,19 @@ export default function AdminDashboard() {
   const [formError, setFormError] = useState('');
   const [formSubmitting, setFormSubmitting] = useState(false);
 
+  // Modal State for License Keys
+  const [showLicenseModal, setShowLicenseModal] = useState(false);
+  const [licenseForm, setLicenseForm] = useState({
+    product_id: '',
+    activation_option: '',
+    package_option: '',
+    license_key: ''
+  });
+  const [licenseFormSubmitting, setLicenseFormSubmitting] = useState(false);
+  const [licenseFormError, setLicenseFormError] = useState('');
+  const [licenseSearchQuery, setLicenseSearchQuery] = useState('');
+  const [licenseCurrentPage, setLicenseCurrentPage] = useState(1);
+
   // Modal State for Order Cancellation
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
@@ -87,18 +101,20 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [prodData, orderData, ticketData, statsData, catData] = await Promise.all([
+      const [prodData, orderData, ticketData, statsData, catData, licenseData] = await Promise.all([
         api.get('/products'),
         api.get('/orders'),
         api.get('/tickets'),
         api.get('/tickets/stats'),
-        api.get('/products/categories')
+        api.get('/products/categories'),
+        api.get('/licenses')
       ]);
       setProducts(prodData);
       setOrders(orderData);
       setTickets(ticketData);
       setTicketStats(statsData);
       setCategories(catData || []);
+      setLicenses(licenseData || []);
     } catch (err) {
       console.error('Failed to load admin stats', err);
       toast.error('Error loading dashboard data. Are you logged in as an Admin?');
@@ -391,6 +407,55 @@ export default function AdminDashboard() {
     }
   };
 
+  // LICENSE KEY HANDLERS
+  const handleOpenLicenseModal = () => {
+    setLicenseForm({
+      product_id: '',
+      activation_option: '',
+      package_option: '',
+      license_key: ''
+    });
+    setLicenseFormError('');
+    setShowLicenseModal(true);
+  };
+
+  const handleLicenseSubmit = async (e) => {
+    e.preventDefault();
+    const { product_id, license_key } = licenseForm;
+
+    if (!product_id || !license_key.trim()) {
+      setLicenseFormError('Please select a product and provide license key(s).');
+      return;
+    }
+
+    setLicenseFormSubmitting(true);
+    setLicenseFormError('');
+
+    try {
+      const res = await api.post('/licenses', licenseForm);
+      toast.success(res.message || 'License key(s) saved successfully!');
+      setShowLicenseModal(false);
+      fetchAdminData();
+    } catch (err) {
+      console.error(err);
+      setLicenseFormError(err.message || 'Failed to save license keys.');
+    } finally {
+      setLicenseFormSubmitting(false);
+    }
+  };
+
+  const handleDeleteLicense = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this license key?')) return;
+    try {
+      const res = await api.delete(`/licenses/${id}`);
+      toast.success(res.message || 'License key deleted successfully!');
+      fetchAdminData();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to delete license key.');
+    }
+  };
+
   const filteredProducts = products.filter((prod) => {
     if (!productSearchQuery) return true;
     const query = productSearchQuery.toLowerCase();
@@ -412,6 +477,27 @@ export default function AdminDashboard() {
   const displayedProducts = filteredProducts.slice(
     (activePage - 1) * itemsPerPage,
     activePage * itemsPerPage
+  );
+
+  // License calculations
+  const filteredLicenses = licenses.filter((lic) => {
+    if (!licenseSearchQuery) return true;
+    const query = licenseSearchQuery.toLowerCase();
+    return (
+      lic.license_key?.toLowerCase().includes(query) ||
+      lic.product_name?.toLowerCase().includes(query) ||
+      lic.activation_option?.toLowerCase().includes(query) ||
+      lic.package_option?.toLowerCase().includes(query) ||
+      lic.id?.toString().includes(query)
+    );
+  });
+
+  const licenseItemsPerPage = 10;
+  const totalLicensePages = Math.ceil(filteredLicenses.length / licenseItemsPerPage);
+  const activeLicensePage = Math.min(licenseCurrentPage, totalLicensePages || 1);
+  const displayedLicenses = filteredLicenses.slice(
+    (activeLicensePage - 1) * licenseItemsPerPage,
+    activeLicensePage * licenseItemsPerPage
   );
 
   const getPageNumbers = (current, total) => {
@@ -465,6 +551,17 @@ export default function AdminDashboard() {
           <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-4 text-left">
             General
           </div>
+
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'dashboard'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+          >
+            <LayoutDashboard className={`w-4 h-4 shrink-0 ${activeTab === 'dashboard' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <span>Dashboard</span>
+          </button>
 
           <button
             onClick={() => setActiveTab('products')}
@@ -525,6 +622,17 @@ export default function AdminDashboard() {
           </button>
 
           <button
+            onClick={() => setActiveTab('licenses')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'licenses'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+          >
+            <KeyRound className={`w-4 h-4 shrink-0 ${activeTab === 'licenses' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <span>License Keys</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('backup')}
             className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'backup'
               ? 'bg-white/10 text-white shadow-xs'
@@ -568,68 +676,174 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Row of 3 Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Revenue */}
-          <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Total Net Revenue</span>
-                <span className="text-lg font-extrabold text-slate-850 mt-1 block">৳{totalSales.toFixed(2)}</span>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-base shadow-xs select-none">
-                ৳
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('orders')}
-              className="text-[10px] text-violet-600 hover:text-violet-850 font-bold flex items-center cursor-pointer"
-            >
-              View orders &rarr;
-            </button>
-          </div>
-
-          {/* Card 2: Orders */}
-          <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Customer Orders</span>
-                <span className="text-lg font-extrabold text-slate-850 mt-1 block">{totalOrders} orders</span>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-purple-500/10 text-purple-650 flex items-center justify-center font-bold text-sm shadow-xs select-none">
-                📋
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('orders')}
-              className="text-[10px] text-violet-600 hover:text-violet-850 font-bold flex items-center cursor-pointer"
-            >
-              View all orders &rarr;
-            </button>
-          </div>
-
-          {/* Card 3: Products */}
-          <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Catalog Products</span>
-                <span className="text-lg font-extrabold text-slate-850 mt-1 block">{totalProducts} items</span>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-blue-500/10 text-blue-650 flex items-center justify-center font-bold text-sm shadow-xs select-none">
-                📦
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('products')}
-              className="text-[10px] text-violet-600 hover:text-violet-850 font-bold flex items-center cursor-pointer"
-            >
-              View catalog &rarr;
-            </button>
-          </div>
-        </div>
-
         {/* Tab Panel Content */}
         <div className="space-y-6">
+          {/* DASHBOARD OVERVIEW TAB */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6 animate-fade-in text-left">
+              {/* Row of 3 Stat Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Card 1: Revenue */}
+                <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Total Net Revenue</span>
+                      <span className="text-lg font-extrabold text-slate-850 mt-1 block">৳{totalSales.toFixed(2)}</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-base shadow-xs select-none">
+                      ৳
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('orders')}
+                    className="text-[10px] text-violet-600 hover:text-violet-850 font-bold flex items-center cursor-pointer"
+                  >
+                    View orders &rarr;
+                  </button>
+                </div>
+
+                {/* Card 2: Orders */}
+                <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Customer Orders</span>
+                      <span className="text-lg font-extrabold text-slate-850 mt-1 block">{totalOrders} orders</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-purple-500/10 text-purple-650 flex items-center justify-center font-bold text-sm shadow-xs select-none">
+                      📋
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('orders')}
+                    className="text-[10px] text-violet-600 hover:text-violet-850 font-bold flex items-center cursor-pointer"
+                  >
+                    View all orders &rarr;
+                  </button>
+                </div>
+
+                {/* Card 3: Products */}
+                <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Catalog Products</span>
+                      <span className="text-lg font-extrabold text-slate-850 mt-1 block">{totalProducts} items</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-blue-500/10 text-blue-650 flex items-center justify-center font-bold text-sm shadow-xs select-none">
+                      📦
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('products')}
+                    className="text-[10px] text-violet-600 hover:text-violet-850 font-bold flex items-center cursor-pointer"
+                  >
+                    View catalog &rarr;
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Actions & Recent Activity Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Recent Orders Section */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">Recent Customer Orders</h4>
+                    <button
+                      onClick={() => setActiveTab('orders')}
+                      className="text-xxs text-violet-650 hover:text-violet-850 font-bold cursor-pointer"
+                    >
+                      View All
+                    </button>
+                  </div>
+                  <div className="divide-y divide-slate-100 overflow-x-auto">
+                    {orders.length === 0 ? (
+                      <p className="text-xs text-slate-450 italic py-4">No customer orders available.</p>
+                    ) : (
+                      <table className="w-full text-xs text-left border-collapse">
+                        <thead>
+                          <tr className="text-slate-400 font-bold text-xxs tracking-wider border-b border-slate-100 uppercase pb-2">
+                            <th className="py-2">Order</th>
+                            <th className="py-2">Customer</th>
+                            <th className="py-2">Total</th>
+                            <th className="py-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {orders.slice(0, 5).map((ord) => (
+                            <tr key={ord.id} className="hover:bg-slate-50/20 text-slate-700 font-medium">
+                              <td className="py-2 font-bold text-slate-805">#{ord.id}</td>
+                              <td className="py-2">
+                                <p className="font-bold text-slate-800 leading-tight">{ord.user_name}</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">{ord.user_email}</p>
+                              </td>
+                              <td className="py-2 font-bold text-slate-850">৳{parseFloat(ord.total_amount).toFixed(2)}</td>
+                              <td className="py-2">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${ord.status === 'Delivered' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                  ord.status === 'Cancelled' ? 'bg-red-50 text-red-500 border border-red-100' :
+                                    'bg-violet-50 text-violet-600 border border-violet-100'
+                                  }`}>
+                                  {ord.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+
+                {/* Recent Support Tickets Section */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">Recent Support Tickets</h4>
+                    <button
+                      onClick={() => setActiveTab('tickets')}
+                      className="text-xxs text-violet-650 hover:text-violet-850 font-bold cursor-pointer"
+                    >
+                      View All
+                    </button>
+                  </div>
+                  <div className="divide-y divide-slate-100 overflow-x-auto">
+                    {tickets.length === 0 ? (
+                      <p className="text-xs text-slate-450 italic py-4">No support tickets available.</p>
+                    ) : (
+                      <table className="w-full text-xs text-left border-collapse">
+                        <thead>
+                          <tr className="text-slate-400 font-bold text-xxs tracking-wider border-b border-slate-100 uppercase pb-2">
+                            <th className="py-2">Ticket</th>
+                            <th className="py-2">Sender</th>
+                            <th className="py-2">Subject</th>
+                            <th className="py-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {tickets.slice(0, 5).map((t) => (
+                            <tr key={t.id} className="hover:bg-slate-50/20 text-slate-700 font-medium">
+                              <td className="py-2 font-bold text-slate-805">#T{t.id}</td>
+                              <td className="py-2">
+                                <p className="font-bold text-slate-800 leading-tight">{t.name}</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">{t.email}</p>
+                              </td>
+                              <td className="py-2 max-w-[120px] truncate" title={t.subject}>{t.subject}</td>
+                              <td className="py-2">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${t.status === 'Resolved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                  t.status === 'Closed' ? 'bg-slate-100 text-slate-500 border border-slate-200' :
+                                    'bg-amber-50 text-amber-600 border border-amber-100'
+                                  }`}>
+                                  {t.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* PRODUCTS TAB */}
           {activeTab === 'products' && (
             <div className="space-y-4 animate-fade-in text-left">
@@ -1261,6 +1475,152 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {/* LICENSE KEYS TAB */}
+          {activeTab === 'licenses' && (
+            <div className="space-y-4 animate-fade-in text-left">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-left">
+                  <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700">License Keys ({licenses.length})</h3>
+                  <input
+                    type="text"
+                    placeholder="Search license keys..."
+                    value={licenseSearchQuery}
+                    onChange={(e) => {
+                      setLicenseSearchQuery(e.target.value);
+                      setLicenseCurrentPage(1);
+                    }}
+                    className="bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-xl px-3 py-1.5 text-xs text-slate-700 w-48 shadow-xs normal-case"
+                  />
+                </div>
+                <button
+                  onClick={handleOpenLicenseModal}
+                  className="flex items-center space-x-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-98"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add License Keys</span>
+                </button>
+              </div>
+
+              <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse table-auto">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xxs tracking-wider border-b border-slate-200/60">
+                      <tr>
+                        <th className="pl-4 pr-2 py-3 whitespace-nowrap">ID</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Product Name</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Activation Option</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Package Option</th>
+                        <th className="px-2 py-3 whitespace-nowrap">License Key</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Status</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Created At</th>
+                        <th className="pl-2 pr-4 py-3 text-right whitespace-nowrap">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredLicenses.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="p-8 text-center text-slate-400 font-medium">
+                            {licenses.length === 0 ? 'No license keys stored in the database yet.' : 'No matching license keys found.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        displayedLicenses.map((lic) => (
+                          <tr key={lic.id} className="hover:bg-slate-50/40 transition-colors border-b border-slate-100 text-slate-700 font-medium text-xs">
+                            <td className="pl-4 pr-2 py-3 font-bold text-slate-800 whitespace-nowrap">#{lic.id}</td>
+                            <td className="px-2 py-3 font-bold text-slate-850 whitespace-normal break-words max-w-[200px]">{lic.product_name}</td>
+                            <td className="px-2 py-3 whitespace-nowrap">
+                              {lic.activation_option ? (
+                                <span className="bg-emerald-50 text-emerald-600 border border-emerald-100/60 px-2 py-0.5 rounded-lg text-[10px] font-bold">{lic.activation_option}</span>
+                              ) : (
+                                <span className="text-slate-450 italic text-[10px]">-</span>
+                              )}
+                            </td>
+                            <td className="px-2 py-3 whitespace-nowrap">
+                              {lic.package_option ? (
+                                <span className="bg-violet-50 text-violet-600 border border-violet-100/60 px-2 py-0.5 rounded-lg text-[10px] font-bold">{lic.package_option}</span>
+                              ) : (
+                                <span className="text-slate-450 italic text-[10px]">-</span>
+                              )}
+                            </td>
+                            <td className="px-2 py-3 font-mono text-[11px] select-all max-w-[250px] truncate" title={lic.license_key}>{lic.license_key}</td>
+                            <td className="px-2 py-3 whitespace-nowrap">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${lic.is_used ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-slate-100 text-slate-700'}`}>
+                                {lic.is_used ? 'Used' : 'Available'}
+                              </span>
+                            </td>
+                            <td className="px-2 py-3 text-slate-400 whitespace-nowrap">{new Date(lic.created_at).toLocaleDateString()}</td>
+                            <td className="pl-2 pr-4 py-3 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => handleDeleteLicense(lic.id)}
+                                className="p-2 bg-slate-55 hover:bg-red-50 hover:text-red-650 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                {totalLicensePages > 1 && (
+                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center select-none">
+                    <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider">
+                      Page {activeLicensePage} of {totalLicensePages} ({filteredLicenses.length} keys total)
+                    </span>
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={() => setLicenseCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={activeLicensePage === 1}
+                        className={`px-3 py-1.5 rounded-lg border text-xxs font-bold uppercase tracking-wider transition-all cursor-pointer select-none ${activeLicensePage === 1
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          : 'bg-white text-slate-650 border-slate-200 hover:bg-slate-50 hover:text-slate-805'
+                          }`}
+                      >
+                        Prev
+                      </button>
+
+                      {getPageNumbers(activeLicensePage, totalLicensePages).map((page, idx) => {
+                        if (page === '...') {
+                          return (
+                            <span key={idx} className="px-2.5 py-1.5 text-xxs font-bold text-slate-400 select-none">
+                              ...
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => setLicenseCurrentPage(page)}
+                            className={`px-3 py-1.5 rounded-lg border text-xxs font-bold transition-all cursor-pointer select-none ${activeLicensePage === page
+                              ? 'bg-violet-600 text-white border-transparent'
+                              : 'bg-white text-slate-650 border-slate-200 hover:bg-slate-50'
+                              }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        onClick={() => setLicenseCurrentPage(prev => Math.min(prev + 1, totalLicensePages))}
+                        disabled={activeLicensePage === totalLicensePages}
+                        className={`px-3 py-1.5 rounded-lg border text-xxs font-bold uppercase tracking-wider transition-all cursor-pointer select-none ${activeLicensePage === totalLicensePages
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                          : 'bg-white text-slate-650 border-slate-200 hover:bg-slate-50 hover:text-slate-805'
+                          }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1833,6 +2193,137 @@ export default function AdminDashboard() {
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <span>Save Category</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* LICENSE CREATE MODAL */}
+      {showLicenseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs" onClick={() => setShowLicenseModal(false)} />
+
+          <div className="relative bg-white border border-slate-200 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl z-10 animate-slide-up text-left">
+            <div className="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+              <h4 className="text-base font-bold text-slate-850">Add License Keys</h4>
+              <button onClick={() => setShowLicenseModal(false)} className="text-slate-400 hover:text-slate-650"><X className="w-5 h-5 cursor-pointer" /></button>
+            </div>
+
+            <form onSubmit={handleLicenseSubmit} className="p-5 space-y-4">
+              {licenseFormError && (
+                <div className="text-xs font-semibold text-red-500 bg-red-50 border border-red-100 px-3 py-2 rounded-xl">
+                  {licenseFormError}
+                </div>
+              )}
+
+              {/* Product Selection */}
+              <div>
+                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Product *</label>
+                <select
+                  value={licenseForm.product_id}
+                  onChange={(e) => {
+                    const prodId = e.target.value;
+                    setLicenseForm({
+                      ...licenseForm,
+                      product_id: prodId,
+                      activation_option: '',
+                      package_option: ''
+                    });
+                  }}
+                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer"
+                  required
+                >
+                  <option value="">Select a Product...</option>
+                  {products.map((prod) => (
+                    <option key={prod.id} value={prod.id}>{prod.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Dynamic Options Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Activation Option Selection */}
+                <div>
+                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Activation Option</label>
+                  {(() => {
+                    const selectedProduct = products.find(p => p.id === parseInt(licenseForm.product_id));
+                    const activationOptions = selectedProduct?.activation_options
+                      ? selectedProduct.activation_options.split(',').map(opt => opt.trim()).filter(Boolean)
+                      : [];
+
+                    return (
+                      <select
+                        value={licenseForm.activation_option}
+                        onChange={(e) => setLicenseForm({ ...licenseForm, activation_option: e.target.value })}
+                        disabled={!licenseForm.product_id || activationOptions.length === 0}
+                        className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="">{activationOptions.length === 0 ? 'No Activation Options' : 'Select Activation Option...'}</option>
+                        {activationOptions.map((opt, idx) => (
+                          <option key={idx} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
+                </div>
+
+                {/* Package Option Selection */}
+                <div>
+                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Package Option</label>
+                  {(() => {
+                    const selectedProduct = products.find(p => p.id === parseInt(licenseForm.product_id));
+                    const packages = selectedProduct?.packages || [];
+
+                    return (
+                      <select
+                        value={licenseForm.package_option}
+                        onChange={(e) => setLicenseForm({ ...licenseForm, package_option: e.target.value })}
+                        disabled={!licenseForm.product_id || packages.length === 0}
+                        className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="">{packages.length === 0 ? 'No Package Options' : 'Select Package Option...'}</option>
+                        {packages.map((pkg, idx) => (
+                          <option key={idx} value={pkg.duration}>{pkg.duration} (৳{pkg.price})</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* License Key input */}
+              <div>
+                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">License Keys (One per line for bulk) *</label>
+                <textarea
+                  rows="5"
+                  value={licenseForm.license_key}
+                  onChange={(e) => setLicenseForm({ ...licenseForm, license_key: e.target.value })}
+                  placeholder="Paste keys here&#10;Key-1-XXXX&#10;Key-2-XXXX"
+                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 font-mono"
+                  required
+                />
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowLicenseModal(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-550 hover:bg-slate-50 rounded-lg text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={licenseFormSubmitting}
+                  className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-all flex items-center space-x-1 cursor-pointer"
+                >
+                  {licenseFormSubmitting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <span>Save Keys</span>
                   )}
                 </button>
               </div>

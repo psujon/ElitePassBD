@@ -10,9 +10,10 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   "https://elitepassbd.com",
-  "https://www.elitepassbd.com"
+  "https://www.elitepassbd.com",
 ];
 
+// 2. CORS and Preflight Setup
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -23,9 +24,41 @@ app.use(cors({
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200
 }));
+
+app.options('*', cors());
+
+// ==========================================
+// 3. PARSERS MUST GO HERE (BEFORE YOUR ROUTES)
+// ==========================================
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 4. Custom Middleware / Fallback Headers (Safe position)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Normalize double /api/api prefixes in case of old cache or config mismatch
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api/api')) {
+    req.url = req.url.replace('/api/api', '/api');
+  }
+  next();
+});
 
 
 
@@ -34,12 +67,16 @@ const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const ticketRoutes = require('./routes/ticketRoutes');
+const licenseRoutes = require('./routes/licenseRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/tickets', ticketRoutes);
+app.use('/api/licenses', licenseRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Database Backup API Route (Admins Only)
 const { authenticateToken, authorizeAdmin } = require('./middleware/auth');
