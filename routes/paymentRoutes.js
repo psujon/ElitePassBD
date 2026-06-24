@@ -14,4 +14,7 @@ router.get('/cancel', paymentController.paymentCancel);
 // IPN Webhook endpoint
 router.post('/ipn', paymentController.paymentIpn);
 
+// Debug endpoint for EPS connection
+router.get('/test-eps', paymentController.testEpsConnection);
+
 module.exports = router;

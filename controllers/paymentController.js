@@ -11,7 +11,7 @@ const getEpsInstance = () => {
     hashKey: process.env.EPS_HASH_KEY,
     merchantId: process.env.EPS_MERCHANT_ID,
     storeId: process.env.EPS_STORE_ID,
-    sandbox: process.env.EPS_SANDBOX,
+    sandbox: process.env.EPS_SANDBOX === 'true',
   };
 
   return new EPS(config);
@@ -315,7 +315,7 @@ const fulfillOrder = async (merchantTransactionId) => {
 
 exports.paymentSuccess = async (req, res) => {
   // Query parameters returned by EPS callback
-  const { merchantTransactionId } = req.query;
+  const merchantTransactionId = req.query.merchantTransactionId || req.query.MerchantTransactionId;
 
   if (!merchantTransactionId) {
     return res.status(400).send('Transaction ID is missing from payment callback.');
@@ -363,7 +363,7 @@ exports.paymentSuccess = async (req, res) => {
 
 // 3. Failure Callback handler (GET redirect from EPS)
 exports.paymentFail = async (req, res) => {
-  const { merchantTransactionId } = req.query;
+  const merchantTransactionId = req.query.merchantTransactionId || req.query.MerchantTransactionId;
   const frontendUrl = process.env.FRONTEND_URL;
 
   try {
@@ -384,7 +384,7 @@ exports.paymentFail = async (req, res) => {
 
 // 4. Cancel Callback handler (GET redirect from EPS)
 exports.paymentCancel = async (req, res) => {
-  const { merchantTransactionId } = req.query;
+  const merchantTransactionId = req.query.merchantTransactionId || req.query.MerchantTransactionId;
   const frontendUrl = process.env.FRONTEND_URL;
 
   try {
@@ -488,5 +488,27 @@ exports.paymentIpn = async (req, res) => {
   } catch (error) {
     console.error('IPN processing error:', error);
     return res.status(500).json({ status: "ERROR", message: "Decryption failed or internal error" });
+  }
+};
+
+exports.testEpsConnection = async (req, res) => {
+  try {
+    const axios = require('axios');
+    const isSandbox = process.env.EPS_SANDBOX === 'true';
+    const url = isSandbox ? 'https://sandbox-pgapi.eps.com.bd/v1/EPSEngine/InitializeEPS' : 'https://pgapi.eps.com.bd/v1/EPSEngine/InitializeEPS';
+    
+    // We expect a 405 Method Not Allowed or 400 Bad Request, but it proves network connectivity
+    await axios.get(url);
+    res.json({ success: true, message: "Connected to EPS server successfully", url });
+  } catch (error) {
+    res.json({
+      success: false,
+      message: "Network Error",
+      url: error.config?.url,
+      code: error.code,
+      responseStatus: error.response?.status,
+      responseData: error.response?.data,
+      errorMessage: error.message
+    });
   }
 };
