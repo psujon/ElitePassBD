@@ -8,15 +8,19 @@ const dbConfig = {
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
   waitForConnections: true,
-  connectionLimit: 0,
+  connectionLimit: 10,
   queueLimit: 0
 };
 
-let pool;
+const dbName = process.env.DB_NAME;
+
+const pool = mysql.createPool({
+  ...dbConfig,
+  database: dbName
+});
 
 async function initDB() {
   try {
-    const dbName = process.env.DB_NAME;
 
     // Try creating the database if privileges allow (mainly for local development)
     try {
@@ -24,20 +28,10 @@ async function initDB() {
       await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
       await connection.end();
     } catch (dbCreateError) {
-      console.log(`Note: Database auto-creation bypassed or failed (${dbCreateError.message}). Attempting direct connection...`);
+      console.log(`Note: Database auto-creation failed (${dbCreateError.message}). Attempting direct connection...`);
     }
 
-    // 2. Create the connection pool with DB name
-    pool = mysql.createPool({
-      ...dbConfig,
-      database: dbName,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0
-    });
-
     console.log(`Connected to MySQL database: ${dbName}`);
-
     // 3. Create tables if they don't exist
     await createTables();
 

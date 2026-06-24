@@ -7,10 +7,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_for_elitepass_bd'
 
 // Register User
 exports.register = async (req, res) => {
-  const { name, email, password, whatsappNumber } = req.body;
+  const { name, email, password, whatsappNumber, address } = req.body;
 
-  if (!name || !email || !password || !whatsappNumber) {
-    return res.status(400).json({ message: 'All fields (name, email, password, whatsappNumber) are required.' });
+  if (!name || !email || !password || !whatsappNumber || !address) {
+    return res.status(400).json({ message: 'All fields (name, email, password, whatsappNumber, address) are required.' });
   }
 
   try {
@@ -25,8 +25,8 @@ exports.register = async (req, res) => {
 
     // Save user to database
     await db.query(
-      'INSERT INTO users (name, email, password, role, whatsapp_number) VALUES (?, ?, ?, "user", ?)',
-      [name, email, hashedPassword, whatsappNumber]
+      'INSERT INTO users (name, email, password, role, whatsapp_number, address) VALUES (?, ?, ?, "user", ?, ?)',
+      [name, email, hashedPassword, whatsappNumber, address]
     );
 
     res.status(201).json({ message: 'User registered successfully!' });
@@ -74,7 +74,8 @@ exports.login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        whatsapp_number: user.whatsapp_number
+        whatsapp_number: user.whatsapp_number,
+        address: user.address
       }
     });
   } catch (error) {
@@ -86,7 +87,7 @@ exports.login = async (req, res) => {
 // Get Profile
 exports.getProfile = async (req, res) => {
   try {
-    const [users] = await db.query('SELECT id, name, email, role, whatsapp_number, created_at FROM users WHERE id = ?', [req.user.id]);
+    const [users] = await db.query('SELECT id, name, email, role, whatsapp_number, address, created_at FROM users WHERE id = ?', [req.user.id]);
     if (users.length === 0) {
       return res.status(404).json({ message: 'User not found.' });
     }

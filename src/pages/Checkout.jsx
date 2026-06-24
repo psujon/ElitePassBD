@@ -34,7 +34,7 @@ export default function Checkout() {
   }, [user, isGuestCheckout, navigate, location]);
 
   // State fields
-  const [address, setAddress] = useState('');
+  const [address, setAddress] = useState(user?.address || '');
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [phone, setPhone] = useState(user?.whatsapp_number || '');
   const [deliveryEmail, setDeliveryEmail] = useState('');
@@ -57,8 +57,11 @@ export default function Checkout() {
       if (user.whatsapp_number && !phone) {
         setPhone(user.whatsapp_number);
       }
+      if (user.address && !address) {
+        setAddress(user.address);
+      }
     }
-  }, [user, phone]);
+  }, [user, phone, address]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -275,7 +278,7 @@ export default function Checkout() {
                 </div>
               )}
 
-              {/* <div>
+              <div>
                 <label className="block text-xxs font-bold text-slate-500 tracking-wider mb-1.5">
                   Shipping / Delivery Address
                 </label>
@@ -289,7 +292,7 @@ export default function Checkout() {
                   />
                   <MapPin className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
                 </div>
-              </div> */}
+              </div>
 
               <div>
                 <label className="block text-xxs font-bold text-slate-500  tracking-wider mb-1.5">

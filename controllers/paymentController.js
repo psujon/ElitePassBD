@@ -49,6 +49,7 @@ exports.initiatePayment = async (req, res) => {
 
     const eps = getEpsInstance();
     let redirectUrl;
+    let sdkErrorMessage = null;
 
     try {
       // Call SDK to initialize
@@ -64,7 +65,7 @@ exports.initiatePayment = async (req, res) => {
         customerName: order.user_name,
         customerEmail: order.user_email,
         customerPhone: order.phone,
-        customerAddress: order.shipping_address,
+        customerAddress: order.shipping_address || 'Gazipur, Dhaka, Bangladesh',
         customerCity: 'Dhaka',
         customerState: 'Dhaka',
         customerPostcode: '1200',
@@ -76,6 +77,7 @@ exports.initiatePayment = async (req, res) => {
         redirectUrl = paymentResult.RedirectURL;
       }
     } catch (sdkErr) {
+      sdkErrorMessage = sdkErr.message;
       console.warn('EPS SDK initializePayment failed:', sdkErr.message);
     }
 
@@ -86,7 +88,7 @@ exports.initiatePayment = async (req, res) => {
         // Redirect directly to backend success handler for simulated successful payment
         redirectUrl = `${backendUrl}/api/payments/success?merchantTransactionId=${merchantTxnId}`;
       } else {
-        throw new Error('Failed to generate payment redirect URL from EPS.');
+        throw new Error(`Failed to generate payment redirect URL from EPS. Details: ${sdkErrorMessage || 'No redirect URL returned.'}`);
       }
     }
 
@@ -338,7 +340,7 @@ exports.paymentSuccess = async (req, res) => {
     if (!isVerified) {
       // Verification failed
       await db.query('UPDATE orders SET payment_status = "Failed" WHERE transaction_id = ?', [merchantTransactionId]);
-      
+
       const [orders] = await db.query('SELECT id FROM orders WHERE transaction_id = ?', [merchantTransactionId]);
       const orderIdParam = orders.length > 0 ? `&orderId=${orders[0].id}` : '';
       return res.redirect(`${frontendUrl}/payment/fail?reason=VerificationFailed${orderIdParam}`);
@@ -421,7 +423,7 @@ exports.paymentIpn = async (req, res) => {
     const encryptedBase64 = parts[1];
 
     const hashKey = process.env.EPS_HASH_KEY || '';
-    
+
     // Most EPS SDKs use the UTF-8 representation of the hashKey. AES-256 requires 32 bytes.
     let keyBuffer = Buffer.from(hashKey, 'utf8');
     if (keyBuffer.length !== 32) {
@@ -474,13 +476,13 @@ exports.paymentIpn = async (req, res) => {
     const isVerified = (verification && verification.Status === 'Success') || (status && status.toString().toLowerCase() === 'success') || isSandbox;
 
     if (!isVerified) {
-       await db.query('UPDATE orders SET payment_status = "Failed" WHERE transaction_id = ?', [merchantTransactionId]);
-       return res.status(200).json({ status: "OK", message: "IPN received and processed (Failed)" });
+      await db.query('UPDATE orders SET payment_status = "Failed" WHERE transaction_id = ?', [merchantTransactionId]);
+      return res.status(200).json({ status: "OK", message: "IPN received and processed (Failed)" });
     }
 
     // Fulfill Order
     await fulfillOrder(merchantTransactionId);
-    
+
     return res.status(200).json({ status: "OK", message: "IPN received and saved successfully" });
 
   } catch (error) {

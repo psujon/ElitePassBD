@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
-import { Loader2, Mail, Lock, User, Phone } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Phone, MapPin } from 'lucide-react';
 
 export default function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -16,7 +17,7 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !email || !password || !whatsappNumber) {
+    if (!name || !email || !password || !whatsappNumber || !address) {
       setError('Please fill in all fields.');
       return;
     }
@@ -24,7 +25,7 @@ export default function Register() {
     try {
       setLoading(true);
       setError('');
-      await api.post('/auth/register', { name, email, password, whatsappNumber });
+      await api.post('/auth/register', { name, email, password, whatsappNumber, address });
 
       setSuccess('Account created successfully! Redirecting to login...');
       setTimeout(() => {
@@ -50,13 +51,13 @@ export default function Register() {
           </div>
 
           {error && (
-            <div className="mb-5 text-xs font-semibold text-red-650 bg-red-50 border border-red-200 px-3 py-2.5 rounded-xl text-left">
+            <div className="mb-5 text-xs font-semibold text-red-900 bg-red-50 border border-red-200 px-3 py-2.5 rounded-xl text-left">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="mb-5 text-xs font-semibold text-emerald-650 bg-emerald-50 border border-emerald-200 px-3 py-2.5 rounded-xl text-left">
+            <div className="mb-5 text-xs font-semibold text-emerald-900 bg-emerald-50 border border-emerald-200 px-3 py-2.5 rounded-xl text-left">
               {success}
             </div>
           )}
@@ -110,6 +111,23 @@ export default function Register() {
                   required
                 />
                 <Phone className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-left text-xxs font-bold text-slate-500 tracking-wider mb-1.5">
+                Shipping / Delivery Address
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Gazipur, Dhaka, Bangladesh"
+                  className="w-full text-sm bg-slate-55 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-all shadow-xs"
+                  required
+                />
+                <MapPin className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
               </div>
             </div>
 
