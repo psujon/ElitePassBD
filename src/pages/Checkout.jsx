@@ -458,6 +458,15 @@ export default function Checkout() {
             </div>
           </div>
         </div>
+
+        {/* Checkout Footer Banner */}
+        <div className="mt-8">
+          <img 
+            src="/Checkout-Page-Pay_with_EPS.png" 
+            alt="Pay securely with EPS" 
+            className="w-full h-auto rounded-xl shadow-xs"
+          />
+        </div>
       </div>
     </div>
   );

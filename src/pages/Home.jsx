@@ -155,21 +155,11 @@ export default function Home() {
   const slides = [
     {
       id: 1,
-      title: "WE PROVIDE AUTHENTIC DIGITAL LICENSE.",
-      subtitle: "THAT WILL ENSURE 100% SECURE YOUR DEVICE.",
-      phone: "01925-112444",
-      accent: "from-blue-600 to-indigo-900",
-      images: [
-      ]
+      image: "/top_slider_image_1.png",
     },
     {
       id: 2,
-      title: "PREMIUM AI & CREATIVE SUBSCRIPTIONS.",
-      subtitle: "GET CHATGPT PLUS, ADOBE CC & MORE INSTANTLY.",
-      phone: "01925-112444",
-      accent: "from-violet-600 to-purple-950",
-      images: [
-      ]
+      image: "/top_slider_image_2.png",
     }
   ];
 
@@ -226,52 +216,22 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-15 md:mb-8">
 
           {/* Left: Dynamic Carousel Slider */}
-          <div className="relative rounded-3xl overflow-hidden shadow-xs h-[420px] group bg-slate-900">
+          <div className="relative rounded-3xl overflow-hidden shadow-xs h-[300px] lg:h-[420px] group bg-slate-900">
             {slides.map((slide, idx) => (
               <div
                 key={slide.id}
-                className={`absolute inset-0 bg-gradient-to-r ${slide.accent} transition-opacity duration-1000 flex flex-col justify-between p-8 md:p-10 ${idx === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                className={`absolute inset-0 transition-opacity duration-1000 ${idx === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
               >
-                {/* Background graphic elements */}
-                <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full filter blur-3xl -z-10" />
+                <img src={slide.image} alt="Slider Banner" className="w-full h-full object-contain" />
 
-                {/* Slide Top Text */}
-                <div className="max-w-md">
-                  <span className="inline-block text-[10px] font-extrabold uppercase tracking-widest bg-yellow-400 text-slate-950 px-2.5 py-1 rounded-full mb-3 shadow-xs">
-                    Licensed Authorized Dealer
-                  </span>
-                  <h1 className="text-2xl md:text-3xl font-black text-white leading-tight">
-                    {slide.title}
-                  </h1>
-                  <p className="text-xs md:text-sm text-slate-200 mt-2 font-medium">
-                    {slide.subtitle}
-                  </p>
-                </div>
-
-                {/* Box Graphic Representation */}
-                <div className="absolute right-4 md:right-8 bottom-20 flex gap-2 md:gap-4 select-none opacity-40 md:opacity-100">
-                  {slide.images.map((imgUrl, i) => (
-                    <div
-                      key={i}
-                      className={`w-16 h-22 md:w-24 md:h-32 bg-white rounded-lg shadow-xl border border-white/20 overflow-hidden transform hover:-translate-y-2 transition-transform duration-300 ${i === 1 ? '-translate-y-4 shadow-2xl scale-105 z-10' : 'scale-95'}`}
-                    >
-                      <img src={imgUrl} alt="Product package mockup" className="w-full h-full object-cover" />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Slide Footer */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-t border-white/10 pt-4 z-20">
-                  <div className="flex items-center gap-2 text-yellow-300 font-bold text-sm">
-                    <Phone className="w-4.5 h-4.5 bg-yellow-400 text-slate-950 p-1 rounded-full animate-bounce" />
-                    <span>{slide.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
+                {/* Slide Footer Indicators */}
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center z-20">
+                  <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1.5 rounded-full backdrop-blur-sm">
                     {slides.map((_, dotIdx) => (
                       <button
                         key={dotIdx}
                         onClick={() => setCurrentSlide(dotIdx)}
-                        className={`w-2.5 h-2.5 rounded-full cursor-pointer transition-all ${dotIdx === currentSlide ? 'bg-white w-6' : 'bg-white/40'}`}
+                        className={`w-2 h-2 rounded-full cursor-pointer transition-all ${dotIdx === currentSlide ? 'bg-white w-4' : 'bg-white/50'}`}
                       />
                     ))}
                   </div>
@@ -844,6 +804,7 @@ export default function Home() {
         </div>
 
       </div>
+
     </div>
   );
 }

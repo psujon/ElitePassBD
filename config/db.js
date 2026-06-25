@@ -150,6 +150,19 @@ async function createTables() {
     );
   `;
 
+  const epsPaymentHistoryTable = `
+    CREATE TABLE IF NOT EXISTS eps_payment_history (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      merchant_transaction_id VARCHAR(255) NOT NULL,
+      eps_transaction_id VARCHAR(255) DEFAULT NULL,
+      order_id INT DEFAULT NULL,
+      amount DECIMAL(10, 2) DEFAULT NULL,
+      status VARCHAR(50) DEFAULT NULL,
+      raw_response TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
   const passwordResetsTable = `
     CREATE TABLE IF NOT EXISTS password_resets (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -182,6 +195,7 @@ async function createTables() {
   await pool.query(orderItemsTable);
   await pool.query(reviewsTable);
   await pool.query(supportTicketsTable);
+  await pool.query(epsPaymentHistoryTable);
   await pool.query(passwordResetsTable);
   await pool.query(productLicensesTable);
 

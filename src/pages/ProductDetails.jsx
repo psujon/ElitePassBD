@@ -305,12 +305,12 @@ export default function ProductDetails() {
 
               {/* Price display */}
               <div className="pt-2">
-                <span className="text-xxs text-slate-450 uppercase font-bold tracking-wider block">Option Price</span>
+                <span className="text-xxs text-slate-450  font-bold tracking-wider block">Price</span>
                 <div className="flex items-baseline space-x-3 mt-1">
                   <span className="text-3xl font-black text-slate-850">
-                    ৳{displayPrice.toFixed(2)}
+                    ৳{displayPrice.toFixed(0)}
                   </span>
-                  {product.packages && product.packages.length > 0 && (
+                  {product.packages && product.packages.length > 1 && (
                     <span className="text-xs text-slate-500 font-semibold">
                       (Range: {priceRange})
                     </span>
@@ -326,7 +326,7 @@ export default function ProductDetails() {
               {/* 2. Device selection if present */}
               {parsedDevices.length > 0 && (
                 <div className="space-y-2.5">
-                  <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Select Device / Compatibility</span>
+                  <span className="text-xxs font-bold text-slate-500  tracking-wider block">Compatible Devices</span>
                   <div className="flex flex-wrap gap-2">
                     {parsedDevices.map((dev) => (
                       <button
@@ -347,7 +347,7 @@ export default function ProductDetails() {
               {/* 3. Activation option selector if present */}
               {parsedActivations.length > 0 && (
                 <div className="space-y-2.5">
-                  <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Activation Choice</span>
+                  <span className="text-xxs font-bold text-slate-500  tracking-wider block">Account Type</span>
                   <div className="flex flex-wrap gap-2">
                     {parsedActivations.map((act) => (
                       <button
@@ -368,7 +368,7 @@ export default function ProductDetails() {
               {/* 1. Package options month wise */}
               {filteredPackages && filteredPackages.length > 0 && (
                 <div className="space-y-2.5">
-                  <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Select Package / Validity</span>
+                  <span className="text-xxs font-bold text-slate-500  tracking-wider block">Choose Plan</span>
                   <div className="flex flex-wrap gap-2">
                     {filteredPackages.map((pkg, idx) => (
                       <button
@@ -389,7 +389,7 @@ export default function ProductDetails() {
               {/* Quantity and Actions */}
               <div className="flex flex-wrap items-end gap-4 pt-4 border-t border-slate-200/80">
                 <div className="space-y-2">
-                  <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider block">Quantity</span>
+                  <span className="text-xxs font-bold text-slate-500  tracking-wider block">Quantity</span>
                   <div className="flex items-center space-x-2 bg-white border border-slate-200 p-1 rounded-xl shadow-xs">
                     <button
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -431,26 +431,26 @@ export default function ProductDetails() {
 
             {/* Product metadata definitions */}
             <div className="border-t border-slate-200/80 pt-6 space-y-2 text-xxs text-slate-500">
-              <div>
-                <span className="font-bold text-slate-450 uppercase tracking-wide">SKU:</span>
+              {/* <div>
+                <span className="font-bold text-slate-450  tracking-wide">SKU:</span>
                 <span className="ml-1 text-slate-600 font-semibold">EP-PROD-{product.id}</span>
-              </div>
+              </div> */}
               {product.category_name && (
                 <div>
-                  <span className="font-bold text-slate-450 uppercase tracking-wide">Categories:</span>
-                  <span className="ml-1 text-slate-600 font-semibold uppercase">{product.category_name}</span>
+                  <span className="font-bold text-slate-450  tracking-wide">Categories:</span>
+                  <span className="ml-1 text-slate-600 font-semibold ">{product.category_name}</span>
                 </div>
               )}
               {parsedTags.length > 0 && (
                 <div className="flex items-center">
-                  <span className="font-bold text-slate-450 uppercase tracking-wide mr-1.5 shrink-0">Tags:</span>
+                  {/* <span className="font-bold text-slate-450  tracking-wide mr-1.5 shrink-0">Tags:</span>
                   <div className="flex flex-wrap gap-1">
                     {parsedTags.map((t, idx) => (
                       <span key={idx} className="text-[9px] font-bold px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded uppercase tracking-wider">
                         {t}
                       </span>
                     ))}
-                  </div>
+                  </div> */}
                 </div>
               )}
             </div>
@@ -486,15 +486,15 @@ export default function ProductDetails() {
           {/* Tab Content */}
           <div className="p-6 sm:p-8 space-y-4 text-slate-600">
             {activeTab === 'description' ? (
-              <div 
+              <div
                 className="prose max-w-none text-sm text-slate-600 leading-relaxed"
                 dangerouslySetInnerHTML={{ __html: product.description || '' }}
               />
             ) : (
-              <div 
+              <div
                 className="prose max-w-none text-sm text-slate-600 leading-relaxed"
-                dangerouslySetInnerHTML={{ 
-                  __html: product.additional_info || '<p class="italic text-slate-400">No additional information available for this product.</p>' 
+                dangerouslySetInnerHTML={{
+                  __html: product.additional_info || '<p class="italic text-slate-400">No additional information available for this product.</p>'
                 }}
               />
             )}

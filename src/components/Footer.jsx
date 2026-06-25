@@ -119,20 +119,26 @@ export default function Footer() {
         </div>
 
         {/* Bottom Bar Payment & Trust Badges */}
-        <div className="border-t border-slate-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-6 text-xs text-slate-500 font-semibold">
+        <div className="border-t border-slate-200 pt-8 justify-between items-center gap-2 text-xs text-slate-500 font-semibold">
 
           {/* Payment Methods */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-2">Secure Payments:</span>
-            {['bKash', 'Nagad', 'Visa', 'Mastercard', 'Payoneer'].map((pay) => (
-              <span key={pay} className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded text-[10px] font-bold text-slate-600 select-none shadow-xxs">
-                {pay}
-              </span>
-            ))}
+          <div className="w-full">
+            {/* Desktop Version */}
+            <img
+              src="/Footer-Desktop-Light-Version.png.png"
+              alt="ElitePassBD Features"
+              className="hidden lg:block w-full h-auto"
+            />
+            {/* Mobile Version */}
+            <img
+              src="/Footer-Mobile-Light-Version.png.png"
+              alt="ElitePassBD Features"
+              className="block md:hidden w-full h-auto"
+            />
           </div>
 
           {/* Trust badges */}
-          <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
+          {/* <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider mt-5">
             <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full select-none shadow-xxs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               100% Genuine
@@ -145,7 +151,7 @@ export default function Footer() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               24/7 Support
             </span>
-          </div>
+          </div> */}
 
         </div>
 
