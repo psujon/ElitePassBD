@@ -344,3 +344,23 @@ exports.deleteCategory = async (req, res) => {
     res.status(500).json({ message: 'Database error occurred while deleting category.' });
   }
 };
+
+// Get Latest Reviews (Top 5-star ratings for home page)
+exports.getLatestReviews = async (req, res) => {
+  try {
+    const [reviews] = await db.query(`
+      SELECT 
+        r.id, r.rating, r.text, r.created_at, u.name as user_name,
+        (SELECT COUNT(*) FROM reviews WHERE user_id = u.id) as user_review_count
+      FROM reviews r
+      JOIN users u ON r.user_id = u.id
+      WHERE r.rating = 5
+      ORDER BY r.created_at DESC
+      LIMIT 12
+    `);
+    res.json(reviews);
+  } catch (error) {
+    console.error('Fetch latest reviews error:', error);
+    res.status(500).json({ message: 'Database error occurred while fetching reviews.' });
+  }
+};

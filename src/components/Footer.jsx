@@ -32,7 +32,7 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-white border-t border-slate-200 py-12 px-4 sm:px-6 mt-auto text-slate-800 text-left relative z-30">
+    <footer className="bg-white border-t border-slate-200 px-4 sm:px-6 mt-auto text-slate-800 text-left relative z-30">
       <div className="max-w-full mx-auto">
 
         {/* Main Grid */}
@@ -76,7 +76,7 @@ export default function Footer() {
 
           {/* Column 2: Products */}
           <div>
-            <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 mb-4">
+            <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 mb-2">
               Products
             </h4>
             <ul className="space-y-2.5 text-xs text-slate-500 font-bold">
@@ -119,7 +119,7 @@ export default function Footer() {
         </div>
 
         {/* Bottom Bar Payment & Trust Badges */}
-        <div className="border-t border-slate-200 pt-8 justify-between items-center gap-2 text-xs text-slate-500 font-semibold">
+        <div className="border-t border-slate-200 justify-between items-center gap-2 text-xs text-slate-500 font-semibold">
 
           {/* Payment Methods */}
           <div className="w-full">
@@ -156,7 +156,7 @@ export default function Footer() {
         </div>
 
         {/* Copyright */}
-        <div className="text-center text-[10px] text-slate-400 font-bold border-t border-slate-150 mt-8 pt-4">
+        <div className="text-center text-[10px] text-slate-400 font-bold border-t border-slate-150 p-2">
           &copy; {new Date().getFullYear()} ElitePassBD. All rights reserved.
         </div>
 

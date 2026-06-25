@@ -45,6 +45,17 @@ const getProductDisplayPriceRange = (prod) => {
   return `${parseFloat(prod.price).toFixed(0)} ৳`;
 };
 
+const timeAgo = (dateStr) => {
+  if (!dateStr) return '';
+  const diffDays = Math.floor((new Date() - new Date(dateStr)) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) return 'Today';
+  if (diffDays < 30) return `${diffDays} days ago`;
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
+  const diffYears = Math.floor(diffDays / 365);
+  return `${diffYears} year${diffYears > 1 ? 's' : ''} ago`;
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
@@ -58,9 +69,21 @@ export default function Home() {
   // Bengali FAQ accordion state
   const [activeFaq, setActiveFaq] = useState(null);
 
+  const [latestReviews, setLatestReviews] = useState([]);
+
   useEffect(() => {
     fetchProducts();
+    fetchLatestReviews();
   }, []);
+
+  const fetchLatestReviews = async () => {
+    try {
+      const data = await api.get('/products/reviews/latest');
+      setLatestReviews(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to load latest reviews:', err);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -360,7 +383,7 @@ export default function Home() {
 
 
         {/* ================= SECTION 1: THE BEST SELLERS ================= */}
-        <div className="bg-slate-50 border border-slate-200/80 rounded-3xl mb-12 shadow-xs">
+        <div className="bg-slate-50 border border-slate-200/80 rounded-3xl mb-6 shadow-xs">
           <div className="flex items-center justify-between border-b border-slate-200 p-4 mb-2">
             <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
               <span className="w-2 h-5 bg-blue-600 rounded-md" />
@@ -489,7 +512,7 @@ export default function Home() {
           if (displayedProducts.length === 0) return null;
 
           return (
-            <div key={categoryName} className="mb-12">
+            <div key={categoryName} className="mb-6">
               <div className="flex items-center justify-between border-b border-slate-200 pb-3.5 mb-6">
                 <h2 className="text-md font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
                   <span className="w-1.5 h-4 bg-blue-600 rounded-sm" />
@@ -596,7 +619,7 @@ export default function Home() {
 
 
         {/* ================= SECTION 4: WHY CHOOSE US ================= */}
-        <div className="relative bg-slate-50/60 border border-slate-200/60 rounded-3xl p-8 md:p-10 mb-12 shadow-xxs overflow-hidden text-center">
+        <div className="relative bg-slate-50/60 border border-slate-200/60 rounded-3xl p-8 md:p-10 mb-6 shadow-xxs overflow-hidden text-center">
           {/* Ambient background glow */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-blue-50/30 via-transparent to-transparent opacity-80 pointer-events-none" />
 
@@ -679,7 +702,7 @@ export default function Home() {
 
 
         {/* ================= SECTION 5: HOW IT WORKS ================= */}
-        <div className="relative bg-slate-50/60 border border-slate-200/60 rounded-3xl p-8 md:p-10 mb-12 shadow-xxs overflow-hidden text-center">
+        <div className="relative bg-slate-50/60 border border-slate-200/60 rounded-3xl p-8 md:p-10 mb-6 shadow-xxs overflow-hidden text-center">
           {/* Ambient background glow */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-indigo-50/30 via-transparent to-transparent opacity-80 pointer-events-none" />
 
@@ -784,6 +807,45 @@ export default function Home() {
               );
             })}
           </div>
+        </div>
+
+        {/* ================= SECTION 7: CUSTOMER REVIEWS ================= */}
+        <div className="bg-[#f1f5f9] border border-slate-200/60 rounded-3xl p-6 md:p-8 mb-6">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-2">
+            <h2 className="text-lg md:text-xl font-extrabold text-[#0c3944] tracking-tight flex items-center gap-2">
+              <span className="w-2 h-5 bg-yellow-400 rounded-md" />
+              What Our Customer Says
+            </h2>
+          </div>
+
+          {latestReviews.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {latestReviews.map((review) => (
+                <div key={review.id} className="bg-white border border-slate-200/60 rounded-xl p-5 shadow-xs flex flex-col h-full hover:shadow-md transition-shadow">
+                  <div className="mb-2">
+                    <h4 className="text-xl font-black text-[#0c3944] tracking-tight">{review.user_name}</h4>
+                    <p className="text-sm text-slate-400 font-medium">{review.user_review_count} review{review.user_review_count !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-1 mb-1">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200 fill-slate-200'}`} />
+                    ))}
+                    <span className="text-sm text-slate-400 ml-2 font-medium">
+                      {timeAgo(review.created_at)}
+                    </span>
+                  </div>
+                  <div className="text-sm font-extrabold text-[#0c3944] mb-3 mt-2">Verified customer</div>
+                  <p className="text-sm text-[#0c3944] leading-relaxed flex-grow">
+                    {review.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-2xl">
+              <p className="text-slate-500 font-bold">No reviews yet.</p>
+            </div>
+          )}
         </div>
 
       </div>
