@@ -24,6 +24,7 @@ export default function AdminDashboard() {
   const [tickets, setTickets] = useState([]);
   const [categories, setCategories] = useState([]);
   const [licenses, setLicenses] = useState([]);
+  const [epsHistory, setEpsHistory] = useState([]);
   const [ticketStats, setTicketStats] = useState({
     total: 0,
     pending: 0,
@@ -68,6 +69,7 @@ export default function AdminDashboard() {
 
   // Modal State for License Keys
   const [showLicenseModal, setShowLicenseModal] = useState(false);
+  const [editingLicense, setEditingLicense] = useState(null);
   const [licenseForm, setLicenseForm] = useState({
     product_id: '',
     activation_option: '',
@@ -78,6 +80,8 @@ export default function AdminDashboard() {
   const [licenseFormError, setLicenseFormError] = useState('');
   const [licenseSearchQuery, setLicenseSearchQuery] = useState('');
   const [licenseCurrentPage, setLicenseCurrentPage] = useState(1);
+  const [licenseProductSearch, setLicenseProductSearch] = useState('');
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
 
   // Modal State for Order Cancellation
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -101,13 +105,14 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [prodData, orderData, ticketData, statsData, catData, licenseData] = await Promise.all([
+      const [prodData, orderData, ticketData, statsData, catData, licenseData, epsData] = await Promise.all([
         api.get('/products'),
         api.get('/orders'),
         api.get('/tickets'),
         api.get('/tickets/stats'),
         api.get('/products/categories'),
-        api.get('/licenses')
+        api.get('/licenses'),
+        api.get('/payments/history')
       ]);
       setProducts(prodData);
       setOrders(orderData);
@@ -115,6 +120,7 @@ export default function AdminDashboard() {
       setTicketStats(statsData);
       setCategories(catData || []);
       setLicenses(licenseData || []);
+      setEpsHistory(epsData || []);
     } catch (err) {
       console.error('Failed to load admin stats', err);
       toast.error('Error loading dashboard data. Are you logged in as an Admin?');
@@ -409,11 +415,24 @@ export default function AdminDashboard() {
 
   // LICENSE KEY HANDLERS
   const handleOpenLicenseModal = () => {
+    setEditingLicense(null);
     setLicenseForm({
       product_id: '',
       activation_option: '',
       package_option: '',
       license_key: ''
+    });
+    setLicenseFormError('');
+    setShowLicenseModal(true);
+  };
+
+  const handleEditLicense = (license) => {
+    setEditingLicense(license);
+    setLicenseForm({
+      product_id: license.product_id,
+      activation_option: license.activation_option || '',
+      package_option: license.package_option || '',
+      license_key: license.license_key
     });
     setLicenseFormError('');
     setShowLicenseModal(true);
@@ -432,8 +451,13 @@ export default function AdminDashboard() {
     setLicenseFormError('');
 
     try {
-      const res = await api.post('/licenses', licenseForm);
-      toast.success(res.message || 'License key(s) saved successfully!');
+      if (editingLicense) {
+        const res = await api.put(`/licenses/${editingLicense.id}`, licenseForm);
+        toast.success(res.message || 'License key updated successfully!');
+      } else {
+        const res = await api.post('/licenses', licenseForm);
+        toast.success(res.message || 'License key(s) saved successfully!');
+      }
       setShowLicenseModal(false);
       fetchAdminData();
     } catch (err) {
@@ -641,6 +665,17 @@ export default function AdminDashboard() {
           >
             <Database className={`w-4 h-4 shrink-0 ${activeTab === 'backup' ? 'text-orange-400' : 'text-slate-500'}`} />
             <span>Database Backup</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('eps_history')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'eps_history'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+          >
+            <Banknote className={`w-4 h-4 shrink-0 ${activeTab === 'eps_history' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <span>EPS Payments</span>
           </button>
         </div>
       </div>
@@ -1552,6 +1587,12 @@ export default function AdminDashboard() {
                             <td className="px-2 py-3 text-slate-400 whitespace-nowrap">{new Date(lic.created_at).toLocaleDateString()}</td>
                             <td className="pl-2 pr-4 py-3 text-right whitespace-nowrap">
                               <button
+                                onClick={() => handleEditLicense(lic)}
+                                className="p-2 bg-slate-55 hover:bg-violet-50 hover:text-violet-650 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer mr-2"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
                                 onClick={() => handleDeleteLicense(lic.id)}
                                 className="p-2 bg-slate-55 hover:bg-red-50 hover:text-red-650 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer"
                               >
@@ -1618,6 +1659,98 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+          {/* EPS PAYMENT HISTORY TAB */}
+          {activeTab === 'eps_history' && (
+            <div className="animate-fade-in space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                    <Banknote className="w-5 h-5 text-violet-600" />
+                    EPS Payment History
+                  </h2>
+                  <p className="text-xs font-semibold text-slate-500 mt-1">View transaction details and the license keys provided.</p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto relative">
+                <table className="w-full text-left border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-xxs font-black text-slate-500 uppercase tracking-wider">
+                      <th className="p-4 py-3">Date</th>
+                      <th className="p-4 py-3">Transaction IDs</th>
+                      <th className="p-4 py-3">User Info</th>
+                      <th className="p-4 py-3">Amount & Status</th>
+                      <th className="p-4 py-3 max-w-[200px]">Products & Licenses</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100/80 text-sm">
+                    {epsHistory.map(row => (
+                      <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-4 align-top">
+                          <span className="font-bold text-slate-700 block whitespace-nowrap text-xs">
+                            {new Date(row.created_at).toLocaleDateString()}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">
+                            {new Date(row.created_at).toLocaleTimeString()}
+                          </span>
+                        </td>
+                        <td className="p-4 align-top text-xs">
+                          <span className="block font-bold text-slate-600 break-all mb-1">
+                            <span className="text-[10px] uppercase text-slate-400 block mb-0.5">Merchant Tx:</span>
+                            {row.merchant_transaction_id}
+                          </span>
+                          {row.eps_transaction_id && (
+                            <span className="block font-bold text-slate-500 break-all">
+                              <span className="text-[10px] uppercase text-slate-400 block mb-0.5">EPS Tx:</span>
+                              {row.eps_transaction_id}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 align-top text-xs">
+                          <span className="block font-bold text-slate-800">{row.user_name || 'Guest'}</span>
+                          <span className="block text-slate-500">{row.user_email || row.delivery_email || 'N/A'}</span>
+                          {row.order_id && (
+                            <span className="block mt-1 font-bold text-violet-600 text-[10px]">Order #{row.order_id}</span>
+                          )}
+                        </td>
+                        <td className="p-4 align-top text-xs">
+                          <span className="font-black text-blue-600 block text-sm">৳{parseFloat(row.amount).toFixed(2)}</span>
+                          <span className={`inline-block px-2 py-0.5 mt-1 rounded text-[10px] font-bold uppercase tracking-wide ${row.payment_status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-700' : row.payment_status === 'FAILED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {row.payment_status || 'UNKNOWN'}
+                          </span>
+                        </td>
+                        <td className="p-4 align-top text-xs max-w-[200px] break-all">
+                          {row.product_names ? (
+                            <div className="space-y-2">
+                              <div className="font-bold text-slate-700 mb-1">{row.product_names.replace(/\|\|/g, ', ')}</div>
+                              {row.license_keys ? (
+                                <div className="font-mono text-[10px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-200">
+                                  {row.license_keys.split('||').map((key, i) => (
+                                    <div key={i} className="mb-1 last:mb-0 pb-1 last:pb-0 border-b last:border-0 border-slate-200">{key}</div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-[10px] font-bold text-amber-500">No keys assigned</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">No products</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {epsHistory.length === 0 && (
+                      <tr>
+                        <td colSpan="5" className="p-8 text-center text-slate-500">
+                          No EPS payment history found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -2146,6 +2279,8 @@ export default function AdminDashboard() {
         </div>
       )}
 
+
+
       {/* CATEGORY CREATE/EDIT MODAL */}
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -2207,7 +2342,7 @@ export default function AdminDashboard() {
 
           <div className="relative bg-white border border-slate-200 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl z-10 animate-slide-up text-left">
             <div className="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-              <h4 className="text-base font-bold text-slate-850">Add License Keys</h4>
+              <h4 className="text-base font-bold text-slate-850">{editingLicense ? 'Edit License Key' : 'Add License Keys'}</h4>
               <button onClick={() => setShowLicenseModal(false)} className="text-slate-400 hover:text-slate-650"><X className="w-5 h-5 cursor-pointer" /></button>
             </div>
 
@@ -2218,28 +2353,58 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Product Selection */}
-              <div>
+              {/* Product Selection Combobox */}
+              <div className="relative">
                 <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Product *</label>
-                <select
-                  value={licenseForm.product_id}
-                  onChange={(e) => {
-                    const prodId = e.target.value;
-                    setLicenseForm({
-                      ...licenseForm,
-                      product_id: prodId,
-                      activation_option: '',
-                      package_option: ''
-                    });
-                  }}
-                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer"
-                  required
+                
+                <div 
+                  className="w-full text-xs bg-slate-50 border border-slate-250 focus-within:border-violet-500 focus-within:bg-white rounded-lg px-3 py-2 text-slate-800 cursor-text flex items-center justify-between"
+                  onClick={() => setShowProductDropdown(true)}
                 >
-                  <option value="">Select a Product...</option>
-                  {products.map((prod) => (
-                    <option key={prod.id} value={prod.id}>{prod.name}</option>
-                  ))}
-                </select>
+                  <input
+                    type="text"
+                    className="bg-transparent border-none outline-none w-full"
+                    placeholder="Search a Product..."
+                    value={showProductDropdown ? licenseProductSearch : (products.find(p => p.id === parseInt(licenseForm.product_id))?.name || '')}
+                    onChange={(e) => {
+                      setLicenseProductSearch(e.target.value);
+                      setShowProductDropdown(true);
+                    }}
+                    onFocus={() => setShowProductDropdown(true)}
+                  />
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                </div>
+
+                {showProductDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)}></div>
+                    <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto custom-scrollbar">
+                      {products
+                        .filter(prod => prod.name.toLowerCase().includes(licenseProductSearch.toLowerCase()))
+                        .map((prod) => (
+                          <div
+                            key={prod.id}
+                            className={`px-3 py-2 text-xs cursor-pointer hover:bg-violet-50 ${licenseForm.product_id == prod.id ? 'bg-violet-100 text-violet-700 font-bold' : 'text-slate-700'}`}
+                            onClick={() => {
+                              setLicenseForm({
+                                ...licenseForm,
+                                product_id: prod.id,
+                                activation_option: '',
+                                package_option: ''
+                              });
+                              setLicenseProductSearch('');
+                              setShowProductDropdown(false);
+                            }}
+                          >
+                            {prod.name}
+                          </div>
+                      ))}
+                      {products.filter(prod => prod.name.toLowerCase().includes(licenseProductSearch.toLowerCase())).length === 0 && (
+                        <div className="px-3 py-2 text-xs text-slate-500 text-center italic">No products found.</div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Dynamic Options Grid */}
@@ -2295,12 +2460,14 @@ export default function AdminDashboard() {
 
               {/* License Key input */}
               <div>
-                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">License Keys (One per line for bulk) *</label>
+                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  {editingLicense ? 'License Key *' : 'License Keys (One per line for bulk) *'}
+                </label>
                 <textarea
-                  rows="5"
+                  rows={editingLicense ? "2" : "5"}
                   value={licenseForm.license_key}
                   onChange={(e) => setLicenseForm({ ...licenseForm, license_key: e.target.value })}
-                  placeholder="Paste keys here&#10;Key-1-XXXX&#10;Key-2-XXXX"
+                  placeholder={editingLicense ? "Key-XXXX" : "Paste keys here\nKey-1-XXXX\nKey-2-XXXX"}
                   className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 font-mono"
                   required
                 />
@@ -2323,7 +2490,7 @@ export default function AdminDashboard() {
                   {licenseFormSubmitting ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <span>Save Keys</span>
+                    <span>{editingLicense ? 'Update Key' : 'Save Keys'}</span>
                   )}
                 </button>
               </div>

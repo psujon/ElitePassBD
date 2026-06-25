@@ -80,3 +80,37 @@ exports.deleteLicense = async (req, res) => {
     res.status(500).json({ message: 'Database error occurred while deleting license key.' });
   }
 };
+
+// Update license key
+exports.updateLicense = async (req, res) => {
+  const { id } = req.params;
+  const { product_id, activation_option, package_option, license_key } = req.body;
+
+  if (!product_id || !license_key) {
+    return res.status(400).json({ message: 'Product and License Key are required.' });
+  }
+
+  try {
+    const [result] = await db.query(
+      `UPDATE product_licenses 
+       SET product_id = ?, activation_option = ?, package_option = ?, license_key = ? 
+       WHERE id = ?`,
+      [
+        parseInt(product_id),
+        activation_option ? activation_option.trim() : null,
+        package_option ? package_option.trim() : null,
+        license_key.trim(),
+        id
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'License key not found.' });
+    }
+
+    res.json({ message: 'License key updated successfully!' });
+  } catch (error) {
+    console.error('Update license error:', error);
+    res.status(500).json({ message: 'Database error occurred while updating license key.' });
+  }
+};

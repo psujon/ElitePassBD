@@ -114,7 +114,7 @@ export default function Navbar({ onCartClick }) {
 
         {/* Desktop Navigation Links */}
         <div className="hidden md:flex items-center space-x-3">
-          <Link to="/" className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200">
+          <Link to="/" className="px-3.5 py-3 text-sm font-semibold text-slate-300 hover:text-white hover:bg-violet-500/50 rounded-xl transition-all duration-200">
             Home
           </Link>
 
@@ -126,7 +126,7 @@ export default function Navbar({ onCartClick }) {
           >
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200 flex items-center space-x-1 focus:outline-none cursor-pointer"
+              className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-violet-500/50 rounded-xl transition-all duration-200 flex items-center space-x-1 focus:outline-none cursor-pointer"
             >
               <span>Products</span>
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
@@ -151,10 +151,10 @@ export default function Navbar({ onCartClick }) {
             )}
           </div>
 
-          <Link to="/about" className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200">
+          <Link to="/about" className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-violet-500/50 rounded-xl transition-all duration-200">
             About Us
           </Link>
-          <Link to="/contact" className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-xl transition-all duration-200">
+          <Link to="/contact" className="px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-violet-500/50 rounded-xl transition-all duration-200">
             Contact
           </Link>
         </div>

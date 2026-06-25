@@ -9,6 +9,7 @@ router.use(authorizeAdmin);
 
 router.get('/', licenseController.getAllLicenses);
 router.post('/', licenseController.createLicense);
+router.put('/:id', licenseController.updateLicense);
 router.delete('/:id', licenseController.deleteLicense);
 
 module.exports = router;

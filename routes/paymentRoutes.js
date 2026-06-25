@@ -14,6 +14,10 @@ router.get('/cancel', paymentController.paymentCancel);
 // IPN Webhook endpoint
 router.post('/ipn', paymentController.paymentIpn);
 
+// Admin: EPS Payment History
+const { authorizeAdmin } = require('../middleware/auth');
+router.get('/history', authenticateToken, authorizeAdmin, paymentController.getEpsHistory);
+
 // Debug endpoint for EPS connection
 router.get('/test-eps', paymentController.testEpsConnection);
 

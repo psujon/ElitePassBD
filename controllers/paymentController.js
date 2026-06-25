@@ -65,7 +65,7 @@ exports.initiatePayment = async (req, res) => {
         customerName: order.user_name,
         customerEmail: order.user_email,
         customerPhone: order.phone,
-        customerAddress: order.shipping_address || 'Gazipur, Dhaka, Bangladesh',
+        customerAddress: 'Gazipur, Dhaka, Bangladesh', // order.shipping_address || 'Gazipur, Dhaka, Bangladesh',
         customerCity: 'Dhaka',
         customerState: 'Dhaka',
         customerPostcode: '1200',
@@ -341,9 +341,9 @@ exports.paymentSuccess = async (req, res) => {
     if (verification && verification.TransactionId) {
       const { MerchantTransactionId, TransactionId, Amount, Status } = verification;
       const rawResponse = JSON.stringify(verification);
-      
+
       const [existing] = await db.query('SELECT id FROM eps_payment_history WHERE merchant_transaction_id = ?', [merchantTransactionId]);
-      
+
       if (existing.length === 0) {
         // Attempt to find order_id based on transaction_id
         const [o] = await db.query('SELECT id FROM orders WHERE transaction_id = ?', [merchantTransactionId]);
@@ -498,9 +498,9 @@ exports.paymentIpn = async (req, res) => {
     if (verification && verification.TransactionId) {
       const { MerchantTransactionId, TransactionId, Amount, Status } = verification;
       const rawResponse = JSON.stringify(verification);
-      
+
       const [existing] = await db.query('SELECT id FROM eps_payment_history WHERE merchant_transaction_id = ?', [MerchantTransactionId]);
-      
+
       if (existing.length === 0) {
         // Attempt to find order_id based on transaction_id
         const [o] = await db.query('SELECT id FROM orders WHERE transaction_id = ?', [MerchantTransactionId]);
@@ -534,7 +534,7 @@ exports.testEpsConnection = async (req, res) => {
     const axios = require('axios');
     const isSandbox = process.env.EPS_SANDBOX === 'true';
     const url = isSandbox ? 'https://sandbox-pgapi.eps.com.bd/v1/EPSEngine/InitializeEPS' : 'https://pgapi.eps.com.bd/v1/EPSEngine/InitializeEPS';
-    
+
     // We expect a 405 Method Not Allowed or 400 Bad Request, but it proves network connectivity
     await axios.get(url);
     res.json({ success: true, message: "Connected to EPS server successfully", url });
@@ -548,5 +548,38 @@ exports.testEpsConnection = async (req, res) => {
       responseData: error.response?.data,
       errorMessage: error.message
     });
+  }
+};
+
+exports.getEpsHistory = async (req, res) => {
+  try {
+    const [history] = await db.query(`
+      SELECT 
+        e.id, 
+        e.merchant_transaction_id, 
+        e.eps_transaction_id, 
+        e.amount, 
+        e.status as payment_status, 
+        e.created_at,
+        o.id as order_id, 
+        o.delivery_email,
+        u.name as user_name, 
+        u.email as user_email,
+        GROUP_CONCAT(DISTINCT p.name SEPARATOR '||') as product_names,
+        GROUP_CONCAT(DISTINCT pl.license_key SEPARATOR '||') as license_keys
+      FROM eps_payment_history e
+      LEFT JOIN orders o ON e.order_id = o.id
+      LEFT JOIN users u ON o.user_id = u.id
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_licenses pl ON oi.id = pl.order_item_id
+      GROUP BY e.id
+      ORDER BY e.created_at DESC
+    `);
+
+    res.json(history);
+  } catch (error) {
+    console.error('Failed to fetch EPS history:', error);
+    res.status(500).json({ message: 'Error fetching EPS history' });
   }
 };

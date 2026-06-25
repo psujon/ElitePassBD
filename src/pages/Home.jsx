@@ -34,6 +34,17 @@ const getProductDisplayPrice = (prod) => {
   return parseFloat(prod.price) || 0;
 };
 
+const getProductDisplayPriceRange = (prod) => {
+  if (!prod) return "৳0";
+  if (prod.packages && prod.packages.length > 1) {
+    const prices = prod.packages.map(p => parseFloat(p.price)).filter(p => !isNaN(p));
+    if (prices.length > 0) {
+      return `${Math.min(...prices).toFixed(0)} ৳ - ${Math.max(...prices).toFixed(0)} ৳`;
+    }
+  }
+  return `${parseFloat(prod.price).toFixed(0)} ৳`;
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
@@ -216,7 +227,7 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-15 md:mb-8">
 
           {/* Left: Dynamic Carousel Slider */}
-          <div className="relative rounded-3xl overflow-hidden shadow-xs h-[300px] lg:h-[420px] group bg-slate-900">
+          <div className="relative rounded-lg overflow-hidden shadow-xs h-[300px] lg:h-[420px] group bg-slate-900">
             {slides.map((slide, idx) => (
               <div
                 key={slide.id}
@@ -257,76 +268,49 @@ export default function Home() {
           {/* Right Column: Promos and Featured */}
           <div className="flex flex-col gap-6 lg:h-[420px]">
 
-            {/* Promo 1: Dynamic Hot Selling Highlight Box */}
-            <div
-              onClick={() => {
-                if (hotProduct) {
-                  navigate(`/product/${hotProduct.id}`);
-                } else {
-                  navigate('/products?category=Windows');
-                }
-              }}
-              className="bg-white border border-slate-200/80 rounded-3xl p-5 flex flex-col justify-between flex-1 shadow-xs hover:border-slate-350 transition-colors cursor-pointer text-left"
-            >
-              <div className="flex justify-between items-start gap-3">
-                <div className="flex gap-3">
-                  <div className="w-12 h-12 bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
-                    <img
-                      src={hotImage}
-                      alt={hotName}
-                      className="w-10 h-10 object-cover"
-                    />
-                  </div>
-                  <div className="text-left">
-                    <h2 className="text-sm font-extrabold text-slate-900 line-clamp-1">{hotName}</h2>
-                    <span className="text-[10px] bg-red-150 text-red-655 font-extrabold px-2 py-0.5 rounded-full mt-1 inline-block uppercase tracking-wider">
-                      {hotSub}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="text-xs text-slate-400 line-through block">{hotOriginalPrice.toFixed(0)}৳</span>
-                  <span className="text-sm font-extrabold text-blue-600">{hotCurrentPrice.toFixed(0)}৳</span>
-                </div>
-              </div>
-
-              <ul className="my-2.5 space-y-1 text-[11px] text-slate-500 font-semibold text-left">
-                {hotBullets.map((bullet, idx) => (
-                  <li key={idx} className="flex items-center gap-1.5 line-clamp-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span>{bullet}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="flex justify-between items-center border-t border-slate-100 pt-3">
-                <div className="flex items-center gap-1 text-slate-500 text-[10px] font-bold">
-                  <Phone className="w-3 h-3" />
-                  <span>01925-112444</span>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (hotProduct) {
-                      navigate(`/product/${hotProduct.id}`);
-                    } else {
-                      navigate('/products?category=Windows');
-                    }
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-extrabold px-4 py-2 rounded-xl transition-all shadow-xs cursor-pointer border-none"
+            <div className='h-[360px] md:h-[200px]'>
+              {products.filter((product) => product.is_hot).slice(0, 1).map((p, idx) => (
+                <Link
+                  to={`/product/${p.id}`}
+                  key={idx}
+                  className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group flex flex-col md:flex-row p-2 h-full min-h-[200px] bg-white border border-slate-200"
                 >
-                  Buy Now
-                </button>
-              </div>
+                  {/* Left Side: Image */}
+                  <div className="w-full md:w-3/12 h-40 md:h-full relative overflow-hidden rounded-lg flex-shrink-0 bg-slate-50 ">
+                    {p.image_url ? (
+                      <img
+                        src={p.image_url}
+                        alt={p.name}
+                        className="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 p-2"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-tr from-red-600 to-red-800 flex items-center justify-center text-white font-bold text-xs">No Image</div>
+                    )}
+                  </div>
+
+                  {/* Right Side: Content */}
+                  <div className="w-full md:w-7/12 flex flex-col justify-center pl-0 md:pl-6 mt-4 md:mt-0 text-left">
+                    <h3 className="text-lg md:text-xl font-black tracking-tight text-slate-800 leading-snug drop-shadow-sm mb-2">
+                      {p.name}
+                    </h3>
+                    <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed font-medium">
+                      {p.description ? p.description.replace(/<[^>]*>?/gm, '') : "Get the best deal right now! Fast and secure delivery."}
+                    </p>
+                    <button className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all self-start shadow-sm active:scale-95 flex items-center gap-2">
+                      <span>Buy Now</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </Link>
+              ))}
+
             </div>
 
-            {/* Promo 2: Stacking Two Half-Banners */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[360px] md:h-[180px]">
 
-              {/* Education Subscription / Recent Product 1 */}
               <Link
                 to={recent1Link}
-                className="relative rounded-3xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group flex flex-col justify-end p-5 h-full min-h-[180px] bg-slate-900 border border-slate-200/50"
+                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group flex flex-col justify-end p-5 h-full min-h-[180px] bg-slate-900 border border-slate-200/50"
               >
                 {recent1Image ? (
                   <>
@@ -347,10 +331,9 @@ export default function Home() {
                 </div>
               </Link>
 
-              {/* Big 65% Offer / Recent Product 2 */}
               <Link
                 to={recent2Link}
-                className="relative rounded-3xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group flex flex-col justify-end p-5 h-full min-h-[180px] bg-slate-900 border border-slate-200/50"
+                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group flex flex-col justify-end p-5 h-full min-h-[180px] bg-slate-900 border border-slate-200/50"
               >
                 {recent2Image ? (
                   <>
@@ -372,18 +355,16 @@ export default function Home() {
               </Link>
 
             </div>
-
           </div>
-
         </div>
 
 
         {/* ================= SECTION 1: THE BEST SELLERS ================= */}
-        <div className="bg-white border border-slate-200/80 rounded-3xl mb-12 shadow-xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
+        <div className="bg-slate-50 border border-slate-200/80 rounded-3xl mb-12 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-200 p-4 mb-2">
             <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
               <span className="w-2 h-5 bg-blue-600 rounded-md" />
-              The Best Sellers
+              <span className='bg-blue-600/90 text-white rounded-lg py-1 px-6'>Popular Items</span>
             </h2>
             <Link
               to="/products"
@@ -398,7 +379,7 @@ export default function Home() {
           ) : bestSellers.length === 0 ? (
             <div className="py-10 text-center text-slate-400">No best seller items found.</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 p-2">
               {bestSellers.map((prod) => {
                 const currentPrice = getProductDisplayPrice(prod);
                 const isOutOfStock = prod.stock === 0;
@@ -430,8 +411,8 @@ export default function Home() {
                       )}
 
                       {isOutOfStock && (
-                        <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex items-center justify-center">
-                          <span className="px-2 py-0.5 bg-red-100 text-red-655 text-[9px] font-extrabold rounded-full border border-red-200">
+                        <div className="absolute top-2 left-2 flex items-start justify-start">
+                          <span className="px-4 py-1.5 bg-red-500 text-white border border-red-200/85 text-xs font-bold rounded-full">
                             Out of Stock
                           </span>
                         </div>
@@ -452,9 +433,9 @@ export default function Home() {
                       {/* Stock */}
                       <div className="text-[10px] font-bold text-slate-500 mb-2">
                         {isOutOfStock ? (
-                          <span className="text-red-500">✗ Out of stock</span>
+                          <span className="text-red-500">Out of stock</span>
                         ) : (
-                          <span className="text-emerald-600">✓ In stock</span>
+                          <span className="text-emerald-600">Stock Available</span>
                         )}
                       </div>
                     </div>
@@ -462,7 +443,9 @@ export default function Home() {
                     {/* Price & Action */}
                     <div className="mt-3 pt-2 border-t border-slate-150">
                       <div className="flex items-baseline gap-1.5 mb-2.5">
-                        <span className="text-xs font-black text-blue-600">{currentPrice.toFixed(0)}৳</span>
+                        <span className="text-xs font-black text-blue-600">{
+                          getProductDisplayPriceRange(prod)
+                        }</span>
                         {!isOutOfStock && hasDiscount && (
                           <span className="text-[10px] text-slate-400 line-through">{originalPrice.toFixed(0)}৳</span>
                         )}
@@ -520,7 +503,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 p-2">
                 {displayedProducts.map((prod) => {
                   const currentPrice = getProductDisplayPrice(prod);
                   const isOutOfStock = prod.stock === 0;
@@ -555,8 +538,8 @@ export default function Home() {
                         )}
 
                         {isOutOfStock && (
-                          <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex items-center justify-center">
-                            <span className="px-2.5 py-1 bg-red-50 text-red-655 text-[10px] font-extrabold rounded-full border border-red-200">
+                          <div className="absolute top-2 left-2 flex items-center justify-center">
+                            <span className="px-4 py-1.5 bg-red-500 text-white border border-red-200/85 text-xs font-bold rounded-full">
                               Out of Stock
                             </span>
                           </div>
@@ -577,7 +560,7 @@ export default function Home() {
                               <span>{views}</span>
                             </div>
                             <div className="flex items-baseline gap-1.5">
-                              <span className="text-blue-600 text-sm font-black">{currentPrice.toFixed(0)}৳</span>
+                              <span className="text-blue-600 text-sm font-black">{getProductDisplayPriceRange(prod)}</span>
                               {!isOutOfStock && hasDiscount && (
                                 <span className="text-[10px] text-slate-400 line-through font-normal">{originalPrice.toFixed(0)}৳</span>
                               )}
@@ -804,7 +787,6 @@ export default function Home() {
         </div>
 
       </div>
-
     </div>
   );
 }

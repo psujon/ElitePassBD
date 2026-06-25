@@ -163,7 +163,7 @@ export default function Footer() {
       </div>
 
       {/* ================= FLOATING WHATSAPP CHATBOX WIDGET ================= */}
-      <div className="fixed bottom-18 right-6 z-50 flex flex-col items-end">
+      <div className="fixed bottom-18 md:bottom-6 right-6 z-50 flex flex-col items-end">
 
         {/* Chat window bubble */}
         {isChatOpen && (

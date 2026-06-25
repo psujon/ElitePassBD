@@ -218,9 +218,7 @@ export default function ProductDetails() {
     ? parseFloat(selectedPackage.price)
     : product ? parseFloat(product.price) : 0;
 
-  const priceRange = filteredPackages.length > 0
-    ? `৳${Math.min(...filteredPackages.map(p => parseFloat(p.price)))} - ৳${Math.max(...filteredPackages.map(p => parseFloat(p.price)))}`
-    : product ? `৳${parseFloat(product.price).toFixed(2)}` : '৳0.00';
+  const priceRange = `${Math.min(...product.packages.map(p => parseFloat(p.price)))}-${Math.max(...product.packages.map(p => parseFloat(p.price)))} ৳`;
 
   return (
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] text-slate-800 py-8 text-left animate-fade-in">
@@ -252,8 +250,8 @@ export default function ProductDetails() {
               )}
 
               {product.stock === 0 && (
-                <div className="absolute inset-0 bg-white/85 backdrop-blur-xs flex items-center justify-center">
-                  <span className="px-4 py-1.5 bg-red-50 text-red-655 border border-red-200/85 text-xs font-bold rounded-full">
+                <div className="absolute top-10 left-10 flex items-start justify-start">
+                  <span className="px-4 py-1.5 bg-red-500 text-white border border-red-200/85 text-xs font-bold rounded-full">
                     Out of Stock
                   </span>
                 </div>
@@ -310,7 +308,7 @@ export default function ProductDetails() {
                   <span className="text-3xl font-black text-slate-850">
                     ৳{displayPrice.toFixed(0)}
                   </span>
-                  {product.packages && product.packages.length > 1 && (
+                  {product.packages && product.packages.length > 0 && (
                     <span className="text-xs text-slate-500 font-semibold">
                       (Range: {priceRange})
                     </span>
