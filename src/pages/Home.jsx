@@ -316,6 +316,16 @@ export default function Home() {
                     <h3 className="text-lg md:text-xl font-black tracking-tight text-slate-800 leading-snug drop-shadow-sm mb-2">
                       {p.name}
                     </h3>
+
+                    {/* Stars */}
+                    {p.avg_rating > 0 && (
+                      <div className="flex gap-0.5 mb-2">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className={`w-4 h-4 ${i < Math.round(p.avg_rating) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                        ))}
+                      </div>
+                    )}
+
                     <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed font-medium">
                       {p.description ? p.description.replace(/<[^>]*>?/gm, '') : "Get the best deal right now! Fast and secure delivery."}
                     </p>
@@ -448,11 +458,13 @@ export default function Home() {
                         {prod.name}
                       </h3>
                       {/* Stars */}
-                      <div className="flex gap-0.5 my-1.5">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="w-3 h-3 fill-amber-450 text-amber-450" />
-                        ))}
-                      </div>
+                      {prod.avg_rating > 0 && (
+                        <div className="flex gap-0.5 my-1.5">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className={`w-3 h-3 ${i < Math.round(prod.avg_rating) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                          ))}
+                        </div>
+                      )}
                       {/* Stock */}
                       <div className="text-[10px] font-bold text-slate-500 mb-2">
                         {isOutOfStock ? (
@@ -575,6 +587,15 @@ export default function Home() {
                           <h3 className="text-xs font-black text-slate-800 line-clamp-2 leading-snug min-h-[2.5rem]">
                             {prod.name}
                           </h3>
+
+                          {/* Stars */}
+                          {prod.avg_rating > 0 && (
+                            <div className="flex gap-0.5 mt-1.5">
+                              {[...Array(5)].map((_, i) => (
+                                <Star key={i} className={`w-3 h-3 ${i < Math.round(prod.avg_rating) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                              ))}
+                            </div>
+                          )}
 
                           {/* Views & Price line */}
                           <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-bold">

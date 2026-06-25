@@ -33,7 +33,8 @@ const formatProduct = (prod) => {
 exports.getAllProducts = async (req, res) => {
   try {
     const [products] = await db.query(`
-      SELECT p.*, c.name AS category_name 
+      SELECT p.*, c.name AS category_name,
+             (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) as avg_rating
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
       ORDER BY p.id DESC
@@ -50,7 +51,8 @@ exports.getProductById = async (req, res) => {
   const { id } = req.params;
   try {
     const [products] = await db.query(`
-      SELECT p.*, c.name AS category_name 
+      SELECT p.*, c.name AS category_name,
+             (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) as avg_rating
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
       WHERE p.id = ?
