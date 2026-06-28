@@ -318,13 +318,13 @@ export default function Checkout() {
 
                 <div className="p-5 bg-violet-50/50 border border-violet-150 rounded-2xl space-y-3">
                   <div className="flex items-start space-x-3 text-left">
-                    <div className="bg-violet-600 text-white p-2 rounded-xl mt-0.5 shrink-0">
+                    <div className="bg-white text-violet-600 p-2 rounded-xl mt-0.5 shrink-0 flex items-center justify-center">
                       <Lock className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-extrabold text-slate-800">Online Payment (Instant & Secure)</h4>
+                      <h4 className="text-sm font-extrabold text-slate-800">EPS Online Payment (Instant & Secure)</h4>
                       <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        You will be redirected to the secure **Easy Payment System (EPS)** gateway to pay. Supports:
+                        You will be redirected to the secure EPS gateway to pay. Supports:
                       </p>
                       <div className="flex flex-wrap gap-2 mt-2">
                         <span className="text-[10px] px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md font-extrabold">bKash</span>
@@ -452,7 +452,7 @@ export default function Checkout() {
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-150 flex items-start space-x-2 text-[10px] text-slate-500 text-left">
                 <span className="text-sm mt-0.5">🛡️</span>
                 <p className="leading-relaxed">
-                  <strong className="text-slate-700">Secure Activation Guarantee</strong>: All purchases are fully tracked. Keys are delivered via dashboard and WhatsApp number within minutes of verification.
+                  <strong className="text-slate-700">Secure Payment Guarantee</strong>: All payments are secured by EPS. After successful payment, keys are delivered via mail within minutes.
                 </p>
               </div>
             </div>
@@ -461,10 +461,10 @@ export default function Checkout() {
 
         {/* Checkout Footer Banner */}
         <div className="mt-8">
-          <img 
-            src="/Checkout-Page-Pay_with_EPS.png" 
-            alt="Pay securely with EPS" 
-            className="w-full h-auto rounded-xl shadow-xs"
+          <img
+            src="/Checkout-Page-Pay_with_EPS.png"
+            alt="Pay securely with EPS"
+            className="w-full h-auto shadow-xs"
           />
         </div>
       </div>

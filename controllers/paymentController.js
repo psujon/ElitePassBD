@@ -78,7 +78,7 @@ exports.initiatePayment = async (req, res) => {
       }
     } catch (sdkErr) {
       sdkErrorMessage = sdkErr.message;
-      console.warn('EPS SDK initializePayment failed:', sdkErr.message);
+      toast.error('EPS SDK initializePayment failed:', sdkErr.message);
     }
 
     if (!redirectUrl) {
@@ -342,16 +342,16 @@ exports.paymentSuccess = async (req, res) => {
       const { MerchantTransactionId, TransactionId, Amount, Status } = verification;
       const rawResponse = JSON.stringify(verification);
 
-      const [existing] = await db.query('SELECT id FROM eps_payment_history WHERE merchant_transaction_id = ?', [merchantTransactionId]);
+      const [existing] = await db.query('SELECT id FROM eps_payment_history WHERE merchant_transaction_id = ?', [MerchantTransactionId]);
 
       if (existing.length === 0) {
         // Attempt to find order_id based on transaction_id
-        const [o] = await db.query('SELECT id FROM orders WHERE transaction_id = ?', [merchantTransactionId]);
+        const [o] = await db.query('SELECT id FROM orders WHERE transaction_id = ?', [MerchantTransactionId]);
         const matchedOrderId = o.length > 0 ? o[0].id : null;
 
         await db.query(
           'INSERT INTO eps_payment_history (merchant_transaction_id, eps_transaction_id, order_id, amount, status, raw_response) VALUES (?, ?, ?, ?, ?, ?)',
-          [merchantTransactionId, TransactionId, matchedOrderId, Amount, Status, rawResponse]
+          [MerchantTransactionId, TransactionId, matchedOrderId, Amount, Status, rawResponse]
         );
       }
     }
@@ -423,6 +423,7 @@ exports.paymentCancel = async (req, res) => {
 };
 
 const crypto = require('crypto');
+const { default: toast } = require('react-hot-toast');
 
 // 5. IPN (Webhook) Endpoint (POST request from EPS)
 exports.paymentIpn = async (req, res) => {

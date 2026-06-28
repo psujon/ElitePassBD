@@ -62,13 +62,13 @@ export default function Footer() {
             </div>
             {/* Social icons */}
             <div className="flex space-x-3.5 pt-2">
-              <a href="https://facebook.com" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs">
+              <a href="https://facebook.com/elitepassbd" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs">
                 <Facebook className="w-4 h-4" />
               </a>
-              <a href="https://linkedin.com" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-blue-700 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs">
+              <a href="https://linkedin.com/elitepassbd" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-blue-700 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs">
                 <Linkedin className="w-4 h-4" />
               </a>
-              <a href="https://youtube.com" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-red-655 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs">
+              <a href="https://youtube.com/elitepassbd" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-red-655 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs">
                 <Youtube className="w-4 h-4" />
               </a>
             </div>

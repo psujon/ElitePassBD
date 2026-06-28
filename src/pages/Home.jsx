@@ -250,13 +250,13 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-15 md:mb-8">
 
           {/* Left: Dynamic Carousel Slider */}
-          <div className="relative rounded-lg overflow-hidden shadow-xs h-[300px] lg:h-[420px] group bg-slate-900">
+          <div className="relative rounded-lg overflow-hidden shadow-xs h-auto aspect-[1663/945] md:h-[400px] lg:h-[420px] md:aspect-auto group bg-slate-900">
             {slides.map((slide, idx) => (
               <div
                 key={slide.id}
                 className={`absolute inset-0 transition-opacity duration-1000 ${idx === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
               >
-                <img src={slide.image} alt="Slider Banner" className="w-full h-full object-contain" />
+                <img src={slide.image} alt="Slider Banner" className="w-full h-full object-cover md:object-contain" />
 
                 {/* Slide Footer Indicators */}
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center z-20">

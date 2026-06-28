@@ -799,18 +799,28 @@ export default function AdminDashboard() {
                             <th className="py-2">Order</th>
                             <th className="py-2">Customer</th>
                             <th className="py-2">Total</th>
+                            <th className="py-2">Payment</th>
                             <th className="py-2">Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {orders.slice(0, 5).map((ord) => (
+                          {orders.slice(0, 10).map((ord) => (
                             <tr key={ord.id} className="hover:bg-slate-50/20 text-slate-700 font-medium">
                               <td className="py-2 font-bold text-slate-805">#{ord.id}</td>
                               <td className="py-2">
                                 <p className="font-bold text-slate-800 leading-tight">{ord.user_name}</p>
                                 <p className="text-[10px] text-slate-400 mt-0.5">{ord.user_email}</p>
                               </td>
-                              <td className="py-2 font-bold text-slate-850">৳{parseFloat(ord.total_amount).toFixed(2)}</td>
+                              <td className="py-2 font-bold text-slate-850">৳{parseFloat(ord.total_amount).toFixed(0)}</td>
+                              <td className="py-2">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${ord.payment_status === 'Paid' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                  ord.payment_status === 'Failed' ? 'bg-red-50 text-red-500 border border-red-100' :
+                                    ord.payment_status === 'Cancelled' ? 'bg-slate-100 text-slate-500 border border-slate-200' :
+                                      'bg-amber-50 text-amber-600 border border-amber-100'
+                                  }`}>
+                                  {ord.payment_status || 'Pending'}
+                                </span>
+                              </td>
                               <td className="py-2">
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${ord.status === 'Delivered' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                   ord.status === 'Cancelled' ? 'bg-red-50 text-red-500 border border-red-100' :
@@ -1220,13 +1230,14 @@ export default function AdminDashboard() {
                         <th className="p-4">Customer</th>
                         <th className="p-4">Details</th>
                         <th className="p-4">Total Bill</th>
+                        <th className="p-4">Payment Status</th>
                         <th className="p-4">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {orders.length === 0 ? (
                         <tr>
-                          <td colSpan="5" className="p-8 text-center text-slate-400 font-medium">No orders placed by customers yet.</td>
+                          <td colSpan="6" className="p-8 text-center text-slate-400 font-medium">No orders placed by customers yet.</td>
                         </tr>
                       ) : (
                         orders.map((ord) => (
@@ -1246,10 +1257,10 @@ export default function AdminDashboard() {
                                     <span className="font-semibold text-slate-850">{i.product_name}</span>
                                     <span className="text-slate-450 ml-1 font-bold">x{i.quantity}</span>
                                     {(i.package_name || i.selected_device || i.selected_activation) && (
-                                      <div className="text-[10px] text-violet-600 font-bold mt-0.5 space-y-0.5 leading-relaxed bg-violet-50 border border-violet-100/60 p-1.5 rounded-lg max-w-xs">
-                                        {i.package_name && <div>📦 Pkg: {i.package_name}</div>}
-                                        {i.selected_device && <div>📱 Dev: {i.selected_device}</div>}
-                                        {i.selected_activation && <div>🔑 Act: {i.selected_activation}</div>}
+                                      <div className="flex flex-row text-[10px] text-violet-600 font-bold mt-0.5 space-y-0.5 leading-relaxed bg-violet-50 border border-violet-100/60 p-1.5 rounded-lg max-w-xs">
+                                        {i.package_name && <div> 📦 Pkg: {i.package_name}</div>}
+                                        {i.selected_device && <div> 📱 Dev: {i.selected_device}</div>}
+                                        {i.selected_activation && <div> 🔑 Act: {i.selected_activation}</div>}
                                       </div>
                                     )}
                                   </div>
@@ -1282,6 +1293,15 @@ export default function AdminDashboard() {
                               )}
                             </td>
                             <td className="p-4 font-extrabold text-slate-800">৳{parseFloat(ord.total_amount).toFixed(2)}</td>
+                            <td className="p-4">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${ord.payment_status === 'Paid' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                ord.payment_status === 'Failed' ? 'bg-red-50 text-red-500 border border-red-100' :
+                                  ord.payment_status === 'Cancelled' ? 'bg-slate-100 text-slate-500 border border-slate-200' :
+                                    'bg-amber-50 text-amber-600 border border-amber-100'
+                                }`}>
+                                {ord.payment_status || 'Pending'}
+                              </span>
+                            </td>
                             <td className="p-4">
                               <select
                                 value={ord.status}
@@ -2356,8 +2376,8 @@ export default function AdminDashboard() {
               {/* Product Selection Combobox */}
               <div className="relative">
                 <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Product *</label>
-                
-                <div 
+
+                <div
                   className="w-full text-xs bg-slate-50 border border-slate-250 focus-within:border-violet-500 focus-within:bg-white rounded-lg px-3 py-2 text-slate-800 cursor-text flex items-center justify-between"
                   onClick={() => setShowProductDropdown(true)}
                 >
@@ -2398,7 +2418,7 @@ export default function AdminDashboard() {
                           >
                             {prod.name}
                           </div>
-                      ))}
+                        ))}
                       {products.filter(prod => prod.name.toLowerCase().includes(licenseProductSearch.toLowerCase())).length === 0 && (
                         <div className="px-3 py-2 text-xs text-slate-500 text-center italic">No products found.</div>
                       )}
