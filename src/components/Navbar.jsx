@@ -14,6 +14,7 @@ export default function Navbar({ onCartClick }) {
   const [categories, setCategories] = useState([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileCategoriesOpen, setIsMobileCategoriesOpen] = useState(false);
   const dropdownTimeoutRef = useRef(null);
 
   // Mobile search state
@@ -112,7 +113,7 @@ export default function Navbar({ onCartClick }) {
         <Link to="/" className="flex items-center space-x-1.5 xs:space-x-2 text-xl font-bold tracking-tight text-white">
           <img src={logo} alt="Logo" className="w-10 h-10 xs:w-12 xs:h-12 md:w-15 md:h-15 rounded-full object-cover border border-violet-500/20 shadow-sm" />
           <span className="text-blue-500 font-extrabold text-sm xs:text-base sm:text-xl md:text-2xl glow-primary">
-            Elite <span className="text-white">Pass</span>BD
+            Elite <span className="text-white">Pass</span>  BD
           </span>
         </Link>
 
@@ -255,7 +256,7 @@ export default function Navbar({ onCartClick }) {
                   className="px-3.5 py-2 text-slate-450 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-200 flex items-center justify-center cursor-pointer"
                   title="Logout"
                 >
-                  <LogOut className="w-4 h-4" />
+                  Logout
                 </button>
               </>
             ) : (
@@ -291,7 +292,12 @@ export default function Navbar({ onCartClick }) {
         <div className="flex justify-between items-center py-2 px-1">
           {/* Hamburger Menu on Left */}
           <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            onClick={() => {
+              if (isMobileMenuOpen) {
+                setIsMobileCategoriesOpen(false);
+              }
+              setIsMobileMenuOpen(!isMobileMenuOpen);
+            }}
             className="w-11 h-11 rounded-full border-2 border-[#001524] flex items-center justify-center bg-white cursor-pointer active:scale-95 transition-transform"
             aria-label="Toggle Menu"
           >
@@ -304,7 +310,10 @@ export default function Navbar({ onCartClick }) {
 
           {/* Centered Logo */}
           <Link to="/" className="flex items-center justify-center">
-            <img src={logo} alt="Logo" className="h-10 max-h-12 object-contain" />
+            <img src={logo} alt="Logo" className="hidden" />
+            <span className="text-blue-600 font-extrabold text-lg xs:text-xl glow-primary">
+              Elite<span className="text-slate-950">Pass</span><span className='ml-2'>BD</span>
+            </span>
           </Link>
 
           {/* Cart Icon on Right */}
@@ -380,7 +389,7 @@ export default function Navbar({ onCartClick }) {
                           {prod.name}
                         </div>
                         <div className="text-xs font-bold text-violet-600 mt-0.5">
-                          {parseFloat(prod.price).toFixed(2)}৳
+                          {parseFloat(prod.price).toFixed(0)}৳
                         </div>
                       </div>
                     </button>
@@ -403,27 +412,36 @@ export default function Navbar({ onCartClick }) {
             Home
           </Link>
 
-          {/* Products Section in Mobile Menu */}
-          <div className="flex flex-col space-y-1.5 px-3.5">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
-              Products
-            </span>
-            <div className="flex flex-col space-y-1.5 pl-3 border-l border-slate-200">
-              {categories.length === 0 ? (
-                <span className="text-xs text-slate-500">No categories</span>
-              ) : (
-                categories.map((cat) => (
-                  <Link
-                    key={cat.id}
-                    to={`/products?category=${encodeURIComponent(cat.name)}`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-violet-600 rounded-lg transition-all duration-200 block"
-                  >
-                    {cat.name}
-                  </Link>
-                ))
-              )}
-            </div>
+          {/* Products Dropdown in Mobile Menu */}
+          <div className="flex flex-col">
+            <button
+              onClick={() => setIsMobileCategoriesOpen(!isMobileCategoriesOpen)}
+              className="px-3.5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 rounded-xl transition-all duration-200 flex items-center justify-between w-full cursor-pointer text-left"
+            >
+              <span>Products</span>
+              <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${isMobileCategoriesOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isMobileCategoriesOpen && (
+              <div className="flex flex-col space-y-1.5 pl-6 pr-3.5 mt-1 border-l border-slate-100 ml-4">
+                {categories.length === 0 ? (
+                  <span className="text-xs text-slate-500 pl-3.5">No categories</span>
+                ) : (
+                  categories.map((cat) => (
+                    <Link
+                      key={cat.id}
+                      to={`/products?category=${encodeURIComponent(cat.name)}`}
+                      onClick={() => {
+                        setIsMobileCategoriesOpen(false);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="px-3.5 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-violet-600 rounded-lg transition-all duration-200 block"
+                    >
+                      {cat.name}
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           <Link
@@ -462,7 +480,7 @@ export default function Navbar({ onCartClick }) {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="flex items-center space-x-2 px-3.5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 rounded-xl transition-all duration-200"
                 >
-                  <User className="w-4 h-4 text-violet-650" />
+                  <User className="w-4 h-4 text-violet-600" />
                   <span>My Account</span>
                 </Link>
 
@@ -471,7 +489,7 @@ export default function Navbar({ onCartClick }) {
                     setIsMobileMenuOpen(false);
                     handleLogout();
                   }}
-                  className="flex items-center space-x-2 px-3.5 py-2 text-sm font-semibold text-slate-605 hover:bg-red-55 hover:text-red-600 rounded-xl transition-all duration-200 text-left w-full cursor-pointer border-none bg-transparent"
+                  className="flex items-center space-x-2 px-3.5 py-2 text-sm font-semibold text-slate-800 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all duration-200 text-left w-full cursor-pointer border-none bg-transparent"
                 >
                   <LogOut className="w-4 h-4 text-red-500" />
                   <span>Logout</span>
@@ -483,7 +501,7 @@ export default function Navbar({ onCartClick }) {
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="flex items-center space-x-2 px-3.5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 rounded-xl transition-all duration-200"
               >
-                <User className="w-4 h-4 text-violet-650" />
+                <User className="w-4 h-4 text-violet-600" />
                 <span>My Account</span>
               </Link>
             )}

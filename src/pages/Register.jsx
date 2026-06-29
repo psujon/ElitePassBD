@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
-import { Loader2, Mail, Lock, User, Phone, MapPin } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Phone, MapPin, Eye, EyeOff } from 'lucide-react';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -9,6 +9,7 @@ export default function Register() {
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -72,7 +73,7 @@ export default function Register() {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="John Doe"
+                  placeholder=""
                   className="w-full text-sm bg-slate-55 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-all shadow-xs"
                   required
                 />
@@ -89,7 +90,7 @@ export default function Register() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder=""
                   className="w-full text-sm bg-slate-55 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-all shadow-xs"
                   required
                 />
@@ -106,7 +107,7 @@ export default function Register() {
                   type="text"
                   value={whatsappNumber}
                   onChange={(e) => setWhatsappNumber(e.target.value)}
-                  placeholder="e.g. +88017XXXXXXXX"
+                  placeholder=""
                   className="w-full text-sm bg-slate-55 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-all shadow-xs"
                   required
                 />
@@ -116,14 +117,14 @@ export default function Register() {
 
             <div>
               <label className="block text-left text-xxs font-bold text-slate-500 tracking-wider mb-1.5">
-                Shipping / Delivery Address
+                Address
               </label>
               <div className="relative">
                 <input
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Gazipur, Dhaka, Bangladesh"
+                  placeholder=""
                   className="w-full text-sm bg-slate-55 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-all shadow-xs"
                   required
                 />
@@ -137,14 +138,26 @@ export default function Register() {
               </label>
               <div className="relative">
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min 6 characters"
-                  className="w-full text-sm bg-slate-55 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-slate-800 placeholder-slate-400 transition-all shadow-xs"
+                  className="w-full text-sm bg-slate-55 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl pl-10 pr-10 py-2.5 text-slate-800 placeholder-slate-400 transition-all shadow-xs"
                   required
                 />
                 <Lock className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4.5 h-4.5" />
+                  ) : (
+                    <Eye className="w-4.5 h-4.5" />
+                  )}
+                </button>
               </div>
             </div>
 
