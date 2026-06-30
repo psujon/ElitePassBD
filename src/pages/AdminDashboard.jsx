@@ -25,6 +25,9 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState([]);
   const [licenses, setLicenses] = useState([]);
   const [epsHistory, setEpsHistory] = useState([]);
+  const [slides, setSlides] = useState([]);
+  const [slideImageUrl, setSlideImageUrl] = useState('');
+  const [slideFormSubmitting, setSlideFormSubmitting] = useState(false);
   const [ticketStats, setTicketStats] = useState({
     total: 0,
     pending: 0,
@@ -54,6 +57,7 @@ export default function AdminDashboard() {
     discount_percent: '',
     is_hot: false,
     is_highlighted: false,
+    is_hot_discount: false,
     activation_process: 'Manual'
   });
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -105,14 +109,15 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [prodData, orderData, ticketData, statsData, catData, licenseData, epsData] = await Promise.all([
+      const [prodData, orderData, ticketData, statsData, catData, licenseData, epsData, slideData] = await Promise.all([
         api.get('/products'),
         api.get('/orders'),
         api.get('/tickets'),
         api.get('/tickets/stats'),
         api.get('/products/categories'),
         api.get('/licenses'),
-        api.get('/payments/history')
+        api.get('/payments/history'),
+        api.get('/slides')
       ]);
       setProducts(prodData);
       setOrders(orderData);
@@ -121,6 +126,7 @@ export default function AdminDashboard() {
       setCategories(catData || []);
       setLicenses(licenseData || []);
       setEpsHistory(epsData || []);
+      setSlides(slideData || []);
     } catch (err) {
       console.error('Failed to load admin stats', err);
       toast.error('Error loading dashboard data. Are you logged in as an Admin?');
@@ -162,6 +168,7 @@ export default function AdminDashboard() {
         discount_percent: product.discount_percent !== null && product.discount_percent !== undefined ? product.discount_percent : '',
         is_hot: !!product.is_hot,
         is_highlighted: !!product.is_highlighted,
+        is_hot_discount: !!product.is_hot_discount,
         activation_process: product.activation_process || 'Manual'
       });
     } else {
@@ -182,6 +189,7 @@ export default function AdminDashboard() {
         discount_percent: '',
         is_hot: false,
         is_highlighted: false,
+        is_hot_discount: false,
         activation_process: 'Manual'
       });
     }
@@ -365,6 +373,40 @@ export default function AdminDashboard() {
       toast.error(err.message || 'Failed to update ticket status.');
     } finally {
       setTicketSubmitting(false);
+    }
+  };
+
+  const handleSlideSubmit = async (e) => {
+    e.preventDefault();
+    if (!slideImageUrl) {
+      toast.error('Please enter an image URL.');
+      return;
+    }
+    try {
+      setSlideFormSubmitting(true);
+      await api.post('/slides', { image_url: slideImageUrl });
+      toast.success('Slide added successfully!');
+      setSlideImageUrl('');
+      const slideData = await api.get('/slides');
+      setSlides(slideData || []);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to save slide.');
+    } finally {
+      setSlideFormSubmitting(false);
+    }
+  };
+
+  const handleDeleteSlide = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this slide?')) return;
+    try {
+      await api.delete(`/slides/${id}`);
+      toast.success('Slide deleted successfully!');
+      const slideData = await api.get('/slides');
+      setSlides(slideData || []);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to delete slide.');
     }
   };
 
@@ -677,6 +719,21 @@ export default function AdminDashboard() {
             <Banknote className={`w-4 h-4 shrink-0 ${activeTab === 'eps_history' ? 'text-orange-400' : 'text-slate-500'}`} />
             <span>EPS Payments</span>
           </button>
+
+          <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-6 text-left">
+            Setup
+          </div>
+
+          <button
+            onClick={() => setActiveTab('slides')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'slides'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+          >
+            <Layers className={`w-4 h-4 shrink-0 ${activeTab === 'slides' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <span>Slides</span>
+          </button>
         </div>
       </div>
 
@@ -966,6 +1023,9 @@ export default function AdminDashboard() {
                                     )}
                                     {!!prod.is_highlighted && (
                                       <span className="text-[9px] bg-amber-100 text-amber-600 border border-amber-200 px-1 rounded font-bold">FEATURED</span>
+                                    )}
+                                    {!!prod.is_hot_discount && (
+                                      <span className="text-[9px] bg-red-100 text-red-600 border border-red-200 px-1 rounded font-bold">HOT DISCOUNT</span>
                                     )}
                                   </div>
                                 </div>
@@ -1774,6 +1834,86 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {/* SLIDES TAB (SETUP) */}
+          {activeTab === 'slides' && (
+            <div className="space-y-6 animate-fade-in text-left">
+              <div className="flex justify-between items-center pt-2">
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700">Home Carousel Slides ({slides.length})</h3>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Form Column */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs h-fit">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-750 mb-4 pb-2 border-b border-slate-100">Add New Slide Image</h4>
+                  <form onSubmit={handleSlideSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Slide Image URL *
+                      </label>
+                      <input
+                        type="url"
+                        value={slideImageUrl}
+                        onChange={(e) => setSlideImageUrl(e.target.value)}
+                        placeholder="https://example.com/slide-banner.png"
+                        className="w-full text-xs bg-slate-50 border border-slate-200 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={slideFormSubmitting}
+                      className="w-full py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {slideFormSubmitting ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Slide</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+
+                {/* List Column */}
+                <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-750 mb-4 pb-2 border-b border-slate-100">Active Slides</h4>
+                  {slides.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 font-medium text-xs">
+                      No slides loaded. Home page will fall back to default slides.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {slides.map((slide) => (
+                        <div key={slide.id} className="border border-slate-200 rounded-xl overflow-hidden shadow-xxxxs flex flex-col justify-between bg-slate-50 relative group">
+                          {/* Slide Image Container */}
+                          <div className="aspect-[1663/945] w-full bg-slate-900 overflow-hidden flex items-center justify-center relative">
+                            <img src={slide.image_url} alt="Slide Preview" className="w-full h-full object-cover" />
+                          </div>
+
+                          {/* Info & Action Bar */}
+                          <div className="p-3 bg-white border-t border-slate-150 flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-mono text-slate-500 truncate select-all flex-1" title={slide.image_url}>
+                              {slide.image_url}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteSlide(slide.id)}
+                              className="p-1.5 bg-red-50 hover:bg-red-100 text-red-650 hover:text-red-700 border border-red-200/40 rounded-lg transition-colors cursor-pointer shrink-0"
+                              title="Delete Slide"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1952,6 +2092,15 @@ export default function AdminDashboard() {
                       className="w-4 h-4 rounded text-violet-600 focus:ring-violet-500 border-slate-300 cursor-pointer"
                     />
                     <span>⭐ Highlighted Product</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={productForm.is_hot_discount}
+                      onChange={(e) => setProductForm({ ...productForm, is_hot_discount: e.target.checked })}
+                      className="w-4 h-4 rounded text-violet-600 focus:ring-violet-500 border-slate-300 cursor-pointer"
+                    />
+                    <span>🏷️ Hot Discount</span>
                   </label>
                 </div>
               </div>

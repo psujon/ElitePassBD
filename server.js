@@ -69,6 +69,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const ticketRoutes = require('./routes/ticketRoutes');
 const licenseRoutes = require('./routes/licenseRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const slideRoutes = require('./routes/slideRoutes');
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -77,6 +78,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/licenses', licenseRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/slides', slideRoutes);
 
 // Database Backup API Route (Admins Only)
 const { authenticateToken, authorizeAdmin } = require('./middleware/auth');

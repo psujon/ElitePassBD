@@ -165,9 +165,9 @@ export default function Navbar({ onCartClick }) {
         </div>
 
         {/* Right Action Items */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center">
           {/* Search Box on Desktop */}
-          <div ref={desktopSearchRef} className="relative hidden md:block w-40 lg:w-56">
+          <div ref={desktopSearchRef} className="relative hidden md:block w-40 lg:w-80 mr-2">
             <div className="relative">
               <input
                 type="text"
@@ -175,7 +175,7 @@ export default function Navbar({ onCartClick }) {
                 value={searchQuery}
                 onFocus={handleSearchFocus}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-800 border border-white focus:border-violet-500 focus:outline-none rounded-full pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 transition-all focus:ring-1 focus:ring-violet-500/50"
+                className="w-full bg-slate-800 border border-white focus:border-violet-500 focus:outline-none rounded-full pl-8 pr-3 py-3 text-xs text-slate-200 placeholder-slate-500 transition-all focus:ring-1 focus:ring-violet-500/50"
               />
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             </div>

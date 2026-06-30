@@ -62,6 +62,7 @@ export default function Home() {
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [slides, setSlides] = useState([]);
 
   // Carousel slider state
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -74,7 +75,17 @@ export default function Home() {
   useEffect(() => {
     fetchProducts();
     fetchLatestReviews();
+    fetchSlides();
   }, []);
+
+  const fetchSlides = async () => {
+    try {
+      const data = await api.get('/slides');
+      setSlides(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to load slides on Home:', err);
+    }
+  };
 
   const fetchLatestReviews = async () => {
     try {
@@ -134,14 +145,18 @@ export default function Home() {
     return name.length > maxLen ? name.substring(0, maxLen).trim() + "..." : name;
   };
 
-  // Recent 2 Products (the products list is returned sorted by p.id DESC)
-  const recentProduct1 = products[0];
-  const recentProduct2 = products[1];
+  // Hot Discount Products (filter where is_hot_discount is set, fallback to products if empty)
+  const hotDiscountProducts = products.filter(p => !!p.is_hot_discount);
+  const recentProduct1 = hotDiscountProducts[0];
+  const recentProduct2 = hotDiscountProducts[1];
+  const recentProduct3 = hotDiscountProducts[2];
+  const recentProduct4 = hotDiscountProducts[3];
+
 
   const recent1Link = recentProduct1 ? `/product/${recentProduct1.id}` : "/products?category=Subscription";
   const recent1Badge = recentProduct1
-    ? (recentProduct1.discount_percent ? `SAVE ${recentProduct1.discount_percent}%` : "NEW ARRIVAL")
-    : "Up to 50%";
+    ? (recentProduct1.discount_percent ? `Hot Deal Upto ${recentProduct1.discount_percent}% Off` : "Hot Deal Upto 50% Off")
+    : "Hot Deal Upto 50% Off";
   const recent1Title = recentProduct1
     ? formatRecentTitle(recentProduct1.name).toUpperCase()
     : "EDUCATION SUBSCRIPTION";
@@ -149,12 +164,30 @@ export default function Home() {
 
   const recent2Link = recentProduct2 ? `/product/${recentProduct2.id}` : "/products?category=Microsoft%20Office";
   const recent2Badge = recentProduct2
-    ? (recentProduct2.discount_percent ? `SAVE ${recentProduct2.discount_percent}%` : "NEW ARRIVAL")
-    : "Big 65% Offer";
+    ? (recentProduct2.discount_percent ? `Hot Deal Upto ${recentProduct2.discount_percent}% Off` : "Hot Deal Upto 50% Off")
+    : "Hot Deal Upto 50% Off";
   const recent2Title = recentProduct2
     ? formatRecentTitle(recentProduct2.name).toUpperCase()
     : "OFFICE BUNDLE SALE";
   const recent2Image = recentProduct2?.image_url;
+
+  const recent3Link = recentProduct3 ? `/product/${recentProduct3.id}` : "/products?category=Microsoft%20Office";
+  const recent3Badge = recentProduct3
+    ? (recentProduct3.discount_percent ? `Hot Deal Upto ${recentProduct3.discount_percent}% Off` : "Hot Deal Upto 50% Off")
+    : "Hot Deal Upto 50% Off";
+  const recent3Title = recentProduct3
+    ? formatRecentTitle(recentProduct3.name).toUpperCase()
+    : "OFFICE BUNDLE SALE";
+  const recent3Image = recentProduct3?.image_url;
+
+  const recent4Link = recentProduct4 ? `/product/${recentProduct4.id}` : "/products?category=Microsoft%20Office";
+  const recent4Badge = recentProduct4
+    ? (recentProduct4.discount_percent ? `Hot Deal Upto ${recentProduct4.discount_percent}% Off` : "Hot Deal Upto 50% Off")
+    : "Hot Deal Upto 50% Off";
+  const recent4Title = recentProduct4
+    ? formatRecentTitle(recentProduct4.name).toUpperCase()
+    : "OFFICE BUNDLE SALE";
+  const recent4Image = recentProduct4?.image_url;
 
   // Dynamic Hot Selling Product
   const hotProduct = products.filter(p => !!p.is_hot).sort((a, b) => b.id - a.id)[0];
@@ -186,30 +219,24 @@ export default function Home() {
   }
 
   // Carousel Slides Content
-  const slides = [
-    {
-      id: 1,
-      image: "/top_slider_image_1.png",
-    },
-    {
-      id: 2,
-      image: "/top_slider_image_2.png",
-    }
+  const activeSlides = slides.length > 0 ? slides : [
+    { id: 'def1', image_url: "/top_slider_image_1.png" },
+    { id: 'def2', image_url: "/top_slider_image_2.png" }
   ];
 
   const handleNextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
+    setCurrentSlide((prev) => (prev + 1) % activeSlides.length);
   };
 
   const handlePrevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+    setCurrentSlide((prev) => (prev - 1 + activeSlides.length) % activeSlides.length);
   };
 
   // Autoplay slider
   useEffect(() => {
     const timer = setInterval(handleNextSlide, 6000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeSlides.length]);
 
   const toggleFaq = (index) => {
     setActiveFaq(activeFaq === index ? null : index);
@@ -251,17 +278,17 @@ export default function Home() {
 
           {/* Left: Dynamic Carousel Slider */}
           <div className="relative rounded-lg overflow-hidden shadow-xs h-auto aspect-[1663/945] md:h-[400px] lg:h-[420px] md:aspect-auto group bg-slate-900">
-            {slides.map((slide, idx) => (
+            {activeSlides.map((slide, idx) => (
               <div
                 key={slide.id}
                 className={`absolute inset-0 transition-opacity duration-1000 ${idx === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
               >
-                <img src={slide.image} alt="Slider Banner" className="w-full h-full object-cover md:object-contain" />
+                <img src={slide.image_url} alt="Slider Banner" className="w-full h-full object-cover md:object-contain" />
 
                 {/* Slide Footer Indicators */}
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center z-20">
                   <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1.5 rounded-full backdrop-blur-sm">
-                    {slides.map((_, dotIdx) => (
+                    {activeSlides.map((_, dotIdx) => (
                       <button
                         key={dotIdx}
                         onClick={() => setCurrentSlide(dotIdx)}
@@ -339,54 +366,85 @@ export default function Home() {
 
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[360px] md:h-[180px]">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-[360px] md:h-[180px]">
 
               <Link
                 to={recent1Link}
-                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group flex flex-col justify-end p-5 h-full min-h-[180px] bg-slate-900 border border-slate-200/50"
+                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full min-h-[180px] bg-slate-200 border border-slate-200"
               >
-                {recent1Image ? (
-                  <>
-                    <img
-                      src={recent1Image}
-                      alt={recent1Title}
-                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-104 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent" />
-                  </>
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-tr from-red-650 to-red-800" />
-                )}
-                <div className="relative z-10 text-left">
-                  <h3 className="text-sm font-black tracking-tight text-white leading-snug drop-shadow-md">
-                    {recent1Title}
-                  </h3>
+                <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[8px] xs:text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                  {recent1Badge}
                 </div>
+                {recent1Image ? (
+                  <img
+                    src={recent1Image}
+                    alt="Recent Product 1"
+                    className="absolute inset-0 w-full h-full object-contain group-hover:scale-104 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-tr from-slate-100 to-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold">
+                    No Image Available
+                  </div>
+                )}
               </Link>
 
               <Link
                 to={recent2Link}
-                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group flex flex-col justify-end p-5 h-full min-h-[180px] bg-slate-900 border border-slate-200/50"
+                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full min-h-[180px] bg-slate-200 border border-slate-200"
               >
-                {recent2Image ? (
-                  <>
-                    <img
-                      src={recent2Image}
-                      alt={recent2Title}
-                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-104 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent" />
-                  </>
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-tr from-blue-650 to-blue-800" />
-                )}
-                <div className="relative z-10 text-left">
-                  <h3 className="text-sm font-black tracking-tight text-white leading-snug drop-shadow-md">
-                    {recent2Title}
-                  </h3>
+                <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[8px] xs:text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                  {recent2Badge}
                 </div>
+                {recent2Image ? (
+                  <img
+                    src={recent2Image}
+                    alt="Recent Product 2"
+                    className="absolute inset-0 w-full h-full object-contain group-hover:scale-104 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-tr from-slate-100 to-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold">
+                    No Image Available
+                  </div>
+                )}
               </Link>
-
+              <Link
+                to={recent3Link}
+                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full min-h-[180px] bg-slate-200 border border-slate-200"
+              >
+                <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[8px] xs:text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                  {recent3Badge}
+                </div>
+                {recent3Image ? (
+                  <img
+                    src={recent3Image}
+                    alt="Recent Product 3"
+                    className="absolute inset-0 w-full h-full object-contain group-hover:scale-104 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-tr from-slate-100 to-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold">
+                    No Image Available
+                  </div>
+                )}
+              </Link>
+              <Link
+                to={recent4Link}
+                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full min-h-[180px] bg-slate-200 border border-slate-200"
+              >
+                <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[8px] xs:text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                  {recent4Badge}
+                </div>
+                {recent4Image ? (
+                  <img
+                    src={recent4Image}
+                    alt="Recent Product 4"
+                    className="absolute inset-0 w-full h-full object-contain group-hover:scale-104 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-tr from-slate-100 to-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold">
+                    No Image Available
+                  </div>
+                )}
+              </Link>
             </div>
           </div>
         </div>

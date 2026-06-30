@@ -84,6 +84,7 @@ async function createTables() {
       discount_percent INT DEFAULT NULL,
       is_hot TINYINT DEFAULT 0,
       is_highlighted TINYINT DEFAULT 0,
+      is_hot_discount TINYINT DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
@@ -188,6 +189,14 @@ async function createTables() {
     );
   `;
 
+  const slidesTable = `
+    CREATE TABLE IF NOT EXISTS slides (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      image_url TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
   await pool.query(usersTable);
   await pool.query(categoriesTable);
   await pool.query(productsTable);
@@ -198,21 +207,21 @@ async function createTables() {
   await pool.query(epsPaymentHistoryTable);
   await pool.query(passwordResetsTable);
   await pool.query(productLicensesTable);
+  await pool.query(slidesTable);
 
   // Seed default admin if not exists
-  const [rows] = await pool.query('SELECT * FROM users WHERE role = "admin" LIMIT 1');
-  if (rows.length === 0) {
-    const bcrypt = require('bcryptjs');
-    const hashedPassword = await bcrypt.hash('admin123', 10);
-    await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-      ['Admin User', 'admin@example.com', hashedPassword, 'admin']
-    );
-    console.log('Seeded default admin user: admin@example.com / admin123');
-  }
+  // const [rows] = await pool.query('SELECT * FROM users WHERE role = "admin" LIMIT 1');
+  // if (rows.length === 0) {
+  //   const bcrypt = require('bcryptjs');
+  //   const hashedPassword = await bcrypt.hash('admin123', 10);
+  //   await pool.query(
+  //     'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+  //     ['Admin User', 'admin@example.com', hashedPassword, 'admin']
+  //   );
+  //   console.log('Seeded default admin user');
+  // }
 
   console.log('Database tables verified/created successfully.');
-  await seedCategoriesAndProducts();
 }
 
 async function updateSchema() {
@@ -346,96 +355,14 @@ async function updateSchema() {
       await pool.query("ALTER TABLE products ADD COLUMN activation_process VARCHAR(50) DEFAULT 'Manual'");
       console.log("Added column 'activation_process' to 'products' table.");
     }
+
+    const [isHotDiscountCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'is_hot_discount'");
+    if (isHotDiscountCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN is_hot_discount TINYINT DEFAULT 0");
+      console.log("Added column 'is_hot_discount' to 'products' table.");
+    }
   } catch (error) {
     console.error("Error updating database schema:", error.message);
-  }
-}
-
-async function seedCategoriesAndProducts() {
-  try {
-    const categories = [
-      'Windows',
-      'Microsoft Office',
-      'Antivirus',
-      'Creative Software',
-      'Subscription',
-      'Gift Card',
-      'VPN',
-      'AI Subscription'
-    ];
-
-    for (const cat of categories) {
-      await pool.query('INSERT IGNORE INTO categories (name) VALUES (?)', [cat]);
-    }
-
-    // Get categories with their IDs
-    const [catRows] = await pool.query('SELECT * FROM categories');
-    const catMap = {};
-    catRows.forEach(row => {
-      catMap[row.name] = row.id;
-    });
-
-    const productsToSeed = [
-      {
-        name: 'Office 365 Premium Subscription',
-        description: 'Office 365 Premium Family/Personal account for 1 year with authentic Microsoft activation.',
-        price: 950.00,
-        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Office-365-Pro-Plus-min-600x600.webp',
-        stock: 10,
-        category_name: 'Microsoft Office',
-        tags: 'Best Sellers, Office, Microsoft, Subscription',
-        additional_info: 'Includes 1TB OneDrive cloud storage. Direct download from official Microsoft portal.',
-        faqs: JSON.stringify([{ q: 'How many devices can I use?', a: 'Up to 5 devices simultaneously.' }]),
-        packages: JSON.stringify([{ duration: '1 Year', price: '950' }]),
-        device_options: 'Windows, Mac, Mobile',
-        activation_options: 'Shared, Personal'
-      },
-      {
-        name: 'Surfshark VPN 1 Year Subscription',
-        description: 'Surfshark VPN Premium Subscription with unlimited devices, high-speed servers, and complete privacy.',
-        price: 950.00,
-        image_url: 'https://www.digitalproductsbd.com/wp-content/uploads/Surfshark-VPN-min-600x600.webp',
-        stock: 15,
-        category_name: 'VPN',
-        tags: 'Best Sellers, VPN, Privacy, Security',
-        additional_info: 'Unlimited devices support. Strict no-logs policy.',
-        faqs: JSON.stringify([{ q: 'Can I use it on Android TV?', a: 'Yes, Surfshark supports Android TV.' }]),
-        packages: JSON.stringify([{ duration: '1 Year', price: '950' }]),
-        device_options: 'All Devices',
-        activation_options: 'Shared Account'
-      }
-    ];
-
-    for (const prod of productsToSeed) {
-      const categoryId = catMap[prod.category_name] || null;
-      // Check if product already exists by name
-      const [existing] = await pool.query('SELECT id FROM products WHERE name = ?', [prod.name]);
-      if (existing.length === 0) {
-        await pool.query(
-          `INSERT INTO products (
-            name, description, price, image_url, stock, category_id,
-            tags, additional_info, faqs, packages, device_options, activation_options
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            prod.name,
-            prod.description,
-            prod.price,
-            prod.image_url,
-            prod.stock,
-            categoryId,
-            prod.tags,
-            prod.additional_info,
-            prod.faqs,
-            prod.packages,
-            prod.device_options,
-            prod.activation_options
-          ]
-        );
-        console.log(`Seeded product: ${prod.name}`);
-      }
-    }
-  } catch (error) {
-    console.error('Error seeding database categories and products:', error);
   }
 }
 
