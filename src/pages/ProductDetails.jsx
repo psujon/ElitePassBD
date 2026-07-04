@@ -7,6 +7,7 @@ import {
   Tag, Info, HelpCircle, ArrowLeft, Layers, Heart, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { trackEvent } from '../utils/fbPixel';
 
 export default function ProductDetails() {
   const { id } = useParams();
@@ -77,6 +78,15 @@ export default function ProductDetails() {
 
       const prodData = await api.get(`/products/${id}`);
       setProduct(prodData);
+
+      // Trigger ViewContent tracking event
+      trackEvent('ViewContent', {
+        content_ids: [String(prodData.id)],
+        content_name: prodData.name,
+        content_type: 'product',
+        value: parseFloat(prodData.price),
+        currency: 'BDT'
+      });
 
       // Pre-select first package if packages exist
       if (prodData.packages && prodData.packages.length > 0) {
@@ -151,6 +161,19 @@ export default function ProductDetails() {
     if (!product) return;
     const success = addToCart(product, quantity, selectedPackage, selectedDevice, selectedActivation);
     if (success) {
+      const priceToUse = selectedPackage ? parseFloat(selectedPackage.price) : parseFloat(product.price);
+      trackEvent('AddToCart', {
+        content_ids: [String(product.id)],
+        content_name: product.name,
+        content_type: 'product',
+        value: priceToUse * quantity,
+        currency: 'BDT',
+        contents: [{
+          id: String(product.id),
+          quantity: parseInt(quantity),
+          item_price: priceToUse
+        }]
+      });
       // Small feedback dialog / confirm
       toast.success(`Added to cart: ${product.name} ${selectedPackage ? `(${selectedPackage.duration})` : ''}`);
     }
@@ -160,6 +183,19 @@ export default function ProductDetails() {
     if (!product) return;
     const success = addToCart(product, quantity, selectedPackage, selectedDevice, selectedActivation);
     if (success) {
+      const priceToUse = selectedPackage ? parseFloat(selectedPackage.price) : parseFloat(product.price);
+      trackEvent('AddToCart', {
+        content_ids: [String(product.id)],
+        content_name: product.name,
+        content_type: 'product',
+        value: priceToUse * quantity,
+        currency: 'BDT',
+        contents: [{
+          id: String(product.id),
+          quantity: parseInt(quantity),
+          item_price: priceToUse
+        }]
+      });
       navigate('/checkout');
     }
   };
@@ -238,12 +274,12 @@ export default function ProductDetails() {
 
           {/* Left Column: Image Box */}
           <div className="lg:col-span-5 space-y-4">
-            <div className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden aspect-square flex items-center justify-center p-6 relative group shadow-xs">
+            <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden aspect-square flex items-center justify-center p-1 relative group shadow-xs">
               {product.image_url ? (
                 <img
                   src={product.image_url}
                   alt={product.name}
-                  className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-102"
+                  className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-102 rounded-xl"
                 />
               ) : (
                 <span className="text-slate-400 text-sm font-semibold uppercase tracking-wider">No Product Image</span>

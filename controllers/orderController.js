@@ -19,10 +19,16 @@ exports.createOrder = async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Extract IP and User Agent for Facebook Conversions API
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    const firstIp = ip.split(',')[0].trim();
+    const cleanIp = firstIp.startsWith('::ffff:') ? firstIp.substring(7) : firstIp;
+    const userAgent = req.headers['user-agent'] || '';
+
     // 1. Insert order record
     const [orderResult] = await connection.query(
-      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [userId, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || null]
+      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, client_ip, client_user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || null, cleanIp, userAgent]
     );
     const orderId = orderResult.insertId;
 
@@ -65,6 +71,24 @@ exports.createOrder = async (req, res) => {
     }
 
     await connection.commit();
+
+    // Send admin notification email asynchronously
+    const { sendEmail } = require('../utils/mailer');
+    sendEmail({
+      to: 'johirul3218@gmail.com',
+      subject: `New Order Placed - Order #${orderId}`,
+      text: `A new order has been placed on ElitePassBD.\nOrder ID: #${orderId}\nTotal Amount: ৳${total_amount}\nPhone: ${phone}`,
+      html: `<h3>New Order Placed</h3>
+             <p>A new order has been placed on ElitePassBD.</p>
+             <p><strong>Order Details:</strong></p>
+             <ul>
+               <li><strong>Order ID:</strong> #${orderId}</li>
+               <li><strong>Total Amount:</strong> ৳${total_amount}</li>
+               <li><strong>Phone:</strong> ${phone}</li>
+               <li><strong>Delivery Email:</strong> ${delivery_email || 'N/A'}</li>
+             </ul>`
+    }).catch(err => console.error('Failed to send admin order placement email:', err));
+
     res.status(201).json({
       message: 'Order placed successfully!',
       orderId: orderId
@@ -407,10 +431,16 @@ exports.createGuestOrder = async (req, res) => {
       userId = userResult.insertId;
     }
 
+    // Extract IP and User Agent for Facebook Conversions API
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    const firstIp = ip.split(',')[0].trim();
+    const cleanIp = firstIp.startsWith('::ffff:') ? firstIp.substring(7) : firstIp;
+    const userAgent = req.headers['user-agent'] || '';
+
     // 2. Insert order record
     const [orderResult] = await connection.query(
-      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [userId, total_amount, shipping_address, phone || 'Not Provided', payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || guest_email || null]
+      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, client_ip, client_user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, total_amount, shipping_address, phone || 'Not Provided', payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || guest_email || null, cleanIp, userAgent]
     );
     const orderId = orderResult.insertId;
 
@@ -454,6 +484,24 @@ exports.createGuestOrder = async (req, res) => {
 
     // Commit database changes
     await connection.commit();
+
+    // Send admin notification email asynchronously
+    const { sendEmail } = require('../utils/mailer');
+    sendEmail({
+      to: 'johirul3218@gmail.com',
+      subject: `New Guest Order Placed - Order #${orderId}`,
+      text: `A new guest order has been placed on ElitePassBD.\nOrder ID: #${orderId}\nTotal Amount: ৳${total_amount}\nGuest Name: ${guest_name}\nGuest Email: ${guest_email}\nPhone: ${phone}`,
+      html: `<h3>New Guest Order Placed</h3>
+             <p>A new guest order has been placed on ElitePassBD.</p>
+             <p><strong>Order Details:</strong></p>
+             <ul>
+               <li><strong>Order ID:</strong> #${orderId}</li>
+               <li><strong>Total Amount:</strong> ৳${total_amount}</li>
+               <li><strong>Guest Name:</strong> ${guest_name}</li>
+               <li><strong>Guest Email:</strong> ${guest_email}</li>
+               <li><strong>Phone:</strong> ${phone || 'N/A'}</li>
+             </ul>`
+    }).catch(err => console.error('Failed to send admin guest order placement email:', err));
 
     // 4. Send email credentials (asynchronous)
     if (isNewUser) {

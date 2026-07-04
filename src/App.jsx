@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { initPixel } from './utils/fbPixel';
 
 // Context Providers
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -49,6 +50,10 @@ const AdminRoute = ({ children }) => {
 function AppContent() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { pathname } = useLocation();
+
+  useEffect(() => {
+    initPixel();
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);

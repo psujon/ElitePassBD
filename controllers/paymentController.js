@@ -298,6 +298,57 @@ const fulfillOrder = async (merchantTransactionId) => {
     }
 
     await connection.commit();
+
+    // Trigger Facebook Conversions API Purchase Event
+    try {
+      const { sendFbEvent } = require('../utils/facebookCapi');
+      const fbContents = items.map(item => ({
+        id: String(item.product_id),
+        quantity: parseInt(item.quantity),
+        item_price: parseFloat(item.price)
+      }));
+
+      // Fire the purchase event asynchronously
+      sendFbEvent({
+        eventName: 'Purchase',
+        eventId: `purchase_${order.id}`,
+        userData: {
+          email: order.delivery_email || order.user_email,
+          phone: order.phone,
+          name: order.user_name,
+          client_ip_address: order.client_ip,
+          client_user_agent: order.client_user_agent,
+          event_source_url: `${process.env.FRONTEND_URL || 'https://elitepassbd.com'}/payment/success?orderId=${order.id}`
+        },
+        customData: {
+          currency: 'BDT',
+          value: parseFloat(order.total_amount),
+          content_type: 'product',
+          contents: fbContents
+        }
+      });
+
+      // Send admin order completion email asynchronously
+      const { sendEmail } = require('../utils/mailer');
+      sendEmail({
+        to: 'johirul3218@gmail.com',
+        subject: `Order Completed (Paid) - Order #${order.id}`,
+        text: `Order #${order.id} has been paid successfully.\nAmount: ৳${order.total_amount}\nTransaction ID: ${merchantTransactionId}\nPhone: ${order.phone}\nDelivery Email: ${order.delivery_email || order.user_email}`,
+        html: `<h3>Order Completed (Paid)</h3>
+               <p>Order #${order.id} has been paid and fulfilled successfully.</p>
+               <p><strong>Transaction Details:</strong></p>
+               <ul>
+                 <li><strong>Order ID:</strong> #${order.id}</li>
+                 <li><strong>Amount Paid:</strong> ৳${order.total_amount}</li>
+                 <li><strong>Transaction ID:</strong> ${merchantTransactionId}</li>
+                 <li><strong>Customer Name:</strong> ${order.user_name}</li>
+                 <li><strong>Customer Phone:</strong> ${order.phone}</li>
+                 <li><strong>Delivery Email:</strong> ${order.delivery_email || order.user_email}</li>
+               </ul>`
+      }).catch(err => console.error('Failed to send admin order completion email:', err));
+    } catch (fbTrackErr) {
+      console.error('FB Purchase CAPI Trigger Error:', fbTrackErr);
+    }
   } catch (dbErr) {
     await connection.rollback();
     connection.release();

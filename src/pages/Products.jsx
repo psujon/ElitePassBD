@@ -4,6 +4,7 @@ import { api } from '../utils/api';
 import { Search, Loader2, Star, CheckCircle, AlertTriangle, ShoppingCart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { toast } from 'react-hot-toast';
+import { trackEvent } from '../utils/fbPixel';
 
 const getProductDisplayPrice = (prod) => {
   if (!prod) return 0;
@@ -72,6 +73,19 @@ export default function Products() {
     e.stopPropagation();
     const success = addToCart(product, 1);
     if (success) {
+      const priceToUse = getProductDisplayPrice(product);
+      trackEvent('AddToCart', {
+        content_ids: [String(product.id)],
+        content_name: product.name,
+        content_type: 'product',
+        value: priceToUse,
+        currency: 'BDT',
+        contents: [{
+          id: String(product.id),
+          quantity: 1,
+          item_price: priceToUse
+        }]
+      });
       toast.success(`${product.name} added to cart!`);
     }
   };

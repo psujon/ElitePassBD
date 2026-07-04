@@ -22,6 +22,7 @@ import {
   ShoppingCart
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { trackEvent } from '../utils/fbPixel';
 
 const getProductDisplayPrice = (prod) => {
   if (!prod) return 0;
@@ -116,6 +117,19 @@ export default function Home() {
     e.stopPropagation();
     const success = addToCart(product, 1);
     if (success) {
+      const priceToUse = getProductDisplayPrice(product);
+      trackEvent('AddToCart', {
+        content_ids: [String(product.id)],
+        content_name: product.name,
+        content_type: 'product',
+        value: priceToUse,
+        currency: 'BDT',
+        contents: [{
+          id: String(product.id),
+          quantity: 1,
+          item_price: priceToUse
+        }]
+      });
       toast.success(`${product.name} added to cart!`);
     }
   };
@@ -220,8 +234,8 @@ export default function Home() {
 
   // Carousel Slides Content
   const activeSlides = slides.length > 0 ? slides : [
-    { id: 'def1', image_url: "/top_slider_image_1.png" },
-    { id: 'def2', image_url: "/top_slider_image_2.png" }
+    { id: 'def1', image_url: "" },
+    { id: 'def2', image_url: "" }
   ];
 
   const handleNextSlide = () => {
@@ -331,7 +345,7 @@ export default function Home() {
                       <img
                         src={p.image_url}
                         alt={p.name}
-                        className="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 p-2"
+                        className="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-tr from-red-600 to-red-800 flex items-center justify-center text-white font-bold text-xs">No Image</div>
@@ -366,11 +380,11 @@ export default function Home() {
 
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 h-[360px] md:h-[180px]">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-1 h-[330px] md:h-[150px">
 
               <Link
                 to={recent1Link}
-                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full min-h-[180px] bg-slate-200 border border-slate-200"
+                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full h-[150px] md:h-[180px]"
               >
                 <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[8px] xs:text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
                   {recent1Badge}
@@ -379,7 +393,7 @@ export default function Home() {
                   <img
                     src={recent1Image}
                     alt="Recent Product 1"
-                    className="absolute inset-0 w-full h-full object-contain group-hover:scale-104 transition-transform duration-500"
+                    className="absolute inset-0 w-full h-full object-contain group-hover:scale-104 rounded transition-transform duration-500"
                   />
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-tr from-slate-100 to-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold">
@@ -390,7 +404,7 @@ export default function Home() {
 
               <Link
                 to={recent2Link}
-                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full min-h-[180px] bg-slate-200 border border-slate-200"
+                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full h-[150px] md:h-[180px]"
               >
                 <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[8px] xs:text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
                   {recent2Badge}
@@ -409,7 +423,7 @@ export default function Home() {
               </Link>
               <Link
                 to={recent3Link}
-                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full min-h-[180px] bg-slate-200 border border-slate-200"
+                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full h-[150px] md:h-[180px]"
               >
                 <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[8px] xs:text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
                   {recent3Badge}
@@ -428,7 +442,7 @@ export default function Home() {
               </Link>
               <Link
                 to={recent4Link}
-                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full min-h-[180px] bg-slate-200 border border-slate-200"
+                className="relative rounded-lg overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all group block h-full h-[150px] md:h-[180px] "
               >
                 <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[8px] xs:text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
                   {recent4Badge}
@@ -453,7 +467,7 @@ export default function Home() {
         {/* ================= SECTION 1: THE BEST SELLERS ================= */}
         <div className="bg-slate-50 border border-slate-200/80 rounded-3xl mb-6 shadow-xs">
           <div className="flex items-center justify-between border-b border-slate-200 p-4 mb-2">
-            <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <h2 className="text-md md:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
               <span className="w-2 h-5 bg-blue-600 rounded-md" />
               <span className='bg-blue-600/90 text-white rounded-lg py-1 px-6'>Popular Items</span>
             </h2>
@@ -470,8 +484,8 @@ export default function Home() {
           ) : bestSellers.length === 0 ? (
             <div className="py-10 text-center text-slate-400">No best seller items found.</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 p-2">
-              {bestSellers.map((prod) => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-2">
+              {bestSellers.slice(0, 8).map((prod) => {
                 const currentPrice = getProductDisplayPrice(prod);
                 const isOutOfStock = prod.stock === 0;
 
@@ -480,29 +494,32 @@ export default function Home() {
                 const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
                 const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
 
+                // Fake eye view count based on id
+                const views = 150 + (prod.id * 97) % 300;
+
                 return (
                   <div
                     key={prod.id}
                     onClick={() => handleProductClick(prod.id)}
-                    className="border border-slate-150 rounded-2xl p-3 bg-slate-50 flex flex-col justify-between hover:shadow-md hover:border-slate-300 transition-all cursor-pointer relative group"
+                    className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden hover:shadow-md hover:border-slate-350 transition-all cursor-pointer flex flex-col group relative"
                   >
-                    {/* Discount Badge */}
-                    {!isOutOfStock && hasDiscount && (
-                      <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
-                        -{discountPercent}%
-                      </div>
-                    )}
-
                     {/* Image */}
-                    <div className="aspect-square w-full bg-white border border-slate-100 rounded-xl overflow-hidden flex items-center justify-center relative mb-3">
+                    <div className="aspect-square w-full bg-slate-50 border-b border-slate-100 flex items-center justify-center overflow-hidden relative">
+                      {/* Discount Badge */}
+                      {!isOutOfStock && hasDiscount && (
+                        <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                          -{discountPercent}%
+                        </div>
+                      )}
+
                       {prod.image_url ? (
-                        <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-350" />
+                        <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover transition-transform group-hover:scale-103 duration-350" />
                       ) : (
-                        <span className="text-[10px] text-slate-400 font-bold uppercase">No Image</span>
+                        <span className="text-xs text-slate-400 font-bold uppercase">No Image</span>
                       )}
 
                       {isOutOfStock && (
-                        <div className="absolute top-2 left-2 flex items-start justify-start">
+                        <div className="absolute top-2 left-2 flex items-center justify-center">
                           <span className="px-4 py-1.5 bg-red-500 text-white border border-red-200/85 text-xs font-bold rounded-full">
                             Out of Stock
                           </span>
@@ -510,63 +527,54 @@ export default function Home() {
                       )}
                     </div>
 
-                    {/* Meta */}
-                    <div>
-                      <h3 className="text-[12px] font-extrabold text-slate-800 line-clamp-2 leading-snug min-h-[2rem]">
-                        {prod.name}
-                      </h3>
-                      {/* Stars */}
-                      {prod.avg_rating > 0 && (
-                        <div className="flex gap-0.5 my-1.5">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} className={`w-3 h-3 ${i < Math.round(prod.avg_rating) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
-                          ))}
+                    {/* Metadata & Actions */}
+                    <div className="p-4 flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-xs font-black text-slate-800 line-clamp-2 leading-snug min-h-[2.5rem]">
+                          {prod.name}
+                        </h3>
+
+                        {/* Stars */}
+                        {prod.avg_rating > 0 && (
+                          <div className="flex gap-0.5 mt-1.5">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} className={`w-3 h-3 ${i < Math.round(prod.avg_rating) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Views & Price line */}
+                        <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-bold">
+                          <div className="flex items-center gap-1">
+                            <Eye className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{views}</span>
+                          </div>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-blue-600 text-sm font-black">{getProductDisplayPriceRange(prod)}</span>
+                            {!isOutOfStock && hasDiscount && (
+                              <span className="text-[10px] text-slate-400 line-through font-normal">{originalPrice.toFixed(0)}৳</span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      {/* Stock */}
-                      <div className="text-[10px] font-bold text-slate-500 mb-2">
-                        {isOutOfStock ? (
-                          <span className="text-red-500">Out of stock</span>
-                        ) : (
-                          <span className="text-emerald-600">Stock Available</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Price & Action */}
-                    <div className="mt-3 pt-2 border-t border-slate-150">
-                      <div className="flex items-baseline gap-1.5 mb-2.5">
-                        <span className="text-xs font-black text-blue-600">{
-                          getProductDisplayPriceRange(prod)
-                        }</span>
-                        {!isOutOfStock && hasDiscount && (
-                          <span className="text-[10px] text-slate-400 line-through">{originalPrice.toFixed(0)}৳</span>
-                        )}
                       </div>
 
-                      {isOutOfStock ? (
+                      {/* Action buttons */}
+                      <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100">
                         <button
-                          disabled
-                          className="w-full py-1.5 rounded-lg text-[10px] font-extrabold text-center bg-slate-200 text-slate-450 cursor-not-allowed"
+                          onClick={(e) => handleAddToCart(e, prod)}
+                          disabled={isOutOfStock}
+                          className="bg-slate-900 hover:bg-slate-950 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                         >
-                          Out of Stock
+                          <ShoppingCart className="w-3 h-3" /> Cart
                         </button>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={(e) => handleAddToCart(e, prod)}
-                            className="bg-slate-900 hover:bg-slate-950 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
-                          >
-                            <ShoppingCart className="w-3 h-3" /> Cart
-                          </button>
-                          <button
-                            onClick={(e) => handleOrderNow(e, prod)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
-                          >
-                            Buy Now
-                          </button>
-                        </div>
-                      )}
+                        <button
+                          onClick={(e) => handleOrderNow(e, prod)}
+                          disabled={isOutOfStock}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          Buy Now
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

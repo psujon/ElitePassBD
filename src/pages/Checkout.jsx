@@ -3,6 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
+import { trackEvent } from '../utils/fbPixel';
 import {
   ShoppingBag,
   MapPin,
@@ -43,6 +44,30 @@ export default function Checkout() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [orderSuccess, setOrderSuccess] = useState(null);
+
+  // Trigger InitiateCheckout event when checkout page loads with cart items
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      const contentIds = cartItems.map(item => String(item.product_id));
+      const contents = cartItems.map(item => ({
+        id: String(item.product_id),
+        quantity: parseInt(item.quantity),
+        item_price: parseFloat(item.price)
+      }));
+
+      trackEvent('InitiateCheckout', {
+        content_ids: contentIds,
+        content_type: 'product',
+        value: parseFloat(cartTotal),
+        currency: 'BDT',
+        contents: contents
+      }, {
+        email: user?.email || '',
+        name: user?.name || '',
+        phone: user?.whatsapp_number || ''
+      });
+    }
+  }, []);
 
   // If cart is empty and order wasn't just placed successfully, redirect to home
   useEffect(() => {

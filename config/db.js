@@ -102,6 +102,8 @@ async function createTables() {
       payment_method VARCHAR(50) DEFAULT 'Cash on Delivery',
       cancel_reason VARCHAR(255) DEFAULT NULL,
       delivery_email VARCHAR(255) DEFAULT NULL,
+      client_ip VARCHAR(255) DEFAULT NULL,
+      client_user_agent TEXT DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -260,6 +262,18 @@ async function updateSchema() {
     if (deliveryEmailCols.length === 0) {
       await pool.query("ALTER TABLE orders ADD COLUMN delivery_email VARCHAR(255) DEFAULT NULL");
       console.log("Added column 'delivery_email' to 'orders' table.");
+    }
+
+    const [clientIpCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'client_ip'");
+    if (clientIpCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN client_ip VARCHAR(255) DEFAULT NULL");
+      console.log("Added column 'client_ip' to 'orders' table.");
+    }
+
+    const [clientUaCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'client_user_agent'");
+    if (clientUaCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN client_user_agent TEXT DEFAULT NULL");
+      console.log("Added column 'client_user_agent' to 'orders' table.");
     }
 
     const [prodColumns] = await pool.query("SHOW COLUMNS FROM products LIKE 'category_id'");
