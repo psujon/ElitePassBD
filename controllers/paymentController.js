@@ -191,6 +191,7 @@ const fulfillOrder = async (merchantTransactionId) => {
   let targetEmail = null;
   let userName = null;
   let alreadyProcessed = false;
+  let pixelData = null;
 
   try {
     await connection.beginTransaction();
@@ -218,7 +219,7 @@ const fulfillOrder = async (merchantTransactionId) => {
     if (order.payment_status === 'Paid') {
       await connection.commit();
       const [items] = await db.query(
-        `SELECT oi.*, p.activation_process 
+        `SELECT oi.*, p.name AS product_name, p.activation_process 
          FROM order_items oi
          JOIN products p ON oi.product_id = p.id
          WHERE oi.order_id = ?`,
@@ -226,8 +227,31 @@ const fulfillOrder = async (merchantTransactionId) => {
       );
       const hasManual = items.some(item => item.activation_process === 'Manual');
       activationType = hasManual ? 'manual' : 'automatic';
+
+      const fbContents = items.map(item => ({
+        id: String(item.product_id),
+        quantity: parseInt(item.quantity),
+        item_price: parseFloat(item.price)
+      }));
+
+      pixelData = {
+        value: parseFloat(order.total_amount),
+        currency: 'BDT',
+        content_ids: items.map(item => String(item.product_id)),
+        contents: fbContents,
+        items: items.map(item => ({
+          item_id: String(item.product_id),
+          item_name: item.product_name,
+          price: parseFloat(item.price),
+          quantity: parseInt(item.quantity)
+        })),
+        email: order.delivery_email || order.user_email,
+        phone: order.phone,
+        name: order.user_name
+      };
+
       connection.release();
-      return { success: true, alreadyProcessed: true, activationType, orderId };
+      return { success: true, alreadyProcessed: true, activationType, orderId, pixelData };
     }
 
     // Mark order as Paid and status Processing
@@ -308,6 +332,22 @@ const fulfillOrder = async (merchantTransactionId) => {
         item_price: parseFloat(item.price)
       }));
 
+      pixelData = {
+        value: parseFloat(order.total_amount),
+        currency: 'BDT',
+        content_ids: items.map(item => String(item.product_id)),
+        contents: fbContents,
+        items: items.map(item => ({
+          item_id: String(item.product_id),
+          item_name: item.product_name,
+          price: parseFloat(item.price),
+          quantity: parseInt(item.quantity)
+        })),
+        email: order.delivery_email || order.user_email,
+        phone: order.phone,
+        name: order.user_name
+      };
+
       // Fire the purchase event asynchronously
       sendFbEvent({
         eventName: 'Purchase',
@@ -361,7 +401,7 @@ const fulfillOrder = async (merchantTransactionId) => {
     sendLicenseEmail(targetEmail, userName, orderId, fulfilledLicenses);
   }
 
-  return { success: true, alreadyProcessed: false, activationType, orderId };
+  return { success: true, alreadyProcessed: false, activationType, orderId, pixelData };
 };
 
 exports.paymentSuccess = async (req, res) => {
@@ -419,7 +459,12 @@ exports.paymentSuccess = async (req, res) => {
     // 2. If Verified, fulfill order using shared helper
     try {
       const fulfillmentResult = await fulfillOrder(merchantTransactionId);
-      return res.redirect(`${frontendUrl}/payment/success?orderId=${fulfillmentResult.orderId}&activationType=${fulfillmentResult.activationType}`);
+      let redirectUrl = `${frontendUrl}/payment/success?orderId=${fulfillmentResult.orderId}&activationType=${fulfillmentResult.activationType}`;
+      if (fulfillmentResult.pixelData) {
+        const pixelDataStr = Buffer.from(JSON.stringify(fulfillmentResult.pixelData)).toString('base64');
+        redirectUrl += `&pixel=${encodeURIComponent(pixelDataStr)}`;
+      }
+      return res.redirect(redirectUrl);
     } catch (fulfillErr) {
       console.error('Fulfillment error in payment success:', fulfillErr);
       return res.redirect(`${frontendUrl}/payment/fail?reason=InternalError`);

@@ -88,6 +88,23 @@ export default function ProductDetails() {
         currency: 'BDT'
       });
 
+      // Trigger GA4 view_item event
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ 'ecommerce': null });
+      window.dataLayer.push({
+        'event': 'view_item',
+        'ecommerce': {
+          'currency': 'BDT',
+          'value': parseFloat(prodData.price),
+          'items': [{
+            'item_id': String(prodData.id),
+            'item_name': prodData.name,
+            'price': parseFloat(prodData.price),
+            'quantity': 1
+          }]
+        }
+      });
+
       // Pre-select first package if packages exist
       if (prodData.packages && prodData.packages.length > 0) {
         setSelectedPackage(prodData.packages[0]);

@@ -1,11 +1,69 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle2, ArrowRight, Mail, ShieldCheck, Clock } from 'lucide-react';
+import { trackEvent } from '../utils/fbPixel';
 
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('orderId');
   const activationType = searchParams.get('activationType') || 'automatic';
+  const pixelParam = searchParams.get('pixel');
+  const trackedRef = useRef(false);
+
+  useEffect(() => {
+    if (orderId && pixelParam && !trackedRef.current) {
+      trackedRef.current = true;
+      try {
+        // Safely decode Base64 JSON supporting UTF-8 (Bengali names, etc.)
+        let decodedJson;
+        if (typeof TextDecoder !== 'undefined') {
+          decodedJson = new TextDecoder().decode(
+            Uint8Array.from(atob(decodeURIComponent(pixelParam)), c => c.charCodeAt(0))
+          );
+        } else {
+          decodedJson = decodeURIComponent(escape(atob(decodeURIComponent(pixelParam))));
+        }
+
+        const pixelData = JSON.parse(decodedJson);
+
+        // Fire browser-side purchase event (skip CAPI tracking since it's already fired from backend)
+        trackEvent(
+          'Purchase',
+          {
+            value: pixelData.value,
+            currency: pixelData.currency || 'BDT',
+            content_type: 'product',
+            contents: pixelData.contents,
+            content_ids: pixelData.content_ids
+          },
+          {
+            email: pixelData.email || '',
+            phone: pixelData.phone || '',
+            name: pixelData.name || ''
+          },
+          `purchase_${orderId}`,
+          true // skipServer = true
+        );
+
+        // Trigger GA4 purchase event
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({ 'ecommerce': null });
+        window.dataLayer.push({
+          'event': 'purchase',
+          'ecommerce': {
+            'transaction_id': String(orderId),
+            'value': parseFloat(pixelData.value),
+            'shipping': 0.00,
+            'tax': 0.00,
+            'currency': pixelData.currency || 'BDT',
+            'items': pixelData.items || []
+          }
+        });
+      } catch (err) {
+        console.error('[Meta Pixel] Failed to track browser purchase event:', err);
+      }
+    }
+  }, [orderId, pixelParam]);
 
   return (
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] py-20 flex flex-col justify-center items-center text-left animate-fade-in">

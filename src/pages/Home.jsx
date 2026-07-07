@@ -291,7 +291,7 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-15 md:mb-8">
 
           {/* Left: Dynamic Carousel Slider */}
-          <div className="relative rounded-lg overflow-hidden shadow-xs h-auto aspect-[1663/945] md:h-[400px] lg:h-[420px] md:aspect-auto group bg-slate-900">
+          <div className="relative rounded overflow-hidden shadow-xs h-auto w-full aspect-[1663/945] md:h-[400px] lg:h-[420px] md:aspect-auto group">
             {activeSlides.map((slide, idx) => (
               <div
                 key={slide.id}
@@ -301,7 +301,7 @@ export default function Home() {
 
                 {/* Slide Footer Indicators */}
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center z-20">
-                  <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1.5 rounded-full backdrop-blur-sm">
+                  <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1.5 rounded backdrop-blur-sm">
                     {activeSlides.map((_, dotIdx) => (
                       <button
                         key={dotIdx}

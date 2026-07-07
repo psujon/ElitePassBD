@@ -66,6 +66,23 @@ export default function Checkout() {
         name: user?.name || '',
         phone: user?.whatsapp_number || ''
       });
+
+      // Trigger GA4 begin_checkout event
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ 'ecommerce': null });
+      window.dataLayer.push({
+        'event': 'begin_checkout',
+        'ecommerce': {
+          'currency': 'BDT',
+          'value': parseFloat(cartTotal),
+          'items': cartItems.map(item => ({
+            'item_id': String(item.product_id),
+            'item_name': item.name,
+            'price': parseFloat(item.price),
+            'quantity': parseInt(item.quantity)
+          }))
+        }
+      });
     }
   }, []);
 

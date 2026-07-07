@@ -36,12 +36,12 @@ export const initPixel = () => {
  * Fires duplicate Meta tracking events (Browser + Server-side Conversions API)
  * with matching event_ids for automatic deduplication.
  */
-export const trackEvent = async (eventName, customData = {}, userData = {}) => {
+export const trackEvent = async (eventName, customData = {}, userData = {}, overrideEventId = null, skipServer = false) => {
   const pixelId = import.meta.env.VITE_FB_PIXEL_ID;
   if (!pixelId) return;
 
   // Generate a unique event ID for Meta deduplication
-  const eventId = `${eventName.toLowerCase()}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+  const eventId = overrideEventId || `${eventName.toLowerCase()}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 
   // 1. Client-Side Browser Tracking
   if (window.fbq) {
@@ -54,20 +54,22 @@ export const trackEvent = async (eventName, customData = {}, userData = {}) => {
   }
 
   // 2. Server-Side Conversions API (CAPI) Tracking
-  try {
-    const payload = {
-      eventName,
-      eventId,
-      userData: {
-        ...userData,
-        event_source_url: window.location.href
-      },
-      customData
-    };
+  if (!skipServer) {
+    try {
+      const payload = {
+        eventName,
+        eventId,
+        userData: {
+          ...userData,
+          event_source_url: window.location.href
+        },
+        customData
+      };
 
-    // Call the server track endpoint
-    await api.post('/pixel/track', payload);
-  } catch (err) {
-    console.error(`[Meta Pixel] Server CAPI tracking failed:`, err);
+      // Call the server track endpoint
+      await api.post('/pixel/track', payload);
+    } catch (err) {
+      console.error(`[Meta Pixel] Server CAPI tracking failed:`, err);
+    }
   }
 };
