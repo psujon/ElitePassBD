@@ -51,9 +51,9 @@ function AppContent() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { pathname } = useLocation();
 
-  useEffect(() => {
-    initPixel();
-  }, []);
+  // useEffect(() => {
+  //   initPixel();
+  // }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
