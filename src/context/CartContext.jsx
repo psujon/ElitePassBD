@@ -33,6 +33,10 @@ export const CartProvider = ({ children }) => {
     const selectedActivationVal = selectedActivation || '';
     const priceToUse = selectedPackage ? parseFloat(selectedPackage.price) : parseFloat(product.price);
     
+    const activeStock = selectedPackage && selectedPackage.stock !== undefined && selectedPackage.stock !== null && selectedPackage.stock !== ''
+      ? parseInt(selectedPackage.stock)
+      : product.stock;
+
     // Create a unique cart key for this combination
     const cartKey = `${product.id}_${packageName}_${selectedDeviceVal}_${selectedActivationVal}`;
 
@@ -43,16 +47,16 @@ export const CartProvider = ({ children }) => {
       const newQty = updated[existingIndex].quantity + orderQty;
       
       // Enforce product stock limit
-      if (newQty > product.stock) {
-        toast.error(`Cannot add more. Only ${product.stock} items available in stock.`);
+      if (newQty > activeStock) {
+        toast.error(`Cannot add more. Only ${activeStock} items available in stock.`);
         return false;
       }
       
       updated[existingIndex].quantity = newQty;
       saveCart(updated);
     } else {
-      if (orderQty > product.stock) {
-        toast.error(`Cannot add. Only ${product.stock} items available in stock.`);
+      if (orderQty > activeStock) {
+        toast.error(`Cannot add. Only ${activeStock} items available in stock.`);
         return false;
       }
       saveCart([...cartItems, {
@@ -65,7 +69,7 @@ export const CartProvider = ({ children }) => {
         price: priceToUse,
         image_url: product.image_url,
         quantity: orderQty,
-        stock: product.stock
+        stock: activeStock
       }]);
     }
     return true;

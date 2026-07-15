@@ -42,7 +42,7 @@ exports.createOrder = async (req, res) => {
 
       // Check stock and deduct it
       const [stockCheck] = await connection.query(
-        'SELECT stock, name FROM products WHERE id = ? FOR UPDATE',
+        'SELECT stock, name, packages FROM products WHERE id = ? FOR UPDATE',
         [product_id]
       );
 
@@ -50,18 +50,71 @@ exports.createOrder = async (req, res) => {
         throw new Error(`Product not found.`);
       }
 
-      const currentStock = stockCheck[0].stock;
       const productName = stockCheck[0].name;
-
-      if (currentStock < quantity) {
-        throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
+      const dbPackagesStr = stockCheck[0].packages;
+      let packages = [];
+      try {
+        packages = dbPackagesStr ? (typeof dbPackagesStr === 'string' ? JSON.parse(dbPackagesStr) : dbPackagesStr) : [];
+      } catch (e) {
+        packages = [];
       }
 
-      // Deduct stock
-      await connection.query(
-        'UPDATE products SET stock = stock - ? WHERE id = ?',
-        [quantity, product_id]
-      );
+      // If packages exist, verify and deduct stock from the specific package
+      if (packages && packages.length > 0) {
+        const matchedPkg = packages.find(p => 
+          p.duration === package_name && 
+          (!p.activation || !selected_activation || p.activation.toLowerCase() === selected_activation.toLowerCase())
+        );
+
+        if (matchedPkg) {
+          const pkgStock = parseInt(matchedPkg.stock);
+          if (!isNaN(pkgStock)) {
+            if (pkgStock < quantity) {
+              throw new Error(`Insufficient stock for package "${package_name}" of product "${productName}". Available: ${pkgStock}`);
+            }
+            // Deduct from package
+            matchedPkg.stock = pkgStock - quantity;
+            
+            // Re-calculate overall product stock as sum of packages
+            const totalStock = packages.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
+            
+            await connection.query(
+              'UPDATE products SET stock = ?, packages = ? WHERE id = ?',
+              [totalStock, JSON.stringify(packages), product_id]
+            );
+          } else {
+            // If package has no stock limit specified, check global product stock
+            const currentStock = stockCheck[0].stock;
+            if (currentStock < quantity) {
+              throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
+            }
+            await connection.query(
+              'UPDATE products SET stock = stock - ? WHERE id = ?',
+              [quantity, product_id]
+            );
+          }
+        } else {
+          // If packages exist but none matched, check global product stock
+          const currentStock = stockCheck[0].stock;
+          if (currentStock < quantity) {
+            throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
+          }
+          await connection.query(
+            'UPDATE products SET stock = stock - ? WHERE id = ?',
+            [quantity, product_id]
+          );
+        }
+      } else {
+        // Fallback to standard global stock check
+        const currentStock = stockCheck[0].stock;
+        if (currentStock < quantity) {
+          throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
+        }
+        await connection.query(
+          'UPDATE products SET stock = stock - ? WHERE id = ?',
+          [quantity, product_id]
+        );
+      }
 
       // Insert order item
       await connection.query(
@@ -71,23 +124,6 @@ exports.createOrder = async (req, res) => {
     }
 
     await connection.commit();
-
-    // Send admin notification email asynchronously
-    const { sendEmail } = require('../utils/mailer');
-    sendEmail({
-      to: 'johirul3218@gmail.com',
-      subject: `New Order Placed - Order #${orderId}`,
-      text: `A new order has been placed on ElitePassBD.\nOrder ID: #${orderId}\nTotal Amount: ৳${total_amount}\nPhone: ${phone}`,
-      html: `<h3>New Order Placed</h3>
-             <p>A new order has been placed on ElitePassBD.</p>
-             <p><strong>Order Details:</strong></p>
-             <ul>
-               <li><strong>Order ID:</strong> #${orderId}</li>
-               <li><strong>Total Amount:</strong> ৳${total_amount}</li>
-               <li><strong>Phone:</strong> ${phone}</li>
-               <li><strong>Delivery Email:</strong> ${delivery_email || 'N/A'}</li>
-             </ul>`
-    }).catch(err => console.error('Failed to send admin order placement email:', err));
 
     res.status(201).json({
       message: 'Order placed successfully!',
@@ -454,7 +490,7 @@ exports.createGuestOrder = async (req, res) => {
 
       // Check stock and deduct it
       const [stockCheck] = await connection.query(
-        'SELECT stock, name FROM products WHERE id = ? FOR UPDATE',
+        'SELECT stock, name, packages FROM products WHERE id = ? FOR UPDATE',
         [product_id]
       );
 
@@ -462,18 +498,71 @@ exports.createGuestOrder = async (req, res) => {
         throw new Error(`Product not found.`);
       }
 
-      const currentStock = stockCheck[0].stock;
       const productName = stockCheck[0].name;
-
-      if (currentStock < quantity) {
-        throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
+      const dbPackagesStr = stockCheck[0].packages;
+      let packages = [];
+      try {
+        packages = dbPackagesStr ? (typeof dbPackagesStr === 'string' ? JSON.parse(dbPackagesStr) : dbPackagesStr) : [];
+      } catch (e) {
+        packages = [];
       }
 
-      // Deduct stock
-      await connection.query(
-        'UPDATE products SET stock = stock - ? WHERE id = ?',
-        [quantity, product_id]
-      );
+      // If packages exist, verify and deduct stock from the specific package
+      if (packages && packages.length > 0) {
+        const matchedPkg = packages.find(p => 
+          p.duration === package_name && 
+          (!p.activation || !selected_activation || p.activation.toLowerCase() === selected_activation.toLowerCase())
+        );
+
+        if (matchedPkg) {
+          const pkgStock = parseInt(matchedPkg.stock);
+          if (!isNaN(pkgStock)) {
+            if (pkgStock < quantity) {
+              throw new Error(`Insufficient stock for package "${package_name}" of product "${productName}". Available: ${pkgStock}`);
+            }
+            // Deduct from package
+            matchedPkg.stock = pkgStock - quantity;
+            
+            // Re-calculate overall product stock as sum of packages
+            const totalStock = packages.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
+            
+            await connection.query(
+              'UPDATE products SET stock = ?, packages = ? WHERE id = ?',
+              [totalStock, JSON.stringify(packages), product_id]
+            );
+          } else {
+            // If package has no stock limit specified, check global product stock
+            const currentStock = stockCheck[0].stock;
+            if (currentStock < quantity) {
+              throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
+            }
+            await connection.query(
+              'UPDATE products SET stock = stock - ? WHERE id = ?',
+              [quantity, product_id]
+            );
+          }
+        } else {
+          // If packages exist but none matched, check global product stock
+          const currentStock = stockCheck[0].stock;
+          if (currentStock < quantity) {
+            throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
+          }
+          await connection.query(
+            'UPDATE products SET stock = stock - ? WHERE id = ?',
+            [quantity, product_id]
+          );
+        }
+      } else {
+        // Fallback to standard global stock check
+        const currentStock = stockCheck[0].stock;
+        if (currentStock < quantity) {
+          throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
+        }
+        await connection.query(
+          'UPDATE products SET stock = stock - ? WHERE id = ?',
+          [quantity, product_id]
+        );
+      }
 
       // Insert order item
       await connection.query(
@@ -484,24 +573,6 @@ exports.createGuestOrder = async (req, res) => {
 
     // Commit database changes
     await connection.commit();
-
-    // Send admin notification email asynchronously
-    const { sendEmail } = require('../utils/mailer');
-    sendEmail({
-      to: 'johirul3218@gmail.com',
-      subject: `New Guest Order Placed - Order #${orderId}`,
-      text: `A new guest order has been placed on ElitePassBD.\nOrder ID: #${orderId}\nTotal Amount: ৳${total_amount}\nGuest Name: ${guest_name}\nGuest Email: ${guest_email}\nPhone: ${phone}`,
-      html: `<h3>New Guest Order Placed</h3>
-             <p>A new guest order has been placed on ElitePassBD.</p>
-             <p><strong>Order Details:</strong></p>
-             <ul>
-               <li><strong>Order ID:</strong> #${orderId}</li>
-               <li><strong>Total Amount:</strong> ৳${total_amount}</li>
-               <li><strong>Guest Name:</strong> ${guest_name}</li>
-               <li><strong>Guest Email:</strong> ${guest_email}</li>
-               <li><strong>Phone:</strong> ${phone || 'N/A'}</li>
-             </ul>`
-    }).catch(err => console.error('Failed to send admin guest order placement email:', err));
 
     // 4. Send email credentials (asynchronous)
     if (isNewUser) {

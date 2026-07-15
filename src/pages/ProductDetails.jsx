@@ -217,6 +217,14 @@ export default function ProductDetails() {
     }
   };
 
+  const handleWhatsAppOrder = () => {
+    if (!product) return;
+    const supportNumber = '8801925112444';
+    const productInfo = `Hello, I'm interested in ordering: ${product.name}${selectedPackage ? ` (${selectedPackage.duration})` : ''} - Price: ৳${displayPrice}. Please assist.`;
+    const encodedText = encodeURIComponent(productInfo);
+    window.open(`https://wa.me/${supportNumber}?text=${encodedText}`, '_blank');
+  };
+
   // Compute average rating
   const avgRating = reviews.length > 0
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
@@ -270,6 +278,17 @@ export default function ProductDetails() {
   const displayPrice = selectedPackage
     ? parseFloat(selectedPackage.price)
     : product ? parseFloat(product.price) : 0;
+
+  const activeDiscountPercent = selectedPackage
+    ? (selectedPackage.discount !== undefined && selectedPackage.discount !== null && selectedPackage.discount !== '' ? parseFloat(selectedPackage.discount) : 0)
+    : (product && product.discount_percent ? parseFloat(product.discount_percent) : 0);
+
+  const hasDiscount = activeDiscountPercent > 0;
+  const originalPrice = hasDiscount ? (displayPrice / (1 - activeDiscountPercent / 100)) : 0;
+
+  const selectedPackageStock = selectedPackage && selectedPackage.stock !== undefined && selectedPackage.stock !== null && selectedPackage.stock !== ''
+    ? parseInt(selectedPackage.stock)
+    : (product ? product.stock : 0);
 
   const priceRange = `${Math.min(...product.packages.map(p => parseFloat(p.price)))}-${Math.max(...product.packages.map(p => parseFloat(p.price)))} ৳`;
 
@@ -342,7 +361,7 @@ export default function ProductDetails() {
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star
                       key={star}
-                      className={`w-4 h-4 ${star <= Math.round(avgRating || 5)
+                      className={`w-4 h-4 ${star <= Math.round(parseFloat(avgRating))
                         ? 'fill-amber-400 text-amber-400'
                         : 'text-slate-200'
                         }`}
@@ -358,14 +377,14 @@ export default function ProductDetails() {
               <div className="pt-2">
                 <span className="text-xxs text-slate-450  font-bold tracking-wider block">Price</span>
                 <div className="flex items-baseline space-x-3 mt-1">
+                  {hasDiscount && (
+                    <span className="text-xl text-slate-400 line-through font-normal">
+                      {originalPrice.toFixed(0)}৳
+                    </span>
+                  )}
                   <span className="text-3xl font-black text-slate-850">
                     ৳{displayPrice.toFixed(0)}
                   </span>
-                  {product.packages && product.packages.length > 0 && (
-                    <span className="text-xs text-slate-500 font-semibold">
-                      (Range: {priceRange})
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
@@ -434,48 +453,72 @@ export default function ProductDetails() {
                       </button>
                     ))}
                   </div>
+                  <div className="mt-2 text-[11px] font-bold">
+                    {selectedPackageStock === 0 ? (
+                      <span className="text-red-500 flex items-center space-x-1.5">
+                        <span className="text-xs">⚠️</span>
+                        <span>Stock Out</span>
+                      </span>
+                    ) : (
+                      <span className="text-emerald-600 flex items-center space-x-1.5">
+                        <span className="text-xs">✓</span>
+                        <span>In Stock</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
+              <div className="pt-4 border-t border-slate-200/80 space-y-3">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="space-y-2">
+                    <span className="text-xxs font-bold text-slate-500  tracking-wider block">Quantity</span>
+                    <div className="flex items-center space-x-2 bg-white border border-slate-200 p-1 rounded-xl shadow-xs">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-xs font-bold text-slate-800 px-3 w-8 text-center select-none">{quantity}</span>
+                      <button
+                        onClick={() => setQuantity(Math.min(selectedPackageStock, quantity + 1))}
+                        className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
 
-              {/* Quantity and Actions */}
-              <div className="flex flex-wrap items-end gap-4 pt-4 border-t border-slate-200/80">
-                <div className="space-y-2">
-                  <span className="text-xxs font-bold text-slate-500  tracking-wider block">Quantity</span>
-                  <div className="flex items-center space-x-2 bg-white border border-slate-200 p-1 rounded-xl shadow-xs">
+                  <div className="flex gap-3 flex-1 min-w-[240px]">
                     <button
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                      onClick={handleAddToCart}
+                      disabled={selectedPackageStock === 0}
+                      className="flex-1 py-3 border border-slate-250 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-lg font-bold rounded-xl transition-all flex items-center justify-center space-x-2 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      <Minus className="w-3.5 h-3.5" />
+                      <ShoppingBag className="w-4 h-4 text-violet-600" />
+                      <span>Add to Cart</span>
                     </button>
-                    <span className="text-xs font-bold text-slate-800 px-3 w-8 text-center select-none">{quantity}</span>
+
                     <button
-                      onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                      className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                      onClick={handleBuyNow}
+                      disabled={selectedPackageStock === 0}
+                      className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white text-lg font-bold rounded-xl transition-all flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <span>Buy Now</span>
                     </button>
                   </div>
                 </div>
 
-                <div className="flex gap-3 flex-1 min-w-[240px]">
-                  <button
-                    onClick={handleAddToCart}
-                    disabled={product.stock === 0}
-                    className="flex-1 py-3 border border-slate-250 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-2 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    <ShoppingBag className="w-4 h-4 text-violet-600" />
-                    <span>Add to Cart</span>
-                  </button>
-
-                  <button
-                    onClick={handleBuyNow}
-                    disabled={product.stock === 0}
-                    className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    <span>Buy Now</span>
-                  </button>
-                </div>
+                {/* WhatsApp Order Button */}
+                <button
+                  onClick={handleWhatsAppOrder}
+                  className="w-full py-3 bg-[#25d366] hover:bg-[#20ba5a] text-white text-xl font-bold rounded-xl transition-all flex items-center justify-center space-x-2 shadow-sm cursor-pointer active:scale-[0.99] hover:scale-[1.01]"
+                >
+                  <svg viewBox="0 0 24 24" className="w-4.5 h-4.5 fill-white shrink-0">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.008c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                  <span>Order on WhatsApp</span>
+                </button>
               </div>
 
             </div>
@@ -680,7 +723,7 @@ export default function ProductDetails() {
                     <div>
                       <h3 className="text-xs font-extrabold text-slate-800 truncate group-hover:text-violet-650 transition-colors">{prod.name}</h3>
                       <p className="text-slate-500 text-[11px] mt-1 line-clamp-2 leading-relaxed min-h-[2.5rem]">
-                        {prod.description}
+                        {prod.description ? prod.description.replace(/<[^>]*>?/gm, '') : ''}
                       </p>
                     </div>
 

@@ -264,8 +264,8 @@ export default function Products() {
                   const isOutOfStock = prod.stock === 0;
 
                   // Real original price and discount percent if specified
-                  const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseInt(prod.discount_percent) > 0;
-                  const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
+                  const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseFloat(prod.discount_percent) > 0;
+                  const discountPercent = hasDiscount ? parseFloat(prod.discount_percent) : 0;
                   const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
 
                   return (

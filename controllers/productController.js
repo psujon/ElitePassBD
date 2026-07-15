@@ -76,11 +76,43 @@ exports.createProduct = async (req, res) => {
     discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process
   } = req.body;
 
-  if (!name || !description || price === undefined || stock === undefined) {
-    return res.status(400).json({ message: 'Name, description, price, and stock are required fields.' });
+  if (!name || !description) {
+    return res.status(400).json({ message: 'Name and description are required fields.' });
   }
 
   try {
+    // Parse packages if it is a string
+    let parsedPackages = [];
+    if (packages) {
+      parsedPackages = typeof packages === 'string' ? JSON.parse(packages) : packages;
+    }
+    
+    // Calculate total stock from packages
+    let calculatedStock = 0;
+    if (parsedPackages && parsedPackages.length > 0) {
+      calculatedStock = parsedPackages.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
+    } else {
+      calculatedStock = stock === undefined || stock === '' || stock === null ? 0 : parseInt(stock);
+    }
+
+    // Calculate max discount from packages
+    let calculatedDiscount = null;
+    if (parsedPackages && parsedPackages.length > 0) {
+      const discounts = parsedPackages.map(p => parseFloat(p.discount)).filter(d => !isNaN(d));
+      calculatedDiscount = discounts.length > 0 ? Math.max(...discounts) : null;
+    } else {
+      calculatedDiscount = discount_percent === undefined || discount_percent === '' || discount_percent === null ? null : parseFloat(discount_percent);
+    }
+
+    // Calculate min price from packages
+    let calculatedPrice = 0;
+    if (parsedPackages && parsedPackages.length > 0) {
+      const prices = parsedPackages.map(p => parseFloat(p.price)).filter(p => !isNaN(p));
+      calculatedPrice = prices.length > 0 ? Math.min(...prices) : 0;
+    } else {
+      calculatedPrice = price === undefined || price === '' || price === null ? 0 : parseFloat(price);
+    }
+
     const [result] = await db.query(
       `INSERT INTO products (
         name, description, price, image_url, stock, category_id, 
@@ -88,10 +120,10 @@ exports.createProduct = async (req, res) => {
         discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        name, description, parseFloat(price), image_url || '', parseInt(stock), category_id || null,
-        tags || null, additional_info || null, stringifyField(faqs), stringifyField(packages),
+        name, description, calculatedPrice, image_url || '', calculatedStock, category_id || null,
+        tags || null, additional_info || null, stringifyField(faqs), stringifyField(parsedPackages),
         device_options || null, activation_options || null,
-        discount_percent === undefined || discount_percent === '' || discount_percent === null ? null : parseInt(discount_percent),
+        calculatedDiscount,
         is_hot ? 1 : 0,
         is_highlighted ? 1 : 0,
         is_hot_discount ? 1 : 0,
@@ -119,11 +151,43 @@ exports.updateProduct = async (req, res) => {
     discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process
   } = req.body;
 
-  if (!name || !description || price === undefined || stock === undefined) {
-    return res.status(400).json({ message: 'Name, description, price, and stock are required fields.' });
+  if (!name || !description) {
+    return res.status(400).json({ message: 'Name and description are required fields.' });
   }
 
   try {
+    // Parse packages if it is a string
+    let parsedPackages = [];
+    if (packages) {
+      parsedPackages = typeof packages === 'string' ? JSON.parse(packages) : packages;
+    }
+    
+    // Calculate total stock from packages
+    let calculatedStock = 0;
+    if (parsedPackages && parsedPackages.length > 0) {
+      calculatedStock = parsedPackages.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
+    } else {
+      calculatedStock = stock === undefined || stock === '' || stock === null ? 0 : parseInt(stock);
+    }
+
+    // Calculate max discount from packages
+    let calculatedDiscount = null;
+    if (parsedPackages && parsedPackages.length > 0) {
+      const discounts = parsedPackages.map(p => parseFloat(p.discount)).filter(d => !isNaN(d));
+      calculatedDiscount = discounts.length > 0 ? Math.max(...discounts) : null;
+    } else {
+      calculatedDiscount = discount_percent === undefined || discount_percent === '' || discount_percent === null ? null : parseFloat(discount_percent);
+    }
+
+    // Calculate min price from packages
+    let calculatedPrice = 0;
+    if (parsedPackages && parsedPackages.length > 0) {
+      const prices = parsedPackages.map(p => parseFloat(p.price)).filter(p => !isNaN(p));
+      calculatedPrice = prices.length > 0 ? Math.min(...prices) : 0;
+    } else {
+      calculatedPrice = price === undefined || price === '' || price === null ? 0 : parseFloat(price);
+    }
+
     const [result] = await db.query(
       `UPDATE products SET 
         name = ?, description = ?, price = ?, image_url = ?, stock = ?, category_id = ?, 
@@ -131,10 +195,10 @@ exports.updateProduct = async (req, res) => {
         discount_percent = ?, is_hot = ?, is_highlighted = ?, is_hot_discount = ?, activation_process = ?
       WHERE id = ?`,
       [
-        name, description, parseFloat(price), image_url || '', parseInt(stock), category_id || null,
-        tags || null, additional_info || null, stringifyField(faqs), stringifyField(packages),
+        name, description, calculatedPrice, image_url || '', calculatedStock, category_id || null,
+        tags || null, additional_info || null, stringifyField(faqs), stringifyField(parsedPackages),
         device_options || null, activation_options || null,
-        discount_percent === undefined || discount_percent === '' || discount_percent === null ? null : parseInt(discount_percent),
+        calculatedDiscount,
         is_hot ? 1 : 0,
         is_highlighted ? 1 : 0,
         is_hot_discount ? 1 : 0,

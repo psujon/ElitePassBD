@@ -81,7 +81,7 @@ async function createTables() {
       device_options TEXT DEFAULT NULL,
       activation_options TEXT DEFAULT NULL,
       activation_process VARCHAR(50) DEFAULT 'Manual',
-      discount_percent INT DEFAULT NULL,
+      discount_percent DECIMAL(5, 2) DEFAULT NULL,
       is_hot TINYINT DEFAULT 0,
       is_highlighted TINYINT DEFAULT 0,
       is_hot_discount TINYINT DEFAULT 0,
@@ -348,8 +348,10 @@ async function updateSchema() {
 
     const [discountCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'discount_percent'");
     if (discountCols.length === 0) {
-      await pool.query("ALTER TABLE products ADD COLUMN discount_percent INT DEFAULT NULL");
+      await pool.query("ALTER TABLE products ADD COLUMN discount_percent DECIMAL(5, 2) DEFAULT NULL");
       console.log("Added column 'discount_percent' to 'products' table.");
+    } else {
+      await pool.query("ALTER TABLE products MODIFY COLUMN discount_percent DECIMAL(5, 2) DEFAULT NULL");
     }
 
     const [isHotCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'is_hot'");

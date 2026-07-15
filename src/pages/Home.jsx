@@ -169,7 +169,7 @@ export default function Home() {
 
   const recent1Link = recentProduct1 ? `/product/${recentProduct1.id}` : "/products?category=Subscription";
   const recent1Badge = recentProduct1
-    ? (recentProduct1.discount_percent ? `Hot Deal Upto ${recentProduct1.discount_percent}% Off` : "Hot Deal Upto 50% Off")
+    ? (recentProduct1.discount_percent ? `Hot Deal Upto ${Math.round(parseFloat(recentProduct1.discount_percent))}% Off` : "Hot Deal Upto 50% Off")
     : "Hot Deal Upto 50% Off";
   const recent1Title = recentProduct1
     ? formatRecentTitle(recentProduct1.name).toUpperCase()
@@ -178,7 +178,7 @@ export default function Home() {
 
   const recent2Link = recentProduct2 ? `/product/${recentProduct2.id}` : "/products?category=Microsoft%20Office";
   const recent2Badge = recentProduct2
-    ? (recentProduct2.discount_percent ? `Hot Deal Upto ${recentProduct2.discount_percent}% Off` : "Hot Deal Upto 50% Off")
+    ? (recentProduct2.discount_percent ? `Hot Deal Upto ${Math.round(parseFloat(recentProduct2.discount_percent))}% Off` : "Hot Deal Upto 50% Off")
     : "Hot Deal Upto 50% Off";
   const recent2Title = recentProduct2
     ? formatRecentTitle(recentProduct2.name).toUpperCase()
@@ -187,7 +187,7 @@ export default function Home() {
 
   const recent3Link = recentProduct3 ? `/product/${recentProduct3.id}` : "/products?category=Microsoft%20Office";
   const recent3Badge = recentProduct3
-    ? (recentProduct3.discount_percent ? `Hot Deal Upto ${recentProduct3.discount_percent}% Off` : "Hot Deal Upto 50% Off")
+    ? (recentProduct3.discount_percent ? `Hot Deal Upto ${Math.round(parseFloat(recentProduct3.discount_percent))}% Off` : "Hot Deal Upto 50% Off")
     : "Hot Deal Upto 50% Off";
   const recent3Title = recentProduct3
     ? formatRecentTitle(recentProduct3.name).toUpperCase()
@@ -196,7 +196,7 @@ export default function Home() {
 
   const recent4Link = recentProduct4 ? `/product/${recentProduct4.id}` : "/products?category=Microsoft%20Office";
   const recent4Badge = recentProduct4
-    ? (recentProduct4.discount_percent ? `Hot Deal Upto ${recentProduct4.discount_percent}% Off` : "Hot Deal Upto 50% Off")
+    ? (recentProduct4.discount_percent ? `Hot Deal Upto ${Math.round(parseFloat(recentProduct4.discount_percent))}% Off` : "Hot Deal Upto 50% Off")
     : "Hot Deal Upto 50% Off";
   const recent4Title = recentProduct4
     ? formatRecentTitle(recentProduct4.name).toUpperCase()
@@ -210,8 +210,8 @@ export default function Home() {
   const hotSub = hotProduct?.category_name;
   const hotCurrentPrice = hotProduct ? getProductDisplayPrice(hotProduct) : 0.00;
 
-  const hasHotDiscount = hotProduct && hotProduct.discount_percent !== null && hotProduct.discount_percent !== undefined && parseInt(hotProduct.discount_percent) > 0;
-  const hotDiscountPercent = hasHotDiscount ? parseInt(hotProduct.discount_percent) : 45;
+  const hasHotDiscount = hotProduct && hotProduct.discount_percent !== null && hotProduct.discount_percent !== undefined && parseFloat(hotProduct.discount_percent) > 0;
+  const hotDiscountPercent = hasHotDiscount ? parseFloat(hotProduct.discount_percent) : 45;
   const hotOriginalPrice = hotProduct ? (hasHotDiscount ? (hotCurrentPrice / (1 - hotDiscountPercent / 100)) : (hotCurrentPrice * 1.45)) : 244.00;
 
   // Split description sentences for checkmarks
@@ -490,8 +490,8 @@ export default function Home() {
                 const isOutOfStock = prod.stock === 0;
 
                 // Real original price and discount percent if specified
-                const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseInt(prod.discount_percent) > 0;
-                const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
+                const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseFloat(prod.discount_percent) > 0;
+                const discountPercent = hasDiscount ? parseFloat(prod.discount_percent) : 0;
                 const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
 
                 // Fake eye view count based on id
@@ -508,7 +508,7 @@ export default function Home() {
                       {/* Discount Badge */}
                       {!isOutOfStock && hasDiscount && (
                         <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
-                          -{discountPercent}%
+                          -{Math.round(discountPercent)}%
                         </div>
                       )}
 
@@ -610,8 +610,8 @@ export default function Home() {
                   const isOutOfStock = prod.stock === 0;
 
                   // Real original price and discount percent if specified
-                  const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseInt(prod.discount_percent) > 0;
-                  const discountPercent = hasDiscount ? parseInt(prod.discount_percent) : 0;
+                  const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseFloat(prod.discount_percent) > 0;
+                  const discountPercent = hasDiscount ? parseFloat(prod.discount_percent) : 0;
                   const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
 
                   // Fake eye view count based on id
@@ -628,7 +628,7 @@ export default function Home() {
                         {/* Discount Badge */}
                         {!isOutOfStock && hasDiscount && (
                           <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
-                            -{discountPercent}%
+                            -{Math.round(discountPercent)}%
                           </div>
                         )}
 
