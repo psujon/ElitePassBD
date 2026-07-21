@@ -28,16 +28,12 @@ const sendEmail = async ({ to, subject, text, html }) => {
         text,
         html
       });
-      console.log(`Email sent successfully to ${to}`);
       return true;
     } else {
-      console.log('----------------------------');
-      console.log(`MOCK SMTP Email -> to: [${to}], subject: [${subject}]`);
-      console.log('----------------------------');
+      console.log(`Failed to send email to ${to}`);
       return false;
     }
   } catch (err) {
-    console.error(`Failed to send email to ${to}:`, err);
     return false;
   }
 };

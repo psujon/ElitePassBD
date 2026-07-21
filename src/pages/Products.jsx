@@ -263,10 +263,10 @@ export default function Products() {
                   const currentPrice = getProductDisplayPrice(prod);
                   const isOutOfStock = prod.stock === 0;
 
-                  // Real original price and discount percent if specified
+                  // Real original price and discount amount if specified
                   const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseFloat(prod.discount_percent) > 0;
-                  const discountPercent = hasDiscount ? parseFloat(prod.discount_percent) : 0;
-                  const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
+                  const discountAmount = hasDiscount ? parseFloat(prod.discount_percent) : 0;
+                  const originalPrice = hasDiscount ? discountAmount : 0;
 
                   return (
                     <div
@@ -277,7 +277,8 @@ export default function Products() {
                       {/* Discount Badge */}
                       {!isOutOfStock && hasDiscount && (
                         <div className="absolute top-3 left-3 z-10 bg-red-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md shadow-xs">
-                          -{discountPercent}%
+                          <span className="md:hidden">-{Math.round(((originalPrice - currentPrice) / originalPrice) * 100)}%</span>
+                          <span className="hidden md:inline">Save ৳{Math.round(originalPrice - currentPrice)}</span>
                         </div>
                       )}
 
@@ -304,7 +305,7 @@ export default function Products() {
 
                       {/* Card Details */}
                       <div className="p-4 flex-1 flex flex-col text-left">
-                        <h3 className="text-sm font-extrabold text-slate-800 line-clamp-2 min-h-[2.5rem] group-hover:text-blue-600 transition-colors">
+                        <h3 className="text-sm font-extrabold text-slate-800 line-clamp-none md:line-clamp-2 min-h-0 md:min-h-[2.5rem] group-hover:text-blue-600 transition-colors">
                           {prod.name}
                         </h3>
 
@@ -329,7 +330,7 @@ export default function Products() {
                             {currentPrice.toFixed(2)}৳
                           </span>
                           {!isOutOfStock && hasDiscount && (
-                            <span className="text-xs text-slate-400 line-through">
+                            <span className="hidden md:inline text-xs text-slate-400 line-through">
                               {originalPrice.toFixed(2)}৳
                             </span>
                           )}

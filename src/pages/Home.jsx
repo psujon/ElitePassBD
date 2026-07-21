@@ -166,38 +166,61 @@ export default function Home() {
   const recentProduct3 = hotDiscountProducts[2];
   const recentProduct4 = hotDiscountProducts[3];
 
+  const getPercentageBadge = (product) => {
+    if (!product) return "20% OFF";
+    if (!product.discount_percent) return "20% OFF";
+    
+    const originalPrice = parseFloat(product.discount_percent);
+    const currentPrice = getProductDisplayPrice(product);
+    
+    if (originalPrice > currentPrice && currentPrice > 0) {
+      const percentage = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+      return `${percentage}% OFF`;
+    }
+    
+    return "20% OFF";
+  };
+
 
   const recent1Link = recentProduct1 ? `/product/${recentProduct1.id}` : "/products?category=Subscription";
-  const recent1Badge = recentProduct1
-    ? (recentProduct1.discount_percent ? `Hot Deal Upto ${Math.round(parseFloat(recentProduct1.discount_percent))}% Off` : "Hot Deal Upto 50% Off")
-    : "Hot Deal Upto 50% Off";
+  const recent1Badge = (
+    <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-xs animate-pulse">
+      {getPercentageBadge(recentProduct1)}
+    </span>
+  );
   const recent1Title = recentProduct1
     ? formatRecentTitle(recentProduct1.name).toUpperCase()
     : "EDUCATION SUBSCRIPTION";
   const recent1Image = recentProduct1?.image_url;
 
   const recent2Link = recentProduct2 ? `/product/${recentProduct2.id}` : "/products?category=Microsoft%20Office";
-  const recent2Badge = recentProduct2
-    ? (recentProduct2.discount_percent ? `Hot Deal Upto ${Math.round(parseFloat(recentProduct2.discount_percent))}% Off` : "Hot Deal Upto 50% Off")
-    : "Hot Deal Upto 50% Off";
+  const recent2Badge = (
+    <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-xs animate-pulse">
+      {getPercentageBadge(recentProduct2)}
+    </span>
+  );
   const recent2Title = recentProduct2
     ? formatRecentTitle(recentProduct2.name).toUpperCase()
     : "OFFICE BUNDLE SALE";
   const recent2Image = recentProduct2?.image_url;
 
   const recent3Link = recentProduct3 ? `/product/${recentProduct3.id}` : "/products?category=Microsoft%20Office";
-  const recent3Badge = recentProduct3
-    ? (recentProduct3.discount_percent ? `Hot Deal Upto ${Math.round(parseFloat(recentProduct3.discount_percent))}% Off` : "Hot Deal Upto 50% Off")
-    : "Hot Deal Upto 50% Off";
+  const recent3Badge = (
+    <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-xs animate-pulse">
+      {getPercentageBadge(recentProduct3)}
+    </span>
+  );
   const recent3Title = recentProduct3
     ? formatRecentTitle(recentProduct3.name).toUpperCase()
     : "OFFICE BUNDLE SALE";
   const recent3Image = recentProduct3?.image_url;
 
   const recent4Link = recentProduct4 ? `/product/${recentProduct4.id}` : "/products?category=Microsoft%20Office";
-  const recent4Badge = recentProduct4
-    ? (recentProduct4.discount_percent ? `Hot Deal Upto ${Math.round(parseFloat(recentProduct4.discount_percent))}% Off` : "Hot Deal Upto 50% Off")
-    : "Hot Deal Upto 50% Off";
+  const recent4Badge = (
+    <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-xs animate-pulse">
+      {getPercentageBadge(recentProduct4)}
+    </span>
+  );
   const recent4Title = recentProduct4
     ? formatRecentTitle(recentProduct4.name).toUpperCase()
     : "OFFICE BUNDLE SALE";
@@ -211,8 +234,8 @@ export default function Home() {
   const hotCurrentPrice = hotProduct ? getProductDisplayPrice(hotProduct) : 0.00;
 
   const hasHotDiscount = hotProduct && hotProduct.discount_percent !== null && hotProduct.discount_percent !== undefined && parseFloat(hotProduct.discount_percent) > 0;
-  const hotDiscountPercent = hasHotDiscount ? parseFloat(hotProduct.discount_percent) : 45;
-  const hotOriginalPrice = hotProduct ? (hasHotDiscount ? (hotCurrentPrice / (1 - hotDiscountPercent / 100)) : (hotCurrentPrice * 1.45)) : 244.00;
+  const hotDiscountAmount = hasHotDiscount ? parseFloat(hotProduct.discount_percent) : 45;
+  const hotOriginalPrice = hotProduct ? (hasHotDiscount ? hotDiscountAmount : (hotCurrentPrice + 45)) : 244.00;
 
   // Split description sentences for checkmarks
   let hotBullets = [];
@@ -484,18 +507,16 @@ export default function Home() {
           ) : bestSellers.length === 0 ? (
             <div className="py-10 text-center text-slate-400">No best seller items found.</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-2">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 p-2">
               {bestSellers.slice(0, 8).map((prod) => {
                 const currentPrice = getProductDisplayPrice(prod);
                 const isOutOfStock = prod.stock === 0;
 
-                // Real original price and discount percent if specified
+                // Real original price and discount amount if specified
                 const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseFloat(prod.discount_percent) > 0;
-                const discountPercent = hasDiscount ? parseFloat(prod.discount_percent) : 0;
-                const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
+                const discountAmount = hasDiscount ? parseFloat(prod.discount_percent) : 0;
+                const originalPrice = hasDiscount ? discountAmount : 0;
 
-                // Fake eye view count based on id
-                const views = 150 + (prod.id * 97) % 300;
 
                 return (
                   <div
@@ -508,7 +529,7 @@ export default function Home() {
                       {/* Discount Badge */}
                       {!isOutOfStock && hasDiscount && (
                         <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
-                          -{Math.round(discountPercent)}%
+                          <span>-{Math.round(((originalPrice - currentPrice) / originalPrice) * 100)}%</span>
                         </div>
                       )}
 
@@ -530,7 +551,7 @@ export default function Home() {
                     {/* Metadata & Actions */}
                     <div className="p-4 flex-1 flex flex-col justify-between">
                       <div>
-                        <h3 className="text-xs font-black text-slate-800 line-clamp-2 leading-snug min-h-[2.5rem]">
+                        <h3 className="text-xs font-black text-slate-800 line-clamp-none md:line-clamp-2 leading-snug min-h-0 md:min-h-[2.5rem]">
                           {prod.name}
                         </h3>
 
@@ -543,17 +564,11 @@ export default function Home() {
                           </div>
                         )}
 
-                        {/* Views & Price line */}
-                        <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-bold">
-                          <div className="flex items-center gap-1">
-                            <Eye className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{views}</span>
-                          </div>
+                        {/* Price line */}
+                        <div className="flex items-center justify-start mt-3 text-[11px] text-slate-500 font-bold">
                           <div className="flex items-baseline gap-1.5">
                             <span className="text-blue-600 text-sm font-black">{getProductDisplayPriceRange(prod)}</span>
-                            {!isOutOfStock && hasDiscount && (
-                              <span className="text-[10px] text-slate-400 line-through font-normal">{originalPrice.toFixed(0)}৳</span>
-                            )}
+
                           </div>
                         </div>
                       </div>
@@ -604,18 +619,16 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 p-2">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 p-2">
                 {displayedProducts.map((prod) => {
                   const currentPrice = getProductDisplayPrice(prod);
                   const isOutOfStock = prod.stock === 0;
 
-                  // Real original price and discount percent if specified
+                  // Real original price and discount amount if specified
                   const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseFloat(prod.discount_percent) > 0;
-                  const discountPercent = hasDiscount ? parseFloat(prod.discount_percent) : 0;
-                  const originalPrice = hasDiscount ? (currentPrice / (1 - discountPercent / 100)) : 0;
+                  const discountAmount = hasDiscount ? parseFloat(prod.discount_percent) : 0;
+                  const originalPrice = hasDiscount ? discountAmount : 0;
 
-                  // Fake eye view count based on id
-                  const views = 150 + (prod.id * 97) % 300;
 
                   return (
                     <div
@@ -628,7 +641,7 @@ export default function Home() {
                         {/* Discount Badge */}
                         {!isOutOfStock && hasDiscount && (
                           <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md">
-                            -{Math.round(discountPercent)}%
+                            <span>-{Math.round(((originalPrice - currentPrice) / originalPrice) * 100)}%</span>
                           </div>
                         )}
 
@@ -650,7 +663,7 @@ export default function Home() {
                       {/* Metadata & Actions */}
                       <div className="p-4 flex-1 flex flex-col justify-between">
                         <div>
-                          <h3 className="text-xs font-black text-slate-800 line-clamp-2 leading-snug min-h-[2.5rem]">
+                          <h3 className="text-xs font-black text-slate-800 line-clamp-none md:line-clamp-2 leading-snug min-h-0 md:min-h-[2.5rem]">
                             {prod.name}
                           </h3>
 
@@ -663,17 +676,11 @@ export default function Home() {
                             </div>
                           )}
 
-                          {/* Views & Price line */}
-                          <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-bold">
-                            <div className="flex items-center gap-1">
-                              <Eye className="w-3.5 h-3.5 text-slate-400" />
-                              <span>{views}</span>
-                            </div>
+                          {/* Price line */}
+                          <div className="flex items-center justify-start mt-3 text-[11px] text-slate-500 font-bold">
                             <div className="flex items-baseline gap-1.5">
                               <span className="text-blue-600 text-sm font-black">{getProductDisplayPriceRange(prod)}</span>
-                              {!isOutOfStock && hasDiscount && (
-                                <span className="text-[10px] text-slate-400 line-through font-normal">{originalPrice.toFixed(0)}৳</span>
-                              )}
+
                             </div>
                           </div>
                         </div>

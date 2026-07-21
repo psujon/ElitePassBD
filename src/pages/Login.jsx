@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { Loader2, Mail, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useGoogleLogin } from '@react-oauth/google';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -56,9 +57,33 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    toast.error('Google login is not available. Please use email & password.');
-  };
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        setLoading(true);
+        setError('');
+        
+        const data = await api.post('/auth/google', { credential: tokenResponse.access_token });
+        
+        login(data.token, data.user);
+        
+        const from = location.state?.from?.pathname || (data.user.role === 'admin' ? '/admin' : '/dashboard');
+        navigate(from, { replace: true });
+        toast.success('Successfully signed in with Google!');
+      } catch (err) {
+        console.error(err);
+        const msg = err.message || 'Failed to sign in with Google.';
+        setError(msg);
+        toast.error(msg);
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: error => {
+      console.error('Google Login Error:', error);
+      toast.error('Google Login Failed.');
+    }
+  });
 
   const handleSendOTP = async (e) => {
     e.preventDefault();

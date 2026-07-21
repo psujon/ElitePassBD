@@ -279,12 +279,12 @@ export default function ProductDetails() {
     ? parseFloat(selectedPackage.price)
     : product ? parseFloat(product.price) : 0;
 
-  const activeDiscountPercent = selectedPackage
+  const activeDiscountAmount = selectedPackage
     ? (selectedPackage.discount !== undefined && selectedPackage.discount !== null && selectedPackage.discount !== '' ? parseFloat(selectedPackage.discount) : 0)
     : (product && product.discount_percent ? parseFloat(product.discount_percent) : 0);
 
-  const hasDiscount = activeDiscountPercent > 0;
-  const originalPrice = hasDiscount ? (displayPrice / (1 - activeDiscountPercent / 100)) : 0;
+  const hasDiscount = activeDiscountAmount > 0;
+  const originalPrice = hasDiscount ? (activeDiscountAmount) : 0;
 
   const selectedPackageStock = selectedPackage && selectedPackage.stock !== undefined && selectedPackage.stock !== null && selectedPackage.stock !== ''
     ? parseInt(selectedPackage.stock)
@@ -385,6 +385,11 @@ export default function ProductDetails() {
                   <span className="text-3xl font-black text-slate-850">
                     ৳{displayPrice.toFixed(0)}
                   </span>
+                  {hasDiscount && (
+                    <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-[10px] font-extrabold shadow-sm border border-red-200">
+                      Save ৳{Math.round(activeDiscountAmount - displayPrice)}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

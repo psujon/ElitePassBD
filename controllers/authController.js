@@ -1,9 +1,13 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_for_elitepass_bd';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID';
+const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+
 
 // Register User
 exports.register = async (req, res) => {
@@ -83,6 +87,81 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Database error occurred during login.' });
   }
 };
+
+// Google Login User
+exports.googleLogin = async (req, res) => {
+  const { credential } = req.body; // This is the access_token from the frontend
+
+  if (!credential) {
+    return res.status(400).json({ message: 'Google credential is required.' });
+  }
+
+  try {
+    // Fetch user info from Google using the access token
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: {
+        Authorization: `Bearer ${credential}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch user info from Google');
+    }
+
+    const payload = await response.json();
+    const { email, name, sub: googleId } = payload;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email not found in Google profile.' });
+    }
+
+    // Check if user exists
+    const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    let user;
+
+    if (users.length === 0) {
+      // Create new user if not exists
+      // Generate a random password for Google-authenticated users
+      const randomPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+      
+      const [result] = await db.query(
+        'INSERT INTO users (name, email, password, role, whatsapp_number, address) VALUES (?, ?, ?, "user", "", "")',
+        [name, email, hashedPassword]
+      );
+      
+      const [newUsers] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
+      user = newUsers[0];
+    } else {
+      user = users[0];
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user.id, name: user.name, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      message: 'Google Login successful!',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        whatsapp_number: user.whatsapp_number,
+        address: user.address
+      }
+    });
+
+  } catch (error) {
+    console.error('Google login error:', error);
+    res.status(401).json({ message: 'Invalid Google credential.' });
+  }
+};
+
 
 // Get Profile
 exports.getProfile = async (req, res) => {

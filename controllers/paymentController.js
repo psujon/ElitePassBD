@@ -368,6 +368,39 @@ const fulfillOrder = async (merchantTransactionId) => {
         }
       });
 
+      let itemsHtml = `<h3>Ordered Items</h3><table style="width: 100%; border-collapse: collapse; margin-top: 10px;" border="1">
+        <thead>
+          <tr style="background-color: #f1f5f9;">
+            <th style="padding: 8px; text-align: left;">Item</th>
+            <th style="padding: 8px; text-align: left;">Delivery Method</th>
+            <th style="padding: 8px; text-align: left;">License (If Auto)</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+      items.forEach(item => {
+        itemsHtml += `<tr><td style="padding: 8px;"><strong>${item.product_name}</strong> (Qty: ${item.quantity})`;
+        if (item.package_name) itemsHtml += `<br><small>Package: ${item.package_name}</small>`;
+        if (item.selected_device) itemsHtml += `<br><small>Device: ${item.selected_device}</small>`;
+        if (item.selected_activation) itemsHtml += `<br><small>Activation: ${item.selected_activation}</small>`;
+        itemsHtml += `</td>`;
+
+        itemsHtml += `<td style="padding: 8px;">${item.activation_process}</td>`;
+
+        let licenseContent = '-';
+        if (item.activation_process === 'Automatic') {
+          // Filter by product_id and package to match precisely if there are multiple items
+          const itemLicenses = fulfilledLicenses.filter(lic => lic.product_id === item.product_id && lic.package_name === item.package_name);
+          if (itemLicenses.length > 0) {
+            licenseContent = itemLicenses.map(l => `<code style="background: #e2e8f0; padding: 2px 4px; border-radius: 4px; display: inline-block; margin: 2px 0; word-break: break-all;">${l.license_key}</code>`).join('<br>');
+          } else {
+            licenseContent = '<span style="color: red;">Out of Stock</span>';
+          }
+        }
+        itemsHtml += `<td style="padding: 8px;">${licenseContent}</td></tr>`;
+      });
+      itemsHtml += `</tbody></table>`;
+
       // Send admin order completion email asynchronously
       const { sendEmail } = require('../utils/mailer');
       sendEmail({
@@ -384,7 +417,8 @@ const fulfillOrder = async (merchantTransactionId) => {
                  <li><strong>Customer Name:</strong> ${order.user_name}</li>
                  <li><strong>Customer Phone:</strong> ${order.phone}</li>
                  <li><strong>Delivery Email:</strong> ${order.delivery_email || order.user_email}</li>
-               </ul>`
+               </ul>
+               ${itemsHtml}`
       }).catch(err => console.error('Failed to send admin order completion email:', err));
     } catch (fbTrackErr) {
       console.error('FB Purchase CAPI Trigger Error:', fbTrackErr);

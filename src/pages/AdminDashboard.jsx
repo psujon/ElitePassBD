@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import JoditEditor from 'jodit-react';
 import { api, API_BASE_URL } from '../utils/api';
 import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database, KeyRound, LayoutDashboard } from 'lucide-react';
 
@@ -15,31 +14,28 @@ const parseJSON = (str, fallback) => {
   }
 };
 
-// ReactQuill custom toolbar modules and formats
-const quillModules = {
-  toolbar: [
-    [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-    [{ 'size': ['small', false, 'large', 'huge'] }],
-    ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-    [{ 'color': [] }, { 'background': [] }],
-    [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-    [{ 'align': [] }],
-    ['link', 'image', 'video'],
-    ['clean']
+// Jodit Editor configuration
+const joditConfig = {
+  readonly: false,
+  height: 300,
+  enableDragAndDropFileToEditor: true,
+  buttons: [
+    'source', '|',
+    'bold', 'strikethrough', 'underline', 'italic', '|',
+    'ul', 'ol', '|',
+    'outdent', 'indent', '|',
+    'font', 'fontsize', 'brush', 'paragraph', '|',
+    'image', 'video', 'table', 'link', '|',
+    'align', 'undo', 'redo', '|',
+    'hr', 'eraser', 'copyformat', '|',
+    'symbol', 'fullsize', 'print', 'about'
   ],
-  clipboard: {
-    matchVisual: false
-  }
+  removeButtons: ['brush'],
+  showXPathInStatusbar: false,
+  showCharsCounter: false,
+  showWordsCounter: false,
+  toolbarAdaptive: false
 };
-
-const quillFormats = [
-  'header', 'size',
-  'bold', 'italic', 'underline', 'strike', 'blockquote',
-  'color', 'background',
-  'list', 'bullet', 'indent',
-  'align',
-  'link', 'image', 'video'
-];
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'products', 'orders', 'tickets', 'categories', 'backup', 'licenses'
@@ -193,6 +189,9 @@ export default function AdminDashboard() {
           duration: p.duration || '',
           stock: p.stock !== undefined && p.stock !== null ? p.stock : '',
           discount: p.discount !== undefined && p.discount !== null ? p.discount : '',
+          activation_process: p.activation_process || 'Automatic',
+          original_price: p.original_price || '',
+          retail_price: p.retail_price || '',
           price: p.price || ''
         })),
         device_options: product.device_options || '',
@@ -1967,7 +1966,7 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Product Name *</label>
                   <input
@@ -2005,33 +2004,6 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">Activation Process</label>
-                  <div className="flex items-center space-x-4 py-2 border border-slate-250 bg-slate-50 rounded-lg px-3 h-[38px] text-xs">
-                    <label className="flex items-center space-x-1.5 cursor-pointer select-none font-semibold text-slate-700">
-                      <input
-                        type="radio"
-                        name="activation_process"
-                        value="Automatic"
-                        checked={productForm.activation_process === 'Automatic'}
-                        onChange={(e) => setProductForm({ ...productForm, activation_process: e.target.value })}
-                        className="w-4 h-4 text-violet-600 focus:ring-violet-500 border-slate-300 cursor-pointer"
-                      />
-                      <span>Automatic</span>
-                    </label>
-                    <label className="flex items-center space-x-1.5 cursor-pointer select-none font-semibold text-slate-700">
-                      <input
-                        type="radio"
-                        name="activation_process"
-                        value="Manual"
-                        checked={productForm.activation_process === 'Manual'}
-                        onChange={(e) => setProductForm({ ...productForm, activation_process: e.target.value })}
-                        className="w-4 h-4 text-violet-600 focus:ring-violet-500 border-slate-300 cursor-pointer"
-                      />
-                      <span>Manual</span>
-                    </label>
-                  </div>
-                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2117,13 +2089,10 @@ export default function AdminDashboard() {
                   </div>
                   <div className="bg-white rounded-lg overflow-hidden">
                     {(productForm._descMode || 'rich') === 'rich' ? (
-                      <ReactQuill
-                        theme="snow"
+                      <JoditEditor
                         value={productForm.description || ''}
-                        onChange={(content) => setProductForm({ ...productForm, description: content })}
-                        placeholder=""
-                        modules={quillModules}
-                        formats={quillFormats}
+                        config={joditConfig}
+                        onBlur={(newContent) => setProductForm({ ...productForm, description: newContent })}
                         className="text-xs text-slate-800"
                       />
                     ) : (
@@ -2153,13 +2122,10 @@ export default function AdminDashboard() {
                   </div>
                   <div className="bg-white rounded-lg overflow-hidden">
                     {(productForm._addMode || 'rich') === 'rich' ? (
-                      <ReactQuill
-                        theme="snow"
+                      <JoditEditor
                         value={productForm.additional_info || ''}
-                        onChange={(content) => setProductForm({ ...productForm, additional_info: content })}
-                        placeholder=""
-                        modules={quillModules}
-                        formats={quillFormats}
+                        config={joditConfig}
+                        onBlur={(newContent) => setProductForm({ ...productForm, additional_info: newContent })}
                         className="text-xs text-slate-800"
                       />
                     ) : (
@@ -2183,7 +2149,7 @@ export default function AdminDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        const updatedPkgs = [...productForm.packages, { activation: '', duration: '', stock: '', discount: '', price: '', original_price: '', retail_price: '' }];
+                        const updatedPkgs = [...productForm.packages, { activation: '', duration: '', stock: '', discount: '', activation_process: 'Automatic', price: '', original_price: '', retail_price: '' }];
                         setProductForm({ ...productForm, packages: updatedPkgs });
                       }}
                       className="px-2.5 py-1 bg-violet-50 hover:bg-violet-600 text-violet-600 hover:text-white border border-violet-200 hover:border-transparent rounded text-[10px] font-bold transition-all cursor-pointer"
@@ -2197,14 +2163,15 @@ export default function AdminDashboard() {
                   ) : (
                     <div className="space-y-2">
                       {/* Grid Headers */}
-                      <div className="hidden md:grid grid-cols-16 gap-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider px-1" style={{ gridTemplateColumns: '2fr 2fr 1fr 1fr 1.2fr 1.2fr 1.2fr auto' }}>
+                      <div className="hidden md:grid gap-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider px-1" style={{ gridTemplateColumns: '1.2fr 1.5fr 1.5fr 1fr 1fr 1.2fr 1.2fr 1.2fr auto' }}>
+                        <div>Type</div>
                         <div>Activation</div>
                         <div>Package</div>
                         <div className="text-center">Stock</div>
-                        <div className="text-center">Discount(%)</div>
-                        <div className="text-center">Original Price</div>
+                        <div className="text-center">Discount</div>
+                        <div className="text-center">Orig. Price</div>
                         <div className="text-center">Retail Price</div>
-                        <div className="text-center">Selling Price</div>
+                        <div className="text-center">Sell Price</div>
                         <div></div>
                       </div>
 
@@ -2213,9 +2180,27 @@ export default function AdminDashboard() {
                           ? productForm.activation_options.split(',').map(o => o.trim()).filter(Boolean)
                           : [];
                         return (
-                          <div key={idx} className="grid gap-2 items-center" style={{ gridTemplateColumns: '2fr 2fr 1fr 1fr 1.2fr 1.2fr 1.2fr auto' }}>
+                          <div key={idx} className="flex flex-col md:grid gap-3 md:gap-2 md:items-center bg-slate-50 md:bg-transparent p-3 md:p-0 border border-slate-200 md:border-none rounded-xl md:rounded-none mb-3 md:mb-0 shadow-xs md:shadow-none" style={{ gridTemplateColumns: '1.2fr 1.5fr 1.5fr 1fr 1fr 1.2fr 1.2fr 1.2fr auto' }}>
+                            {/* Activation Type */}
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Type</span>
+                              <select
+                                value={pkg.activation_process || 'Automatic'}
+                                onChange={(e) => {
+                                  const updated = [...productForm.packages];
+                                  updated[idx].activation_process = e.target.value;
+                                  setProductForm({ ...productForm, packages: updated });
+                                }}
+                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2 py-1.5 text-slate-855 cursor-pointer shrink-0"
+                              >
+                                <option value="Automatic">Auto</option>
+                                <option value="Manual">Manual</option>
+                              </select>
+                            </div>
+
                             {/* Activation Process */}
-                            <div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Activation</span>
                               {activationOpts.length > 0 ? (
                                 <select
                                   value={pkg.activation || ''}
@@ -2248,7 +2233,8 @@ export default function AdminDashboard() {
                             </div>
 
                             {/* Duration / Package */}
-                            <div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Package/Duration</span>
                               <input
                                 type="text"
                                 value={pkg.duration}
@@ -2264,7 +2250,8 @@ export default function AdminDashboard() {
                             </div>
 
                             {/* Stock */}
-                            <div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Stock</span>
                               <input
                                 type="number"
                                 value={pkg.stock}
@@ -2274,30 +2261,31 @@ export default function AdminDashboard() {
                                   setProductForm({ ...productForm, packages: updated });
                                 }}
                                 placeholder="Stock"
-                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-850 text-center"
+                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-850 text-center md:text-left"
                               />
                             </div>
 
                             {/* Discount */}
-                            <div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Discount Amount</span>
                               <input
                                 type="number"
                                 step="any"
                                 min="0"
-                                max="100"
                                 value={pkg.discount}
                                 onChange={(e) => {
                                   const updated = [...productForm.packages];
                                   updated[idx].discount = e.target.value;
                                   setProductForm({ ...productForm, packages: updated });
                                 }}
-                                placeholder="%"
-                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-1.5 py-1.5 text-slate-850 text-center"
+                                placeholder="৳"
+                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-1.5 py-1.5 text-slate-850 text-center md:text-left"
                               />
                             </div>
 
                             {/* Original Price (অরিজিনাল দাম) */}
-                            <div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Original Price</span>
                               <input
                                 type="number"
                                 step="0.01"
@@ -2308,12 +2296,13 @@ export default function AdminDashboard() {
                                   setProductForm({ ...productForm, packages: updated });
                                 }}
                                 placeholder="৳"
-                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-1.5 py-1.5 text-slate-850 text-center"
+                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-1.5 py-1.5 text-slate-850 text-center md:text-left"
                               />
                             </div>
 
                             {/* Retail Price (রিটেইল দাম) */}
-                            <div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Retail Price</span>
                               <input
                                 type="number"
                                 step="0.01"
@@ -2324,12 +2313,13 @@ export default function AdminDashboard() {
                                   setProductForm({ ...productForm, packages: updated });
                                 }}
                                 placeholder="৳"
-                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-1.5 py-1.5 text-slate-850 text-center"
+                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-1.5 py-1.5 text-slate-850 text-center md:text-left"
                               />
                             </div>
 
                             {/* Price */}
-                            <div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Sell Price</span>
                               <input
                                 type="number"
                                 step="0.01"
@@ -2340,22 +2330,23 @@ export default function AdminDashboard() {
                                   setProductForm({ ...productForm, packages: updated });
                                 }}
                                 placeholder="Price"
-                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-855 text-center"
+                                className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-2.5 py-1.5 text-slate-855 text-center md:text-left"
                                 required
                               />
                             </div>
 
                             {/* Delete */}
-                            <div className="flex justify-end">
+                            <div className="flex justify-end mt-2 md:mt-0">
                               <button
                                 type="button"
                                 onClick={() => {
                                   const updated = productForm.packages.filter((_, i) => i !== idx);
                                   setProductForm({ ...productForm, packages: updated });
                                 }}
-                                className="p-1.5 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white border border-red-200 rounded-lg transition-colors cursor-pointer shrink-0"
+                                className="p-2 md:p-1.5 bg-red-50 hover:bg-red-600 text-red-500 hover:text-white border border-red-200 rounded-lg transition-colors cursor-pointer shrink-0 w-full md:w-auto flex justify-center items-center gap-1 text-[11px] font-bold"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
+                                <span className="md:hidden">Remove Option</span>
                               </button>
                             </div>
                           </div>
