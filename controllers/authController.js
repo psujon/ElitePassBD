@@ -97,18 +97,41 @@ exports.googleLogin = async (req, res) => {
   }
 
   try {
-    // Fetch user info from Google using the access token
-    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: {
-        Authorization: `Bearer ${credential}`
-      }
-    });
+    console.log('Received googleLogin request. Credential length:', credential ? credential.length : 0);
+    
+    // Fetch user info from Google using native https module for cross-version Node compatibility
+    const https = require('https');
+    const getGoogleUserInfo = (token) => {
+      return new Promise((resolve, reject) => {
+        const req = https.get(
+          'https://www.googleapis.com/oauth2/v3/userinfo',
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          },
+          (response) => {
+            let rawData = '';
+            response.on('data', (chunk) => { rawData += chunk; });
+            response.on('end', () => {
+              if (response.statusCode === 200) {
+                try {
+                  resolve(JSON.parse(rawData));
+                } catch (e) {
+                  reject(new Error('Failed to parse Google userinfo response.'));
+                }
+              } else {
+                reject(new Error(`Google userinfo fetch failed with status ${response.statusCode}: ${rawData}`));
+              }
+            });
+          }
+        );
+        req.on('error', (err) => { reject(err); });
+      });
+    };
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch user info from Google');
-    }
-
-    const payload = await response.json();
+    const payload = await getGoogleUserInfo(credential);
+    console.log('Google userinfo fetched successfully. Email:', payload.email);
     const { email, name, sub: googleId } = payload;
 
     if (!email) {

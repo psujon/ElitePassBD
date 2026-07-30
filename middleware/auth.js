@@ -21,6 +21,23 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Middleware to optionally attach user if token exists
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return next();
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (!err && user) {
+      req.user = user;
+    }
+    next();
+  });
+};
+
 // Middleware to restrict access to Admins only
 const authorizeAdmin = (req, res, next) => {
   if (!req.user || req.user.role !== 'admin') {
@@ -31,5 +48,6 @@ const authorizeAdmin = (req, res, next) => {
 
 module.exports = {
   authenticateToken,
+  optionalAuth,
   authorizeAdmin
 };

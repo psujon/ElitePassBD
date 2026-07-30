@@ -72,6 +72,27 @@ export const CartProvider = ({ children }) => {
         stock: activeStock
       }]);
     }
+
+    // Trigger GA4 / Meta add_to_cart event
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ 'ecommerce': null }); // Clear previous ecommerce object
+    window.dataLayer.push({
+      event: "add_to_cart",
+      event_id: `add_to_cart_${product.id}_${Date.now()}`,
+      ecommerce: {
+        currency: "BDT",
+        value: Number(priceToUse) * orderQty,
+        items: [
+          {
+            item_id: String(product.id),
+            item_name: product.name,
+            price: Number(priceToUse),
+            quantity: orderQty
+          }
+        ]
+      }
+    });
+
     return true;
   };
 

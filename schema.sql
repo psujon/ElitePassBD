@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS products (
     packages TEXT DEFAULT NULL,
     device_options TEXT DEFAULT NULL,
     activation_options TEXT DEFAULT NULL,
+    highlighted_text TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
@@ -75,15 +76,16 @@ CREATE TABLE IF NOT EXISTS order_items (
 -- 5. Reviews Table
 CREATE TABLE IF NOT EXISTS reviews (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
+    user_id INT NULL DEFAULT NULL,
+    reviewer_name VARCHAR(255) DEFAULT NULL,
+    reviewer_email VARCHAR(255) DEFAULT NULL,
     product_id INT NOT NULL,
     rating INT NOT NULL,
     text TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_product (user_id, product_id)
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
 -- 6. Support Tickets Table
@@ -107,6 +109,7 @@ CREATE TABLE IF NOT EXISTS product_licenses (
     product_id INT NOT NULL,
     activation_option VARCHAR(255) DEFAULT NULL,
     package_option VARCHAR(255) DEFAULT NULL,
+    rules TEXT DEFAULT NULL,
     license_key VARCHAR(255) NOT NULL,
     is_used TINYINT DEFAULT 0,
     order_item_id INT DEFAULT NULL,

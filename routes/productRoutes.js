@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
-const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
+const { authenticateToken, optionalAuth, authorizeAdmin } = require('../middleware/auth');
 
 // Public routes
 router.get('/', productController.getAllProducts);
@@ -10,9 +10,11 @@ router.get('/reviews/latest', productController.getLatestReviews);
 router.get('/:id', productController.getProductById);
 router.get('/:productId/reviews', productController.getProductReviews);
 
+// Public/Optional auth review route
+router.post('/:productId/reviews', optionalAuth, productController.addOrUpdateReview);
+
 // Authenticated reviews routes
 router.get('/:productId/my-review', authenticateToken, productController.getUserReviewForProduct);
-router.post('/:productId/reviews', authenticateToken, productController.addOrUpdateReview);
 
 // Admin-only categories routes
 router.post('/categories', authenticateToken, authorizeAdmin, productController.createCategory);

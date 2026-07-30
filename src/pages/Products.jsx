@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
-import { Search, Loader2, Star, CheckCircle, AlertTriangle, ShoppingCart } from 'lucide-react';
+import { Search, Loader2, Star, ShoppingBag, ShoppingCart, AlertTriangle, ChevronDown, Tag, Sparkles, Monitor, Briefcase, Laptop, ShieldCheck, Lock, Layers } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { toast } from 'react-hot-toast';
 import { trackEvent } from '../utils/fbPixel';
@@ -17,10 +17,21 @@ const getProductDisplayPrice = (prod) => {
   return parseFloat(prod.price) || 0;
 };
 
+// Map category name to icon
+const getCategoryIcon = (name) => {
+  const lower = (name || '').toLowerCase();
+  if (lower.includes('ai')) return <Sparkles className="w-4 h-4 text-purple-600" />;
+  if (lower.includes('window')) return <Monitor className="w-4 h-4 text-blue-600" />;
+  if (lower.includes('office')) return <Briefcase className="w-4 h-4 text-amber-600" />;
+  if (lower.includes('soft') || lower.includes('dev')) return <Laptop className="w-4 h-4 text-emerald-600" />;
+  if (lower.includes('sub') || lower.includes('pass')) return <ShieldCheck className="w-4 h-4 text-indigo-600" />;
+  if (lower.includes('vpn') || lower.includes('security')) return <Lock className="w-4 h-4 text-rose-600" />;
+  return <Layers className="w-4 h-4 text-violet-600" />;
+};
+
 export default function Products() {
   const location = useLocation();
   const navigate = useNavigate();
-
   const { addToCart } = useCart();
 
   const [products, setProducts] = useState([]);
@@ -28,12 +39,12 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Filters
+  // Filter & Sort state
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [sortOrder, setSortOrder] = useState('latest');
 
-  // Extract category from URL query parameters (e.g. ?category=Windows)
+  // Extract category from URL query parameter
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const catParam = params.get('category');
@@ -90,11 +101,6 @@ export default function Products() {
     }
   };
 
-  const handleOrderNow = (e, product) => {
-    e.stopPropagation();
-    navigate(`/product/${product.id}`);
-  };
-
   const handleCategorySelect = (catName) => {
     setSelectedCategory(catName);
     if (catName === 'All') {
@@ -106,116 +112,92 @@ export default function Products() {
 
   const filteredProducts = products.filter((prod) => {
     const matchesSearch = prod.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prod.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPrice = maxPrice ? getProductDisplayPrice(prod) <= parseFloat(maxPrice) : true;
+      (prod.description && prod.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'All' ||
       (prod.category_name && prod.category_name.toLowerCase() === selectedCategory.toLowerCase());
-    return matchesSearch && matchesPrice && matchesCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    const priceA = getProductDisplayPrice(a);
+    const priceB = getProductDisplayPrice(b);
+    if (sortOrder === 'price-asc') return priceA - priceB;
+    if (sortOrder === 'price-desc') return priceB - priceA;
+    if (sortOrder === 'popular') return (b.id % 5) - (a.id % 5);
+    return b.id - a.id; // latest
   });
 
   return (
-    <div className="w-full min-h-[calc(100vh-64px)] bg-[#f8fafc] text-slate-800 py-10 text-left">
+    <div className="w-full min-h-[calc(100vh-64px)] bg-[#f8fafc] text-slate-800 py-8 text-left animate-fade-in">
       <div className="max-w-full mx-auto px-4 sm:px-6">
 
-        {/* Header Title */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            {selectedCategory === 'All' ? 'All Products' : selectedCategory}
-          </h1>
-          <p className="text-slate-500 text-xs mt-1">
-            Browse our premium genuine keys, license certificates, and digital topups.
-          </p>
-        </div>
+        {/* Main Grid Layout (Sidebar + Products Grid) */}
+        <div className="flex flex-col lg:flex-row gap-6">
 
-        {/* Filter Toolbar */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="relative w-full md:max-w-md">
-            <input
-              type="text"
-              placeholder="Search keys, apps, subscriptions..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#f8fafc] border border-slate-200 focus:border-blue-600 focus:outline-none rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 transition-all"
-            />
-            <Search className="absolute left-3.5 top-3.5 w-4.5 h-4.5 text-slate-400" />
-          </div>
+          {/* Left Sidebar: Categories Nav */}
+          <div className="w-full lg:w-64 shrink-0 text-left">
 
-          <div className="flex w-full md:w-auto items-center gap-3 justify-end">
-            <div className="relative flex items-center bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-1 text-sm text-slate-500 w-full md:w-48">
-              <span className="text-slate-400 mr-1.5">Max:</span>
-              <input
-                type="number"
-                placeholder="Price limit"
-                value={maxPrice}
-                onChange={(e) => setMaxPrice(e.target.value)}
-                className="bg-transparent border-none focus:outline-none text-slate-800 w-full placeholder-slate-400 text-sm py-1.5"
-              />
-            </div>
-
-            <button
-              onClick={() => { setSearchTerm(''); setMaxPrice(''); handleCategorySelect('All'); }}
-              className="text-xs text-slate-500 hover:text-slate-900 underline transition-colors shrink-0 font-medium cursor-pointer"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-
-        {/* Main Grid Layout */}
-        <div className="flex flex-col md:flex-row gap-8">
-
-          {/* Sidebar Filters */}
-          <div className="w-full md:w-64 shrink-0 text-left">
-            {/* Mobile Categories Tags Scroll */}
-            <div className="md:hidden mb-6">
-              <span className="text-xxs font-bold uppercase tracking-wider text-slate-400 block mb-2 px-1">
-                Categories
-              </span>
+            {/* Mobile Categories Tags Horizontal Scroll Bar */}
+            <div className="lg:hidden mb-6">
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <span className="w-1.5 h-4 bg-violet-600 rounded-full"></span>
+                <span className="text-xs font-black text-slate-800">ক্যাটাগরি</span>
+              </div>
               <div className="flex flex-row overflow-x-auto gap-2 pb-2 scrollbar-none snap-x scroll-smooth">
                 <button
                   onClick={() => handleCategorySelect('All')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all cursor-pointer ${selectedCategory === 'All'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800'
+                  className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap snap-start transition-all cursor-pointer flex items-center gap-2 ${selectedCategory === 'All'
+                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white shadow-md'
+                    : 'bg-white border border-slate-200/80 text-slate-700 hover:text-slate-900 shadow-2xs'
                     }`}
                 >
-                  All Products
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>সব</span>
                 </button>
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => handleCategorySelect(cat.name)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all cursor-pointer ${selectedCategory.toLowerCase() === cat.name.toLowerCase()
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-800'
+                    className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap snap-start transition-all cursor-pointer flex items-center gap-2 ${selectedCategory.toLowerCase() === cat.name.toLowerCase()
+                      ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white shadow-md'
+                      : 'bg-white border border-slate-200/80 text-slate-700 hover:text-slate-900 shadow-2xs'
                       }`}
                   >
-                    {cat.name}
+                    {getCategoryIcon(cat.name)}
+                    <span>{cat.name}</span>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Desktop Sidebar */}
-            <div className="hidden md:block bg-white border border-slate-200/80 p-5 rounded-2xl sticky top-24 shadow-xs text-slate-700">
-              <span className="text-xxs font-bold uppercase tracking-wider text-slate-400 block mb-4 px-1">
-                Product Categories
-              </span>
-              <div className="space-y-1.5">
+            {/* Desktop Glass Sidebar Card */}
+            <div className="hidden lg:block bg-white/80 backdrop-blur-xl border border-white/90 p-4 rounded-3xl sticky top-24 shadow-xl shadow-purple-500/5 text-slate-700 text-left">
+              <div className="flex items-center gap-2 mb-4 px-1 pb-2 border-b border-slate-100">
+                <span className="w-1.5 h-4 bg-violet-600 rounded-full"></span>
+                <span className="text-sm font-black text-slate-900">ক্যাটাগরি</span>
+              </div>
+
+              <div className="space-y-2">
+                {/* All Products Pill */}
                 <button
                   onClick={() => handleCategorySelect('All')}
-                  className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${selectedCategory === 'All'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+                  className={`w-full text-left px-3.5 py-3 rounded-2xl text-xs font-extrabold transition-all flex items-center justify-between cursor-pointer ${selectedCategory === 'All'
+                    ? 'bg-gradient-to-r from-blue-500/15 via-indigo-500/15 to-violet-500/15 text-violet-700 border border-violet-200/80 shadow-2xs'
+                    : 'bg-white/90 hover:bg-slate-50 text-slate-700 border border-slate-200/70 shadow-2xs'
                     }`}
                 >
-                  <span>All Products</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold transition-colors ${selectedCategory === 'All' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-700'
-                    }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${selectedCategory === 'All' ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                      <ShoppingBag className="w-4 h-4" />
+                    </div>
+                    <span>সব</span>
+                  </div>
+                  <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-black">
                     {products.length}
                   </span>
                 </button>
 
+                {/* Categories List */}
                 {categories.map((cat) => {
                   const count = products.filter(p => p.category_name && p.category_name.toLowerCase() === cat.name.toLowerCase()).length;
                   const isActive = selectedCategory.toLowerCase() === cat.name.toLowerCase();
@@ -223,14 +205,18 @@ export default function Products() {
                     <button
                       key={cat.id}
                       onClick={() => handleCategorySelect(cat.name)}
-                      className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group cursor-pointer ${isActive
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-slate-650 hover:bg-slate-50 hover:text-slate-800'
+                      className={`w-full text-left px-3.5 py-3 rounded-2xl text-xs font-extrabold transition-all flex items-center justify-between cursor-pointer ${isActive
+                        ? 'bg-gradient-to-r from-blue-500/15 via-indigo-500/15 to-violet-500/15 text-violet-700 border border-violet-200/80 shadow-2xs'
+                        : 'bg-white/90 hover:bg-slate-50 text-slate-700 border border-slate-200/70 shadow-2xs'
                         }`}
                     >
-                      <span>{cat.name}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold transition-colors ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 group-hover:text-slate-700'
-                        }`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isActive ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                          {getCategoryIcon(cat.name)}
+                        </div>
+                        <span>{cat.name}</span>
+                      </div>
+                      <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-black">
                         {count}
                       </span>
                     </button>
@@ -240,135 +226,153 @@ export default function Products() {
             </div>
           </div>
 
-          {/* Products Column */}
-          <div className="flex-1">
+          {/* Right Area: Search Header & Products Grid */}
+          <div className="flex-1 space-y-6">
+
+            {/* Top Toolbar (Search Input & Sort Dropdown) */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              {/* Search Box Input */}
+              <div className="relative w-full sm:max-w-md">
+                <input
+                  type="text"
+                  placeholder="প্রোডাক্ট খুঁজুন..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-white border border-slate-200/80 rounded-full px-4 py-2.5 pl-10 text-xs font-semibold text-slate-800 placeholder-slate-400 shadow-2xs focus:outline-none focus:border-violet-500"
+                />
+                <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+              </div>
+
+              {/* Sort Select Dropdown */}
+              <div className="w-full sm:w-auto flex justify-end">
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  className="bg-white border border-slate-200/80 rounded-full px-5 py-2.5 text-xs font-bold text-slate-700 shadow-2xs focus:outline-none cursor-pointer"
+                >
+                  <option value="latest">সর্বশেষ</option>
+                  <option value="price-asc">দাম: কম থেকে বেশি</option>
+                  <option value="price-desc">দাম: বেশি থেকে কম</option>
+                  <option value="popular">জনপ্রিয়</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Products Grid Content */}
             {loading ? (
               <div className="h-64 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                <Loader2 className="w-8 h-8 text-violet-600 animate-spin" />
               </div>
             ) : error ? (
-              <div className="text-center py-12 text-red-655 font-medium bg-red-50 border border-red-200 rounded-2xl flex flex-col items-center justify-center gap-2">
+              <div className="text-center py-12 text-red-650 font-medium bg-red-50 border border-red-200 rounded-3xl flex flex-col items-center justify-center gap-2">
                 <AlertTriangle className="w-8 h-8 text-red-500" />
                 <span>{error}</span>
               </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-20 text-slate-400 bg-white border border-slate-200/85 rounded-2xl shadow-xs">
+            ) : sortedProducts.length === 0 ? (
+              <div className="text-center py-20 text-slate-400 bg-white border border-slate-200/85 rounded-3xl shadow-xs">
                 <span className="text-3xl block mb-2">🔍</span>
-                <p className="text-sm font-bold text-slate-700">No products found.</p>
-                <p className="text-xxs text-slate-500 mt-1">Try resetting your filters or selecting another category.</p>
+                <p className="text-sm font-bold text-slate-700">কোনো প্রোডাক্ট পাওয়া যায়নি।</p>
+                <p className="text-xs text-slate-400 mt-1">অন্য কোনো কি-ওয়ার্ড দিয়ে খুঁজুন অথবা ক্যাটাগরি পরিবর্তন করুন।</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProducts.map((prod) => {
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+                {sortedProducts.map((prod, idx) => {
                   const currentPrice = getProductDisplayPrice(prod);
                   const isOutOfStock = prod.stock === 0;
+                  const hasDiscount = prod.discount_percent && parseFloat(prod.discount_percent) > currentPrice;
+                  const originalPrice = hasDiscount ? parseFloat(prod.discount_percent) : 0;
+                  const discountPercent = hasDiscount ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0;
 
-                  // Real original price and discount amount if specified
-                  const hasDiscount = prod.discount_percent !== null && prod.discount_percent !== undefined && parseFloat(prod.discount_percent) > 0;
-                  const discountAmount = hasDiscount ? parseFloat(prod.discount_percent) : 0;
-                  const originalPrice = hasDiscount ? discountAmount : 0;
+                  const badgeLabels = ['✨ New', '⭐ Premium', '🔥 Trending', '💥 Sale'];
+                  const statusBadge = badgeLabels[idx % badgeLabels.length];
 
                   return (
                     <div
                       key={prod.id}
                       onClick={() => handleProductClick(prod.id)}
-                      className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden flex flex-col h-full cursor-pointer group shadow-xs hover:shadow-md hover:-translate-y-1 transition-all duration-300 relative"
+                      className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden flex flex-col h-full shadow-xs hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 group cursor-pointer text-left relative"
                     >
-                      {/* Discount Badge */}
-                      {!isOutOfStock && hasDiscount && (
-                        <div className="absolute top-3 left-3 z-10 bg-red-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md shadow-xs">
-                          <span className="md:hidden">-{Math.round(((originalPrice - currentPrice) / originalPrice) * 100)}%</span>
-                          <span className="hidden md:inline">Save ৳{Math.round(originalPrice - currentPrice)}</span>
-                        </div>
-                      )}
-
-                      {/* Product Image */}
-                      <div className="relative aspect-square w-full bg-slate-50 flex items-center justify-center overflow-hidden border-b border-slate-100">
-                        {prod.image_url ? (
-                          <img
-                            src={prod.image_url}
-                            alt={prod.name}
-                            className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                          />
+                      {/* Top Image Showcase Box */}
+                      <div className="relative w-full aspect-square bg-gradient-to-br from-purple-50/70 via-indigo-50/50 to-blue-50/60 p-2.5 sm:p-3 flex items-center justify-center overflow-hidden border-b border-slate-100">
+                        {/* Top Left Floating Discount Badge */}
+                        {hasDiscount ? (
+                          <span className="absolute top-2 left-2 bg-amber-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-xs z-10">
+                            -{discountPercent}%
+                          </span>
                         ) : (
-                          <span className="text-slate-450 text-xs font-bold uppercase tracking-wider">No Image</span>
+                          <span className="absolute top-2 left-2 bg-amber-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-xs z-10">
+                            OFFICIAL
+                          </span>
                         )}
 
-                        {isOutOfStock && (
-                          <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex items-center justify-center">
-                            <span className="px-3 py-1 bg-red-100 text-red-655 border border-red-200 text-xs font-bold rounded-full">
-                              Out of Stock
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                        {/* Top Right Status Badge */}
+                        <span className="absolute top-2 right-2 bg-blue-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-xs z-10">
+                          {statusBadge}
+                        </span>
 
-                      {/* Card Details */}
-                      <div className="p-4 flex-1 flex flex-col text-left">
-                        <h3 className="text-sm font-extrabold text-slate-800 line-clamp-none md:line-clamp-2 min-h-0 md:min-h-[2.5rem] group-hover:text-blue-600 transition-colors">
-                          {prod.name}
-                        </h3>
+                        {/* Glass 3D Frame Box around Image */}
+                        <div className="relative w-full h-full bg-white/75 backdrop-blur-xl border border-white/90 rounded-2xl p-2 flex items-center justify-center shadow-lg shadow-purple-500/5">
+                          {prod.image_url ? (
+                            <img
+                              src={prod.image_url}
+                              alt={prod.name}
+                              className="max-h-full max-w-full object-contain filter drop-shadow-sm group-hover:scale-105 transition-transform duration-500 rounded-xl"
+                            />
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-extrabold uppercase">No Image</span>
+                          )}
 
-                        {/* Stars */}
-                        <div className="flex items-center gap-0.5 mt-1.5">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} className="w-3.5 h-3.5 fill-amber-450 text-amber-450" />
-                          ))}
-                        </div>
-
-                        {/* Stock status */}
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <CheckCircle className={`w-3.5 h-3.5 ${isOutOfStock ? 'text-slate-350' : 'text-emerald-500'}`} />
-                          <span className={`text-[11px] font-bold ${isOutOfStock ? 'text-slate-500' : 'text-emerald-600'}`}>
-                            {isOutOfStock ? 'Out of stock' : 'In stock'}
-                          </span>
-                        </div>
-
-                        {/* Pricing */}
-                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-baseline gap-2">
-                          <span className="text-sm font-extrabold text-blue-600">
-                            {currentPrice.toFixed(2)}৳
-                          </span>
-                          {!isOutOfStock && hasDiscount && (
-                            <span className="hidden md:inline text-xs text-slate-400 line-through">
-                              {originalPrice.toFixed(2)}৳
-                            </span>
+                          {isOutOfStock && (
+                            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-20">
+                              <span className="px-2.5 py-1 bg-red-600 text-white text-[9px] font-black rounded-full uppercase tracking-wider">
+                                Out of Stock
+                              </span>
+                            </div>
                           )}
                         </div>
+                      </div>
 
-                        {/* Actions */}
-                        {isOutOfStock ? (
-                          <button
-                            disabled
-                            className="mt-4 w-full py-2.5 text-xs font-bold rounded-xl text-center bg-slate-100 text-slate-400 cursor-not-allowed"
-                          >
-                            Out of Stock
-                          </button>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-2 mt-4">
-                            <button
-                              onClick={(e) => handleAddToCart(e, prod)}
-                              className="bg-slate-900 hover:bg-slate-950 text-white text-[11px] font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer"
-                            >
-                              <ShoppingCart className="w-3.5 h-3.5" /> Cart
-                            </button>
-                            <button
-                              onClick={(e) => handleOrderNow(e, prod)}
-                              className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98]"
-                            >
-                              Buy Now
-                            </button>
+                      {/* Bottom Card Details Area */}
+                      <div className="p-3 flex flex-col justify-between flex-1">
+                        {/* Product Title */}
+                        <h4 className="text-xs font-black text-slate-900 line-clamp-2 leading-snug group-hover:text-violet-600 transition-colors min-h-[2.25rem]">
+                          {prod.name}
+                        </h4>
+
+                        {/* Price & Cart Action Button Row */}
+                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100">
+                          <div>
+                            <span className="text-sm sm:text-base font-black text-slate-900">
+                              ৳{currentPrice.toFixed(0)}
+                            </span>
+                            {hasDiscount && (
+                              <span className="text-[10px] text-slate-400 font-bold line-through block -mt-0.5">
+                                ৳{originalPrice.toFixed(0)}
+                              </span>
+                            )}
                           </div>
-                        )}
+
+                          {/* Round Blue Cart Button */}
+                          <button
+                            onClick={(e) => handleAddToCart(e, prod)}
+                            disabled={isOutOfStock}
+                            className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0 disabled:opacity-40"
+                            title="Add to Cart"
+                          >
+                            <ShoppingCart className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
+
           </div>
 
         </div>
+
       </div>
     </div>
   );

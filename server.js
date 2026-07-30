@@ -45,6 +45,7 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -71,6 +72,7 @@ const licenseRoutes = require('./routes/licenseRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const slideRoutes = require('./routes/slideRoutes');
 const pixelRoutes = require('./routes/pixelRoutes');
+const couponRoutes = require('./routes/couponRoutes');
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -81,6 +83,7 @@ app.use('/api/licenses', licenseRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/slides', slideRoutes);
 app.use('/api/pixel', pixelRoutes);
+app.use('/api/coupons', couponRoutes);
 
 // Database Backup API Route (Admins Only)
 const { authenticateToken, authorizeAdmin } = require('./middleware/auth');

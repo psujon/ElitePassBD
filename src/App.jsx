@@ -6,6 +6,7 @@ import { initPixel } from './utils/fbPixel';
 // Context Providers
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Components
 import Navbar from './components/Navbar';
@@ -60,12 +61,12 @@ function AppContent() {
   }, [pathname]);
 
   return (
-    <div className="flex flex-col min-h-screen container mx-auto pb-16 md:pb-0">
+    <div className="flex flex-col min-h-screen w-full pb-16 md:pb-0">
       {/* Global Navbar */}
       <Navbar onCartClick={() => setIsCartOpen(true)} />
 
-      {/* Main Container */}
-      <main className="flex-grow">
+      {/* Main Container (95% Width Layout) */}
+      <main className="flex-grow w-full max-w-[95%] mx-auto px-2 sm:px-4">
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
@@ -127,13 +128,15 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <BrowserRouter>
-          <Toaster position="top-right" reverseOrder={false} />
-          <AppContent />
-        </BrowserRouter>
-      </CartProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <CartProvider>
+          <BrowserRouter>
+            <Toaster position="top-right" reverseOrder={false} />
+            <AppContent />
+          </BrowserRouter>
+        </CartProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

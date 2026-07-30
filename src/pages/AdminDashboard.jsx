@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import JoditEditor from 'jodit-react';
 import { api, API_BASE_URL } from '../utils/api';
-import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database, KeyRound, LayoutDashboard } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database, KeyRound, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 const parseJSON = (str, fallback) => {
   if (!str) return fallback;
@@ -30,7 +31,7 @@ const joditConfig = {
     'hr', 'eraser', 'copyformat', '|',
     'symbol', 'fullsize', 'print', 'about'
   ],
-  removeButtons: ['brush'],
+  removeButtons: [],
   showXPathInStatusbar: false,
   showCharsCounter: false,
   showWordsCounter: false,
@@ -38,7 +39,8 @@ const joditConfig = {
 };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'products', 'orders', 'tickets', 'categories', 'backup', 'licenses'
+  const { theme, updateTheme, selectPreset, THEME_PRESETS } = useTheme();
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'products', 'orders', 'tickets', 'categories', 'backup', 'licenses', 'theme_settings'
 
   // Data lists
   const [products, setProducts] = useState([]);
@@ -76,6 +78,7 @@ export default function AdminDashboard() {
     packages: [],
     device_options: '',
     activation_options: '',
+    highlighted_text: '',
     discount_percent: '',
     is_hot: false,
     is_highlighted: false,
@@ -100,6 +103,7 @@ export default function AdminDashboard() {
     product_id: '',
     activation_option: '',
     package_option: '',
+    rules: '',
     license_key: ''
   });
   const [licenseFormSubmitting, setLicenseFormSubmitting] = useState(false);
@@ -115,7 +119,7 @@ export default function AdminDashboard() {
   const [cancelRemarks, setCancelRemarks] = useState('');
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
-  // Modal State for Ticket Action
+  // Modal State for Tickets / Admin
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [activeTicket, setActiveTicket] = useState(null);
   const [ticketForm, setTicketForm] = useState({
@@ -124,6 +128,22 @@ export default function AdminDashboard() {
   });
   const [ticketSubmitting, setTicketSubmitting] = useState(false);
 
+  // Modal State for Coupons
+  const [coupons, setCoupons] = useState([]);
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [couponForm, setCouponForm] = useState({
+    code: '',
+    discount_type: 'percentage',
+    discount_value: '',
+    min_order_amount: '',
+    max_discount_amount: '',
+    usage_limit: '',
+    expires_at: ''
+  });
+  const [couponFormSubmitting, setCouponFormSubmitting] = useState(false);
+  const [couponFormError, setCouponFormError] = useState('');
+  const [couponSearchQuery, setCouponSearchQuery] = useState('');
+
   useEffect(() => {
     fetchAdminData();
   }, []);
@@ -131,7 +151,7 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [prodData, orderData, ticketData, statsData, catData, licenseData, epsData, slideData] = await Promise.all([
+      const [prodData, orderData, ticketData, statsData, catData, licenseData, epsData, slideData, couponData] = await Promise.all([
         api.get('/products'),
         api.get('/orders'),
         api.get('/tickets'),
@@ -139,7 +159,8 @@ export default function AdminDashboard() {
         api.get('/products/categories'),
         api.get('/licenses'),
         api.get('/payments/history'),
-        api.get('/slides')
+        api.get('/slides'),
+        api.get('/coupons').catch(() => [])
       ]);
       setProducts(prodData);
       setOrders(orderData);
@@ -149,11 +170,81 @@ export default function AdminDashboard() {
       setLicenses(licenseData || []);
       setEpsHistory(epsData || []);
       setSlides(slideData || []);
+      setCoupons(couponData || []);
     } catch (err) {
       console.error('Failed to load admin stats', err);
       toast.error('Error loading dashboard data. Are you logged in as an Admin?');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCoupons = async () => {
+    try {
+      const data = await api.get('/coupons');
+      setCoupons(data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleOpenCouponModal = () => {
+    setCouponForm({
+      code: '',
+      discount_type: 'percentage',
+      discount_value: '',
+      min_order_amount: '',
+      max_discount_amount: '',
+      usage_limit: '',
+      expires_at: ''
+    });
+    setCouponFormError('');
+    setShowCouponModal(true);
+  };
+
+  const handleSaveCoupon = async (e) => {
+    e.preventDefault();
+    if (!couponForm.code || !couponForm.discount_value) {
+      setCouponFormError('Coupon code and discount value are required.');
+      return;
+    }
+
+    try {
+      setCouponFormSubmitting(true);
+      setCouponFormError('');
+      await api.post('/coupons', couponForm);
+      toast.success('Coupon created successfully!');
+      setShowCouponModal(false);
+      fetchCoupons();
+    } catch (err) {
+      console.error(err);
+      setCouponFormError(err.message || 'Failed to create coupon.');
+    } finally {
+      setCouponFormSubmitting(false);
+    }
+  };
+
+  const handleToggleCouponStatus = async (coupon) => {
+    try {
+      await api.put(`/coupons/${coupon.id}/status`, { is_active: !coupon.is_active });
+      toast.success(`Coupon '${coupon.code}' ${!coupon.is_active ? 'activated' : 'deactivated'}.`);
+      fetchCoupons();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update coupon status.');
+    }
+  };
+
+  const handleDeleteCoupon = async (id) => {
+    if (window.confirm('Are you sure you want to delete this coupon?')) {
+      try {
+        await api.delete(`/coupons/${id}`);
+        toast.success('Coupon deleted successfully!');
+        fetchCoupons();
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to delete coupon.');
+      }
     }
   };
 
@@ -196,6 +287,7 @@ export default function AdminDashboard() {
         })),
         device_options: product.device_options || '',
         activation_options: product.activation_options || '',
+        highlighted_text: product.highlighted_text || '',
         discount_percent: product.discount_percent !== null && product.discount_percent !== undefined ? product.discount_percent : '',
         is_hot: !!product.is_hot,
         is_highlighted: !!product.is_highlighted,
@@ -217,6 +309,7 @@ export default function AdminDashboard() {
         packages: [],
         device_options: '',
         activation_options: '',
+        highlighted_text: '',
         discount_percent: '',
         is_hot: false,
         is_highlighted: false,
@@ -381,6 +474,18 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm(`Are you sure you want to delete order #${orderId}? This action cannot be undone.`)) return;
+    try {
+      const res = await api.delete(`/orders/${orderId}`);
+      toast.success(res.message || `Order #${orderId} deleted successfully!`);
+      fetchAdminData();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to delete order.');
+    }
+  };
+
   // TICKET ACTION HANDLERS
   const handleOpenTicketModal = (ticket) => {
     setActiveTicket(ticket);
@@ -493,6 +598,7 @@ export default function AdminDashboard() {
       product_id: '',
       activation_option: '',
       package_option: '',
+      rules: '',
       license_key: ''
     });
     setLicenseFormError('');
@@ -505,6 +611,7 @@ export default function AdminDashboard() {
       product_id: license.product_id,
       activation_option: license.activation_option || '',
       package_option: license.package_option || '',
+      rules: license.rules || '',
       license_key: license.license_key
     });
     setLicenseFormError('');
@@ -585,6 +692,7 @@ export default function AdminDashboard() {
       lic.product_name?.toLowerCase().includes(query) ||
       lic.activation_option?.toLowerCase().includes(query) ||
       lic.package_option?.toLowerCase().includes(query) ||
+      lic.rules?.toLowerCase().includes(query) ||
       lic.id?.toString().includes(query)
     );
   });
@@ -730,6 +838,17 @@ export default function AdminDashboard() {
           </button>
 
           <button
+            onClick={() => setActiveTab('coupons')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'coupons'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+          >
+            <Tag className={`w-4 h-4 shrink-0 ${activeTab === 'coupons' ? 'text-amber-400' : 'text-slate-500'}`} />
+            <span>Coupons / Promo Codes</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('backup')}
             className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'backup'
               ? 'bg-white/10 text-white shadow-xs'
@@ -765,6 +884,17 @@ export default function AdminDashboard() {
             <Layers className={`w-4 h-4 shrink-0 ${activeTab === 'slides' ? 'text-orange-400' : 'text-slate-500'}`} />
             <span>Slides</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('theme_settings')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'theme_settings'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+          >
+            <Palette className={`w-4 h-4 shrink-0 ${activeTab === 'theme_settings' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <span>Theme Settings</span>
+          </button>
         </div>
       </div>
 
@@ -772,30 +902,9 @@ export default function AdminDashboard() {
       <div className="flex-1 bg-[#f5f7fa] p-6 sm:p-8 overflow-y-auto space-y-6 min-w-0">
 
         {/* Header Row */}
-        <div className="flex justify-between items-center border-b border-slate-200/60 pb-5 shrink-0">
+        <div className="flex justify-between items-center border-b border-slate-200/60 pb-2 shrink-0">
           <div className="text-left">
             <h1 className="text-2xl font-extrabold text-slate-850 tracking-tight">Dashboard</h1>
-            <p className="text-xs text-slate-500 mt-1">Welcome back, Admin. Manage catalog and track customer orders.</p>
-          </div>
-
-          {/* Header Actions */}
-          <div className="flex items-center space-x-4">
-            <button className="p-2 text-slate-400 hover:text-slate-650 bg-white border border-slate-200/60 hover:bg-slate-50 rounded-xl transition-colors relative cursor-pointer shadow-xs">
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#ff5e3a] rounded-full animate-pulse" />
-              🔔
-            </button>
-            <button className="p-2 text-slate-400 hover:text-slate-650 bg-white border border-slate-200/60 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer shadow-xs">
-              ✉️
-            </button>
-            <div className="flex items-center space-x-2.5 bg-white border border-slate-200/60 px-3 py-1.5 rounded-xl shadow-xs">
-              <div className="w-7 h-7 rounded-full bg-violet-650 flex items-center justify-center text-white font-extrabold text-xs">
-                AD
-              </div>
-              <div className="hidden sm:block text-left">
-                <span className="block text-xs font-bold text-slate-700 leading-tight">Admin User</span>
-                <span className="block text-[10px] text-slate-500 font-semibold leading-tight">Super Admin</span>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -865,7 +974,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Quick Actions & Recent Activity Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 {/* Recent Orders Section */}
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
                   <div className="flex justify-between items-center mb-4">
@@ -885,16 +994,32 @@ export default function AdminDashboard() {
                         <thead>
                           <tr className="text-slate-400 font-bold text-xxs tracking-wider border-b border-slate-100 uppercase pb-2">
                             <th className="py-2">Order</th>
+                            <th className="py-2">Date & Time</th>
                             <th className="py-2">Customer</th>
                             <th className="py-2">Total</th>
                             <th className="py-2">Payment</th>
                             <th className="py-2">Status</th>
+                            <th className="py-2 text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {orders.slice(0, 10).map((ord) => (
                             <tr key={ord.id} className="hover:bg-slate-50/20 text-slate-700 font-medium">
                               <td className="py-2 font-bold text-slate-805">#{ord.id}</td>
+                              <td className="py-2 text-left">
+                                {ord.created_at ? (
+                                  <>
+                                    <p className="font-bold text-slate-700 text-xs leading-tight">
+                                      {new Date(ord.created_at).toLocaleDateString()}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5 leading-tight font-medium">
+                                      {new Date(ord.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                  </>
+                                ) : (
+                                  '-'
+                                )}
+                              </td>
                               <td className="py-2">
                                 <p className="font-bold text-slate-800 leading-tight">{ord.user_name}</p>
                                 <p className="text-[10px] text-slate-400 mt-0.5">{ord.user_email}</p>
@@ -916,6 +1041,15 @@ export default function AdminDashboard() {
                                   }`}>
                                   {ord.status}
                                 </span>
+                              </td>
+                              <td className="py-2 text-right">
+                                <button
+                                  onClick={() => handleDeleteOrder(ord.id)}
+                                  title="Delete Order"
+                                  className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -1323,19 +1457,29 @@ export default function AdminDashboard() {
                         <th className="p-4">Total Bill</th>
                         <th className="p-4">Payment Status</th>
                         <th className="p-4">Status</th>
+                        <th className="p-4 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {orders.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="p-8 text-center text-slate-400 font-medium">No orders placed by customers yet.</td>
+                          <td colSpan="7" className="p-8 text-center text-slate-400 font-medium">No orders placed by customers yet.</td>
                         </tr>
                       ) : (
                         orders.map((ord) => (
                           <tr key={ord.id} className="hover:bg-slate-50/40 transition-colors">
                             <td className="p-4 text-left">
                               <p className="font-bold text-slate-805">#{ord.id}</p>
-                              <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">{new Date(ord.created_at).toLocaleDateString()}</p>
+                              {ord.created_at && (
+                                <>
+                                  <p className="text-[10px] text-slate-500 font-semibold mt-0.5 leading-tight">
+                                    {new Date(ord.created_at).toLocaleDateString()}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 mt-0.5 font-normal leading-tight">
+                                    {new Date(ord.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                </>
+                              )}
                             </td>
                             <td className="p-4 text-left">
                               <p className="font-bold text-slate-700">{ord.user_name}</p>
@@ -1352,6 +1496,18 @@ export default function AdminDashboard() {
                                         {i.package_name && <div> 📦 Pkg: {i.package_name}</div>}
                                         {i.selected_device && <div> 📱 Dev: {i.selected_device}</div>}
                                         {i.selected_activation && <div> 🔑 Act: {i.selected_activation}</div>}
+                                      </div>
+                                    )}
+                                    {i.license_keys && i.license_keys.length > 0 && (
+                                      <div className="mt-1.5 space-y-1 text-left">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase block">🔑 License Key(s):</span>
+                                        <div className="flex flex-wrap gap-1">
+                                          {i.license_keys.map((lic, lIdx) => (
+                                            <code key={lIdx} className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded text-[10px] font-mono select-all break-all">
+                                              {lic}
+                                            </code>
+                                          ))}
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -1408,6 +1564,15 @@ export default function AdminDashboard() {
                                 <option value="Delivered">Delivered</option>
                                 <option value="Cancelled">Cancelled</option>
                               </select>
+                            </td>
+                            <td className="p-4 text-center">
+                              <button
+                                onClick={() => handleDeleteOrder(ord.id)}
+                                title="Delete Order"
+                                className="p-1.5 bg-slate-50 hover:bg-red-50 hover:text-red-600 border border-slate-200/60 rounded-lg text-slate-400 transition-colors cursor-pointer inline-flex items-center justify-center"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </td>
                           </tr>
                         ))
@@ -1657,16 +1822,18 @@ export default function AdminDashboard() {
                         <th className="px-2 py-3 whitespace-nowrap">Product Name</th>
                         <th className="px-2 py-3 whitespace-nowrap">Activation Option</th>
                         <th className="px-2 py-3 whitespace-nowrap">Package Option</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Rules</th>
                         <th className="px-2 py-3 whitespace-nowrap">License Key</th>
                         <th className="px-2 py-3 whitespace-nowrap">Status</th>
                         <th className="px-2 py-3 whitespace-nowrap">Created At</th>
+                        <th className="px-2 py-3 whitespace-nowrap text-red-600 font-extrabold">Used At</th>
                         <th className="pl-2 pr-4 py-3 text-right whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredLicenses.length === 0 ? (
                         <tr>
-                          <td colSpan="8" className="p-8 text-center text-slate-400 font-medium">
+                          <td colSpan="10" className="p-8 text-center text-slate-400 font-medium">
                             {licenses.length === 0 ? 'No license keys stored in the database yet.' : 'No matching license keys found.'}
                           </td>
                         </tr>
@@ -1689,6 +1856,15 @@ export default function AdminDashboard() {
                                 <span className="text-slate-450 italic text-[10px]">-</span>
                               )}
                             </td>
+                            <td className="px-2 py-3 max-w-[180px]">
+                              {lic.rules ? (
+                                <span className="bg-amber-50 text-amber-700 border border-amber-200/70 px-2 py-0.5 rounded-lg text-[10px] font-medium truncate block" title={lic.rules}>
+                                  {lic.rules}
+                                </span>
+                              ) : (
+                                <span className="text-slate-450 italic text-[10px]">-</span>
+                              )}
+                            </td>
                             <td className="px-2 py-3 font-mono text-[11px] select-all max-w-[250px] truncate" title={lic.license_key}>{lic.license_key}</td>
                             <td className="px-2 py-3 whitespace-nowrap">
                               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${lic.is_used ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-slate-100 text-slate-700'}`}>
@@ -1696,6 +1872,15 @@ export default function AdminDashboard() {
                               </span>
                             </td>
                             <td className="px-2 py-3 text-slate-400 whitespace-nowrap">{new Date(lic.created_at).toLocaleDateString()}</td>
+                            <td className="px-2 py-3 whitespace-nowrap">
+                              {lic.is_used ? (
+                                <span className="text-red-600 font-extrabold text-[11px] bg-red-50 border border-red-200/80 px-2 py-0.5 rounded-lg shadow-2xs">
+                                  {lic.used_at ? new Date(lic.used_at).toLocaleDateString() : 'Used'}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 italic text-[10px]">-</span>
+                              )}
+                            </td>
                             <td className="pl-2 pr-4 py-3 text-right whitespace-nowrap">
                               <button
                                 onClick={() => handleEditLicense(lic)}
@@ -1770,6 +1955,106 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* COUPONS TAB */}
+          {activeTab === 'coupons' && (
+            <div className="animate-fade-in space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-amber-500" />
+                    Coupons & Promo Codes
+                  </h2>
+                  <p className="text-xs font-semibold text-slate-500 mt-1">Manage promotional discount codes for checkout.</p>
+                </div>
+                <button
+                  onClick={handleOpenCouponModal}
+                  className="flex items-center space-x-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-98"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create New Coupon</span>
+                </button>
+              </div>
+
+              <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse table-auto">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xxs tracking-wider border-b border-slate-200/60">
+                      <tr>
+                        <th className="pl-4 pr-2 py-3 whitespace-nowrap">ID</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Code</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Type</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Discount Value</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Min Order</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Usage</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Status</th>
+                        <th className="px-2 py-3 whitespace-nowrap">Expires At</th>
+                        <th className="pl-2 pr-4 py-3 text-right whitespace-nowrap">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {coupons.length === 0 ? (
+                        <tr>
+                          <td colSpan="9" className="p-8 text-center text-slate-400 font-medium">
+                            No coupons created yet. Click "Create New Coupon" to add one!
+                          </td>
+                        </tr>
+                      ) : (
+                        coupons.map((c) => (
+                          <tr key={c.id} className="hover:bg-slate-50/40 transition-colors border-b border-slate-100 text-slate-700 font-medium text-xs">
+                            <td className="pl-4 pr-2 py-3 font-bold text-slate-800 whitespace-nowrap">#{c.id}</td>
+                            <td className="px-2 py-3 font-mono font-extrabold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/60 inline-block text-xs uppercase my-2">
+                              {c.code}
+                            </td>
+                            <td className="px-2 py-3 whitespace-nowrap capitalize font-bold text-slate-700">
+                              {c.discount_type}
+                            </td>
+                            <td className="px-2 py-3 font-extrabold text-emerald-600 whitespace-nowrap">
+                              {c.discount_type === 'percentage' ? `${parseFloat(c.discount_value)}%` : `৳${parseFloat(c.discount_value)}`}
+                              {c.max_discount_amount > 0 && c.discount_type === 'percentage' && (
+                                <span className="text-[10px] text-slate-400 block font-normal">(Max: ৳{c.max_discount_amount})</span>
+                              )}
+                            </td>
+                            <td className="px-2 py-3 whitespace-nowrap font-semibold text-slate-600">
+                              ৳{parseFloat(c.min_order_amount || 0)}
+                            </td>
+                            <td className="px-2 py-3 whitespace-nowrap">
+                              <span className="bg-slate-100 px-2 py-0.5 rounded text-[11px] font-bold text-slate-700">
+                                {c.used_count} / {c.usage_limit ? c.usage_limit : '∞'}
+                              </span>
+                            </td>
+                            <td className="px-2 py-3 whitespace-nowrap">
+                              <button
+                                onClick={() => handleToggleCouponStatus(c)}
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold cursor-pointer border transition-all ${c.is_active
+                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                  : 'bg-slate-100 text-slate-400 border-slate-200'
+                                  }`}
+                              >
+                                {c.is_active ? 'Active' : 'Disabled'}
+                              </button>
+                            </td>
+                            <td className="px-2 py-3 text-slate-500 whitespace-nowrap">
+                              {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'No Expiry'}
+                            </td>
+                            <td className="pl-2 pr-4 py-3 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => handleDeleteCoupon(c.id)}
+                                className="p-2 bg-slate-55 hover:bg-red-50 hover:text-red-650 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer"
+                                title="Delete Coupon"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -1945,6 +2230,138 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {/* THEME SETTINGS TAB */}
+          {activeTab === 'theme_settings' && (
+            <div className="space-y-6 animate-fade-in text-left">
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
+                <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-slate-100">
+                  <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600">
+                    <Palette className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-850">Website Color Palette & Theme Settings</h3>
+                    <p className="text-xs text-slate-500">Customize the visual theme, primary brand color, and call-to-action accent colors across your store.</p>
+                  </div>
+                </div>
+
+                {/* Preset Themes Grid */}
+                <div className="mb-8">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">Select Theme Preset</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {Object.keys(THEME_PRESETS).map((key) => {
+                      const item = THEME_PRESETS[key];
+                      const isSelected = theme.id === item.id;
+                      return (
+                        <div
+                          key={key}
+                          onClick={() => {
+                            selectPreset(key);
+                            toast.success(`Selected theme: ${item.name}`);
+                          }}
+                          className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                            isSelected
+                              ? 'border-[#005F53] bg-teal-50/20 shadow-sm'
+                              : 'border-slate-200/80 hover:border-slate-300 bg-white'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-extrabold text-xs text-slate-800">{item.name}</span>
+                              {isSelected && <span className="text-[10px] bg-[#005F53] text-white px-2 py-0.5 rounded-full font-bold">Active</span>}
+                            </div>
+                            <p className="text-[11px] text-slate-500 leading-relaxed mb-3">{item.desc}</p>
+                          </div>
+                          
+                          {/* Color Palette Swatches */}
+                          <div className="flex items-center space-x-2 pt-2 border-t border-slate-100">
+                            <div className="flex items-center space-x-1">
+                              <span className="w-5 h-5 rounded-full border border-black/10 inline-block" style={{ backgroundColor: item.primaryColor }} title="Primary" />
+                              <span className="w-5 h-5 rounded-full border border-black/10 inline-block" style={{ backgroundColor: item.accentColor }} title="Accent CTA" />
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-400">{item.primaryColor} / {item.accentColor}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Custom Color Pickers */}
+                <div className="mb-8 p-5 bg-slate-50 border border-slate-200/80 rounded-xl">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-4">Custom Color Configuration</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-2">Primary Brand Color</label>
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="color"
+                          value={theme.primaryColor || '#005F53'}
+                          onChange={(e) => updateTheme({ primaryColor: e.target.value, id: 'custom' })}
+                          className="w-10 h-10 rounded-lg border border-slate-300 cursor-pointer p-0.5"
+                        />
+                        <input
+                          type="text"
+                          value={theme.primaryColor || '#005F53'}
+                          onChange={(e) => updateTheme({ primaryColor: e.target.value, id: 'custom' })}
+                          className="px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-700 w-32 focus:outline-none focus:border-teal-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-2">Accent CTA Color (Buy Buttons & Highlights)</label>
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="color"
+                          value={theme.accentColor || '#FF6D00'}
+                          onChange={(e) => updateTheme({ accentColor: e.target.value, id: 'custom' })}
+                          className="w-10 h-10 rounded-lg border border-slate-300 cursor-pointer p-0.5"
+                        />
+                        <input
+                          type="text"
+                          value={theme.accentColor || '#FF6D00'}
+                          onChange={(e) => updateTheme({ accentColor: e.target.value, id: 'custom' })}
+                          className="px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-700 w-32 focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Preview Box */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Live UI Components Preview</h4>
+                  <div className="p-6 rounded-2xl border border-slate-200/80 bg-slate-100/60 backdrop-blur-md flex flex-wrap items-center gap-4">
+                    <button
+                      className="px-5 py-2.5 rounded-xl font-extrabold text-xs text-white shadow-md transition-transform active:scale-95 cursor-pointer"
+                      style={{ backgroundColor: theme.primaryColor || '#005F53' }}
+                    >
+                      Primary Header Button
+                    </button>
+
+                    <button
+                      className="px-5 py-2.5 rounded-xl font-extrabold text-xs text-white shadow-md transition-transform active:scale-95 cursor-pointer"
+                      style={{ backgroundColor: theme.accentColor || '#FF6D00' }}
+                    >
+                      🛒 Buy Now (Accent CTA)
+                    </button>
+
+                    <span
+                      className="px-3 py-1 rounded-full text-xs font-bold border"
+                      style={{
+                        backgroundColor: theme.primaryColor ? `${theme.primaryColor}15` : '#005F5315',
+                        color: theme.primaryColor || '#005F53',
+                        borderColor: theme.primaryColor ? `${theme.primaryColor}30` : '#005F5330'
+                      }}
+                    >
+                      Badge Preview
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2037,6 +2454,23 @@ export default function AdminDashboard() {
                     className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-850 placeholder-slate-400"
                   />
                 </div>
+              </div>
+
+              {/* Highlighted Bullet Points Text Field */}
+              <div>
+                <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">
+                  Highlighted Text / Bullet Features (One bullet per line or comma-separated)
+                </label>
+                <textarea
+                  rows="3"
+                  value={productForm.highlighted_text}
+                  onChange={(e) => setProductForm({ ...productForm, highlighted_text: e.target.value })}
+                  placeholder="e.g.&#10;Zoom Premium লাইফটাইম লাইসেন্স কিনুন এলিম পাস বিডি থেকে।&#10;These keys can be used on the same PCs to reactivate after reinstallation.&#10;Lifetime Activation & Instant Delivery."
+                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-850 placeholder-slate-400 font-medium"
+                />
+                <span className="text-[10px] text-slate-400 block mt-1">
+                  💡 This text will automatically display as bullet points under the product title on the Product Details page.
+                </span>
               </div>
 
               <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2.5">
@@ -2753,6 +3187,20 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* License Rules input */}
+              <div>
+                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  License Rules / Instructions (Optional)
+                </label>
+                <textarea
+                  rows="2"
+                  value={licenseForm.rules}
+                  onChange={(e) => setLicenseForm({ ...licenseForm, rules: e.target.value })}
+                  placeholder="e.g. Do not change password. Valid for 1 device. Contact support if locked."
+                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
+                />
+              </div>
+
               {/* License Key input */}
               <div>
                 <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -2786,6 +3234,155 @@ export default function AdminDashboard() {
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <span>{editingLicense ? 'Update Key' : 'Save Keys'}</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE COUPON MODAL */}
+      {showCouponModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h4 className="text-base font-bold text-slate-850 flex items-center gap-2">
+                <Tag className="w-4 h-4 text-amber-500" />
+                <span>Create New Coupon</span>
+              </h4>
+              <button
+                onClick={() => setShowCouponModal(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {couponFormError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-lg">
+                {couponFormError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveCoupon} className="space-y-4 text-left">
+              <div>
+                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Coupon Code *
+                </label>
+                <input
+                  type="text"
+                  value={couponForm.code}
+                  onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
+                  placeholder="e.g. SAVE10, ELITE100"
+                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-amber-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 font-mono font-bold uppercase"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Discount Type
+                  </label>
+                  <select
+                    value={couponForm.discount_type}
+                    onChange={(e) => setCouponForm({ ...couponForm, discount_type: e.target.value })}
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-amber-500 focus:outline-none rounded-lg px-3 py-2 text-slate-800 font-bold"
+                  >
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="fixed">Fixed Amount (৳)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Discount Value *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={couponForm.discount_value}
+                    onChange={(e) => setCouponForm({ ...couponForm, discount_value: e.target.value })}
+                    placeholder={couponForm.discount_type === 'percentage' ? '10 (for 10%)' : '100 (for ৳100)'}
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-amber-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Min Order Amount (৳)
+                  </label>
+                  <input
+                    type="number"
+                    value={couponForm.min_order_amount}
+                    onChange={(e) => setCouponForm({ ...couponForm, min_order_amount: e.target.value })}
+                    placeholder="0"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-amber-500 focus:outline-none rounded-lg px-3 py-2 text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Max Discount Limit (৳)
+                  </label>
+                  <input
+                    type="number"
+                    value={couponForm.max_discount_amount}
+                    onChange={(e) => setCouponForm({ ...couponForm, max_discount_amount: e.target.value })}
+                    placeholder="Optional (e.g. 500)"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-amber-500 focus:outline-none rounded-lg px-3 py-2 text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Usage Limit (Max Uses)
+                  </label>
+                  <input
+                    type="number"
+                    value={couponForm.usage_limit}
+                    onChange={(e) => setCouponForm({ ...couponForm, usage_limit: e.target.value })}
+                    placeholder="Optional (e.g. 100)"
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-amber-500 focus:outline-none rounded-lg px-3 py-2 text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Expiration Date
+                  </label>
+                  <input
+                    type="date"
+                    value={couponForm.expires_at}
+                    onChange={(e) => setCouponForm({ ...couponForm, expires_at: e.target.value })}
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-amber-500 focus:outline-none rounded-lg px-3 py-2 text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCouponModal(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-550 hover:bg-slate-50 rounded-lg text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={couponFormSubmitting}
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition-all flex items-center space-x-1 cursor-pointer"
+                >
+                  {couponFormSubmitting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <span>Create Coupon</span>
                   )}
                 </button>
               </div>

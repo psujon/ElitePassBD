@@ -4,9 +4,11 @@ const db = require('../config/db');
 exports.getAllLicenses = async (req, res) => {
   try {
     const [licenses] = await db.query(`
-      SELECT pl.*, p.name AS product_name 
+      SELECT pl.*, p.name AS product_name, COALESCE(pl.used_at, o.created_at) AS used_at
       FROM product_licenses pl
       JOIN products p ON pl.product_id = p.id
+      LEFT JOIN order_items oi ON pl.order_item_id = oi.id
+      LEFT JOIN orders o ON oi.order_id = o.id
       ORDER BY pl.id DESC
     `);
     res.json(licenses);
@@ -18,7 +20,7 @@ exports.getAllLicenses = async (req, res) => {
 
 // Create license key(s) - supports single or bulk (newline-separated) insertion
 exports.createLicense = async (req, res) => {
-  const { product_id, activation_option, package_option, license_key } = req.body;
+  const { product_id, activation_option, package_option, rules, license_key } = req.body;
 
   if (!product_id || !license_key) {
     return res.status(400).json({ message: 'Product ID and License Key are required fields.' });
@@ -46,12 +48,13 @@ exports.createLicense = async (req, res) => {
       parseInt(product_id),
       activation_option ? activation_option.trim() : null,
       package_option ? package_option.trim() : null,
+      rules ? rules.trim() : null,
       k,
       0 // is_used = 0
     ]);
 
     await db.query(
-      `INSERT INTO product_licenses (product_id, activation_option, package_option, license_key, is_used) VALUES ?`,
+      `INSERT INTO product_licenses (product_id, activation_option, package_option, rules, license_key, is_used) VALUES ?`,
       [values]
     );
 
@@ -84,7 +87,7 @@ exports.deleteLicense = async (req, res) => {
 // Update license key
 exports.updateLicense = async (req, res) => {
   const { id } = req.params;
-  const { product_id, activation_option, package_option, license_key } = req.body;
+  const { product_id, activation_option, package_option, rules, license_key } = req.body;
 
   if (!product_id || !license_key) {
     return res.status(400).json({ message: 'Product and License Key are required.' });
@@ -93,12 +96,13 @@ exports.updateLicense = async (req, res) => {
   try {
     const [result] = await db.query(
       `UPDATE product_licenses 
-       SET product_id = ?, activation_option = ?, package_option = ?, license_key = ? 
+       SET product_id = ?, activation_option = ?, package_option = ?, rules = ?, license_key = ? 
        WHERE id = ?`,
       [
         parseInt(product_id),
         activation_option ? activation_option.trim() : null,
         package_option ? package_option.trim() : null,
+        rules ? rules.trim() : null,
         license_key.trim(),
         id
       ]

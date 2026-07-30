@@ -62,11 +62,11 @@ export default function Login() {
       try {
         setLoading(true);
         setError('');
-        
+
         const data = await api.post('/auth/google', { credential: tokenResponse.access_token });
-        
+
         login(data.token, data.user);
-        
+
         const from = location.state?.from?.pathname || (data.user.role === 'admin' ? '/admin' : '/dashboard');
         navigate(from, { replace: true });
         toast.success('Successfully signed in with Google!');
@@ -389,7 +389,7 @@ export default function Login() {
             </>
           )}
 
-          {/* VIEW: VERIFY OTP */}g
+          {/* VIEW: VERIFY OTP */}
           {view === 'verify' && (
             <>
               <div className="text-center mb-6">

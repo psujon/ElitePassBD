@@ -1,6 +1,6 @@
 const { EPS } = require('eps-gateway-nodejs');
 const db = require('../config/db');
-const nodemailer = require('nodemailer');
+const { sendEmail } = require('../utils/mailer');
 
 // Helper to get EPS instance with configuration checks
 const getEpsInstance = () => {
@@ -108,71 +108,49 @@ exports.initiatePayment = async (req, res) => {
 // Helper function to send email containing automatic license keys
 const sendLicenseEmail = async (email, userName, orderId, licenses) => {
   try {
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT || 587;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-
-    if (smtpHost && smtpUser && smtpPass) {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: parseInt(smtpPort),
-        secure: smtpPort === '465',
-        auth: {
-          user: smtpUser,
-          pass: smtpPass
-        },
-        tls: {
-          rejectUnauthorized: false
-        }
-      });
-
-      let keysHtml = '';
-      for (const lic of licenses) {
-        keysHtml += `
-          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px; font-family: sans-serif;">
-            <h4 style="margin: 0 0 8px 0; color: #1e293b; font-size: 14px;">${lic.product_name}</h4>
-            ${lic.package_name ? `<p style="margin: 2px 0; color: #64748b; font-size: 12px;"><strong>Package:</strong> ${lic.package_name}</p>` : ''}
-            ${lic.selected_device ? `<p style="margin: 2px 0; color: #64748b; font-size: 12px;"><strong>Device:</strong> ${lic.selected_device}</p>` : ''}
-            ${lic.selected_activation ? `<p style="margin: 2px 0; color: #64748b; font-size: 12px;"><strong>Activation:</strong> ${lic.selected_activation}</p>` : ''}
-            <div style="margin-top: 10px; background-color: #ecfdf5; border: 1px dashed #10b981; border-radius: 6px; padding: 10px; color: #065f46; font-family: monospace; font-size: 14px; font-weight: bold; width: fit-content; word-break: break-all;">
-              ${lic.license_key}
-            </div>
+    let keysHtml = '';
+    for (const lic of licenses) {
+      keysHtml += `
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px; font-family: sans-serif;">
+          <h4 style="margin: 0 0 8px 0; color: #1e293b; font-size: 14px;">${lic.product_name}</h4>
+          ${lic.package_name ? `<p style="margin: 2px 0; color: #64748b; font-size: 12px;"><strong>Package:</strong> ${lic.package_name}</p>` : ''}
+          ${lic.selected_device ? `<p style="margin: 2px 0; color: #64748b; font-size: 12px;"><strong>Device:</strong> ${lic.selected_device}</p>` : ''}
+          ${lic.selected_activation ? `<p style="margin: 2px 0; color: #64748b; font-size: 12px;"><strong>Activation:</strong> ${lic.selected_activation}</p>` : ''}
+          ${lic.rules ? `<p style="margin: 6px 0 2px 0; color: #b45309; background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; padding: 6px 10px; font-size: 11px;"><strong>License Rules:</strong> ${lic.rules}</p>` : ''}
+          <div style="margin-top: 10px; background-color: #ecfdf5; border: 1px dashed #10b981; border-radius: 6px; padding: 10px; color: #065f46; font-family: monospace; font-size: 14px; font-weight: bold; width: fit-content; word-break: break-all;">
+            ${lic.license_key}
           </div>
-        `;
-      }
+        </div>
+      `;
+    }
 
-      await transporter.sendMail({
-        from: `"${process.env.APP_NAME || 'ElitePassBD'}" <${smtpUser}>`,
-        to: email,
-        subject: `Your Digital Keys - Order #${orderId} - ElitePassBD`,
-        text: `Hello ${userName},\n\nThank you for your purchase! Here are your digital keys for Order #${orderId}:\n\n` +
-          licenses.map(lic => `${lic.product_name}: ${lic.license_key}`).join('\n') +
-          `\n\nYou can also find these keys at any time in your customer dashboard.`,
-        html: `
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: sans-serif; color: #334155;">
-            <div style="text-align: center; margin-bottom: 24px;">
-              <h2 style="color: #6d28d9; margin: 0;">ElitePass BD</h2>
-              <p style="color: #64748b; font-size: 14px; margin: 4px 0 0 0;">Your Digital Keys are Ready!</p>
-            </div>
-            <p>Hello <strong>${userName}</strong>,</p>
-            <p>Thank you for your order! The payment was successful, and your keys have been issued successfully.</p>
-            <h3 style="color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-top: 24px;">Purchase Details (Order #${orderId})</h3>
-            ${keysHtml}
-            <div style="margin-top: 24px; padding: 16px; background-color: #f1f5f9; border-radius: 12px; font-size: 12px; color: #475569;">
-              <strong>Need Help?</strong> If you have any trouble activating your products, please open a support ticket from your account dashboard or reply to this email.
-            </div>
+    const emailSent = await sendEmail({
+      to: email,
+      subject: `Your Digital Keys - Order #${orderId} - ElitePassBD`,
+      text: `Hello ${userName},\n\nThank you for your purchase! Here are your digital keys for Order #${orderId}:\n\n` +
+        licenses.map(lic => `${lic.product_name}: ${lic.license_key}${lic.rules ? `\nLicense Rules: ${lic.rules}` : ''}`).join('\n\n') +
+        `\n\nYou can also find these keys at any time in your customer dashboard.`,
+      html: `
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: sans-serif; color: #334155;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="color: #6d28d9; margin: 0;">ElitePass BD</h2>
+            <p style="color: #64748b; font-size: 14px; margin: 4px 0 0 0;">Your Digital Keys are Ready!</p>
           </div>
-        `
-      });
+          <p>Hello <strong>${userName}</strong>,</p>
+          <p>Thank you for your order! The payment was successful, and your keys have been issued successfully.</p>
+          <h3 style="color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-top: 24px;">Purchase Details (Order #${orderId})</h3>
+          ${keysHtml}
+          <div style="margin-top: 24px; padding: 16px; background-color: #f1f5f9; border-radius: 12px; font-size: 12px; color: #475569;">
+            <strong>Need Help?</strong> If you have any trouble activating your products, please open a support ticket from your account dashboard or reply to this email.
+          </div>
+        </div>
+      `
+    });
+
+    if (emailSent) {
       console.log(`License keys email sent successfully to ${email}`);
     } else {
-      console.log('----------------------------');
-      console.log(`MOCK SMTP: License Keys for Order #${orderId} -> Email: ${email}`);
-      licenses.forEach(lic => {
-        console.log(`  - ${lic.product_name}: [REDACTED_KEY]`);
-      });
-      console.log('----------------------------');
+      console.log(`Failed to send license keys email to ${email}`);
     }
   } catch (error) {
     console.error('Failed to send license keys email:', error);
@@ -219,13 +197,28 @@ const fulfillOrder = async (merchantTransactionId) => {
     if (order.payment_status === 'Paid') {
       await connection.commit();
       const [items] = await db.query(
-        `SELECT oi.*, p.name AS product_name, p.activation_process 
+        `SELECT oi.*, p.name AS product_name, p.activation_process, p.packages 
          FROM order_items oi
          JOIN products p ON oi.product_id = p.id
          WHERE oi.order_id = ?`,
         [order.id]
       );
-      const hasManual = items.some(item => item.activation_process === 'Manual');
+      const hasManual = items.some(item => {
+        let actProcess = item.activation_process || 'Manual';
+        if (item.packages) {
+          try {
+            const pkgs = typeof item.packages === 'string' ? JSON.parse(item.packages) : item.packages;
+            const matchedPkg = pkgs.find(pkg => 
+              pkg.duration === item.package_name && 
+              (!pkg.activation || !item.selected_activation || pkg.activation.toLowerCase() === item.selected_activation.toLowerCase())
+            );
+            if (matchedPkg && matchedPkg.activation_process) {
+              actProcess = matchedPkg.activation_process;
+            }
+          } catch (e) {}
+        }
+        return actProcess === 'Manual';
+      });
       activationType = hasManual ? 'manual' : 'automatic';
 
       const fbContents = items.map(item => ({
@@ -262,7 +255,7 @@ const fulfillOrder = async (merchantTransactionId) => {
 
     // Fetch order items to process activation processes
     const [items] = await connection.query(
-      `SELECT oi.*, p.name AS product_name, p.activation_process 
+      `SELECT oi.*, p.name AS product_name, p.activation_process, p.packages 
        FROM order_items oi
        JOIN products p ON oi.product_id = p.id
        WHERE oi.order_id = ?`,
@@ -272,14 +265,28 @@ const fulfillOrder = async (merchantTransactionId) => {
     let allAutomaticFulfilled = true;
 
     for (const item of items) {
-      if (item.activation_process === 'Automatic') {
+      let actProcess = item.activation_process || 'Manual';
+      if (item.packages) {
+        try {
+          const pkgs = typeof item.packages === 'string' ? JSON.parse(item.packages) : item.packages;
+          const matchedPkg = pkgs.find(pkg => 
+            pkg.duration === item.package_name && 
+            (!pkg.activation || !item.selected_activation || pkg.activation.toLowerCase() === item.selected_activation.toLowerCase())
+          );
+          if (matchedPkg && matchedPkg.activation_process) {
+            actProcess = matchedPkg.activation_process;
+          }
+        } catch (e) {}
+      }
+
+      if (actProcess === 'Automatic') {
         // Find unused license keys for this product WITH FOR UPDATE lock
         const [licenses] = await connection.query(
-          `SELECT id, license_key FROM product_licenses 
+          `SELECT id, license_key, rules FROM product_licenses 
            WHERE product_id = ? AND is_used = 0 
            ORDER BY 
-             (activation_option = ?) DESC, 
-             (package_option = ?) DESC, 
+             (activation_option <=> ?) DESC, 
+             (package_option <=> ?) DESC, 
              id ASC 
            LIMIT ? FOR UPDATE`,
           [
@@ -293,12 +300,14 @@ const fulfillOrder = async (merchantTransactionId) => {
         if (licenses.length >= item.quantity) {
           for (const lic of licenses) {
             await connection.query(
-              'UPDATE product_licenses SET is_used = 1, order_item_id = ? WHERE id = ?',
+              'UPDATE product_licenses SET is_used = 1, order_item_id = ?, used_at = NOW() WHERE id = ?',
               [item.id, lic.id]
             );
             fulfilledLicenses.push({
+              product_id: item.product_id,
               product_name: item.product_name,
               license_key: lic.license_key,
+              rules: lic.rules,
               package_name: item.package_name,
               selected_device: item.selected_device,
               selected_activation: item.selected_activation
@@ -385,10 +394,24 @@ const fulfillOrder = async (merchantTransactionId) => {
         if (item.selected_activation) itemsHtml += `<br><small>Activation: ${item.selected_activation}</small>`;
         itemsHtml += `</td>`;
 
-        itemsHtml += `<td style="padding: 8px;">${item.activation_process}</td>`;
+        let actProcess = item.activation_process || 'Manual';
+        if (item.packages) {
+          try {
+            const pkgs = typeof item.packages === 'string' ? JSON.parse(item.packages) : item.packages;
+            const matchedPkg = pkgs.find(pkg => 
+              pkg.duration === item.package_name && 
+              (!pkg.activation || !item.selected_activation || pkg.activation.toLowerCase() === item.selected_activation.toLowerCase())
+            );
+            if (matchedPkg && matchedPkg.activation_process) {
+              actProcess = matchedPkg.activation_process;
+            }
+          } catch (e) {}
+        }
+
+        itemsHtml += `<td style="padding: 8px;">${actProcess}</td>`;
 
         let licenseContent = '-';
-        if (item.activation_process === 'Automatic') {
+        if (actProcess === 'Automatic') {
           // Filter by product_id and package to match precisely if there are multiple items
           const itemLicenses = fulfilledLicenses.filter(lic => lic.product_id === item.product_id && lic.package_name === item.package_name);
           if (itemLicenses.length > 0) {
@@ -402,7 +425,6 @@ const fulfillOrder = async (merchantTransactionId) => {
       itemsHtml += `</tbody></table>`;
 
       // Send admin order completion email asynchronously
-      const { sendEmail } = require('../utils/mailer');
       sendEmail({
         to: 'johirul3218@gmail.com',
         subject: `Order Completed (Paid) - Order #${order.id}`,

@@ -25,7 +25,8 @@ const formatProduct = (prod) => {
   return {
     ...prod,
     faqs: parseJSON(prod.faqs, []),
-    packages: parseJSON(prod.packages, [])
+    packages: parseJSON(prod.packages, []),
+    total_sold: parseInt(prod.total_sold || 0, 10)
   };
 };
 
@@ -34,7 +35,8 @@ exports.getAllProducts = async (req, res) => {
   try {
     const [products] = await db.query(`
       SELECT p.*, c.name AS category_name,
-             (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) as avg_rating
+             (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) as avg_rating,
+             COALESCE((SELECT SUM(quantity) FROM order_items WHERE product_id = p.id), 0) as total_sold
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
       ORDER BY p.id DESC
@@ -52,7 +54,8 @@ exports.getProductById = async (req, res) => {
   try {
     const [products] = await db.query(`
       SELECT p.*, c.name AS category_name,
-             (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) as avg_rating
+             (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) as avg_rating,
+             COALESCE((SELECT SUM(quantity) FROM order_items WHERE product_id = p.id), 0) as total_sold
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
       WHERE p.id = ?
@@ -73,7 +76,7 @@ exports.createProduct = async (req, res) => {
   const {
     name, description, price, image_url, stock, category_id,
     tags, additional_info, faqs, packages, device_options, activation_options,
-    discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process
+    discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process, highlighted_text
   } = req.body;
 
   if (!name || !description) {
@@ -117,8 +120,8 @@ exports.createProduct = async (req, res) => {
       `INSERT INTO products (
         name, description, price, image_url, stock, category_id, 
         tags, additional_info, faqs, packages, device_options, activation_options,
-        discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process, highlighted_text
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name, description, calculatedPrice, image_url || '', calculatedStock, category_id || null,
         tags || null, additional_info || null, stringifyField(faqs), stringifyField(parsedPackages),
@@ -127,7 +130,8 @@ exports.createProduct = async (req, res) => {
         is_hot ? 1 : 0,
         is_highlighted ? 1 : 0,
         is_hot_discount ? 1 : 0,
-        activation_process || 'Manual'
+        activation_process || 'Manual',
+        highlighted_text || null
       ]
     );
 
@@ -148,7 +152,7 @@ exports.updateProduct = async (req, res) => {
   const {
     name, description, price, image_url, stock, category_id,
     tags, additional_info, faqs, packages, device_options, activation_options,
-    discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process
+    discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process, highlighted_text
   } = req.body;
 
   if (!name || !description) {
@@ -192,7 +196,8 @@ exports.updateProduct = async (req, res) => {
       `UPDATE products SET 
         name = ?, description = ?, price = ?, image_url = ?, stock = ?, category_id = ?, 
         tags = ?, additional_info = ?, faqs = ?, packages = ?, device_options = ?, activation_options = ?,
-        discount_percent = ?, is_hot = ?, is_highlighted = ?, is_hot_discount = ?, activation_process = ?
+        discount_percent = ?, is_hot = ?, is_highlighted = ?, is_hot_discount = ?, activation_process = ?,
+        highlighted_text = ?
       WHERE id = ?`,
       [
         name, description, calculatedPrice, image_url || '', calculatedStock, category_id || null,
@@ -203,6 +208,7 @@ exports.updateProduct = async (req, res) => {
         is_highlighted ? 1 : 0,
         is_hot_discount ? 1 : 0,
         activation_process || 'Manual',
+        highlighted_text || null,
         id
       ]
     );
@@ -244,11 +250,17 @@ exports.deleteProduct = async (req, res) => {
 // Add or update a product review
 exports.addOrUpdateReview = async (req, res) => {
   const { productId } = req.params;
-  const { rating, text } = req.body;
-  const userId = req.user.id;
+  const { rating, text, reviewer_name, reviewer_email } = req.body;
+  const userId = req.user ? req.user.id : null;
+  const finalName = req.user ? req.user.name : (reviewer_name ? reviewer_name.trim() : 'Customer');
+  const finalEmail = req.user ? req.user.email : (reviewer_email ? reviewer_email.trim() : null);
 
   if (rating === undefined || !text || text.trim() === '') {
     return res.status(400).json({ message: 'Rating and review text are required.' });
+  }
+
+  if (!finalName) {
+    return res.status(400).json({ message: 'Name is required to submit a review.' });
   }
 
   const ratingVal = parseInt(rating);
@@ -257,27 +269,10 @@ exports.addOrUpdateReview = async (req, res) => {
   }
 
   try {
-    // 1. Verify if the user has purchased this product AND the order is 'Delivered'
-    const [purchased] = await db.query(
-      `SELECT 1 FROM orders o
-       JOIN order_items oi ON o.id = oi.order_id
-       WHERE o.user_id = ? AND oi.product_id = ? AND o.status = 'Delivered'
-       LIMIT 1`,
-      [userId, productId]
-    );
-
-    if (purchased.length === 0) {
-      return res.status(403).json({
-        message: 'You can only review products that you have purchased and that have been successfully delivered.'
-      });
-    }
-
-    // 2. Insert or update the review
     await db.query(
-      `INSERT INTO reviews (user_id, product_id, rating, text)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE rating = VALUES(rating), text = VALUES(text), updated_at = CURRENT_TIMESTAMP`,
-      [userId, productId, ratingVal, text.trim()]
+      `INSERT INTO reviews (user_id, product_id, rating, text, reviewer_name, reviewer_email)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, productId, ratingVal, text.trim(), finalName, finalEmail]
     );
 
     res.json({ message: 'Review submitted successfully!' });
@@ -292,9 +287,9 @@ exports.getProductReviews = async (req, res) => {
   const { productId } = req.params;
   try {
     const [reviews] = await db.query(
-      `SELECT r.*, u.name AS user_name 
+      `SELECT r.*, COALESCE(u.name, r.reviewer_name, 'Customer') AS user_name 
        FROM reviews r
-       JOIN users u ON r.user_id = u.id
+       LEFT JOIN users u ON r.user_id = u.id
        WHERE r.product_id = ?
        ORDER BY r.created_at DESC`,
       [productId]
@@ -321,17 +316,17 @@ exports.getUserReviewForProduct = async (req, res) => {
     res.json(reviews[0]);
   } catch (error) {
     console.error('Fetch user review error:', error);
-    res.status(500).json({ message: 'Database error occurred while fetching your review.' });
+    res.status(500).json({ message: 'Database error occurred while fetching user review.' });
   }
 };
 
-// Get latest reviews globally (for homepage testimonials)
+// Get latest reviews for store/home
 exports.getLatestReviews = async (req, res) => {
   try {
     const [reviews] = await db.query(
-      `SELECT r.*, u.name AS user_name, p.name AS product_name
+      `SELECT r.*, COALESCE(u.name, r.reviewer_name, 'Customer') AS user_name, p.name AS product_name
        FROM reviews r
-       JOIN users u ON r.user_id = u.id
+       LEFT JOIN users u ON r.user_id = u.id
        JOIN products p ON r.product_id = p.id
        ORDER BY r.created_at DESC
        LIMIT 4`

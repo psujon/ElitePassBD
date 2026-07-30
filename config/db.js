@@ -53,6 +53,7 @@ async function createTables() {
       password VARCHAR(255) NOT NULL,
       role ENUM('user', 'admin') DEFAULT 'user',
       whatsapp_number VARCHAR(20) DEFAULT NULL,
+      address TEXT DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `;
@@ -81,10 +82,11 @@ async function createTables() {
       device_options TEXT DEFAULT NULL,
       activation_options TEXT DEFAULT NULL,
       activation_process VARCHAR(50) DEFAULT 'Manual',
-      discount_percent DECIMAL(5, 2) DEFAULT NULL,
+      discount_percent DECIMAL(10, 2) DEFAULT NULL,
       is_hot TINYINT DEFAULT 0,
       is_highlighted TINYINT DEFAULT 0,
       is_hot_discount TINYINT DEFAULT 0,
+      highlighted_text TEXT DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
@@ -182,6 +184,7 @@ async function createTables() {
       product_id INT NOT NULL,
       activation_option VARCHAR(255) DEFAULT NULL,
       package_option VARCHAR(255) DEFAULT NULL,
+      rules TEXT DEFAULT NULL,
       license_key VARCHAR(255) NOT NULL,
       is_used TINYINT DEFAULT 0,
       order_item_id INT DEFAULT NULL,
@@ -348,10 +351,10 @@ async function updateSchema() {
 
     const [discountCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'discount_percent'");
     if (discountCols.length === 0) {
-      await pool.query("ALTER TABLE products ADD COLUMN discount_percent DECIMAL(5, 2) DEFAULT NULL");
+      await pool.query("ALTER TABLE products ADD COLUMN discount_percent DECIMAL(10, 2) DEFAULT NULL");
       console.log("Added column 'discount_percent' to 'products' table.");
     } else {
-      await pool.query("ALTER TABLE products MODIFY COLUMN discount_percent DECIMAL(5, 2) DEFAULT NULL");
+      await pool.query("ALTER TABLE products MODIFY COLUMN discount_percent DECIMAL(10, 2) DEFAULT NULL");
     }
 
     const [isHotCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'is_hot'");
@@ -376,6 +379,83 @@ async function updateSchema() {
     if (isHotDiscountCols.length === 0) {
       await pool.query("ALTER TABLE products ADD COLUMN is_hot_discount TINYINT DEFAULT 0");
       console.log("Added column 'is_hot_discount' to 'products' table.");
+    }
+
+    const [highlightedTextCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'highlighted_text'");
+    if (highlightedTextCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN highlighted_text TEXT DEFAULT NULL");
+      console.log("Added column 'highlighted_text' to 'products' table.");
+    }
+
+    const [addressCols] = await pool.query("SHOW COLUMNS FROM users LIKE 'address'");
+    if (addressCols.length === 0) {
+      await pool.query("ALTER TABLE users ADD COLUMN address TEXT DEFAULT NULL");
+      console.log("Added column 'address' to 'users' table.");
+    }
+
+    const [rulesCols] = await pool.query("SHOW COLUMNS FROM product_licenses LIKE 'rules'");
+    if (rulesCols.length === 0) {
+      await pool.query("ALTER TABLE product_licenses ADD COLUMN rules TEXT DEFAULT NULL");
+      console.log("Added column 'rules' to 'product_licenses' table.");
+    }
+
+    const [usedAtCols] = await pool.query("SHOW COLUMNS FROM product_licenses LIKE 'used_at'");
+    if (usedAtCols.length === 0) {
+      await pool.query("ALTER TABLE product_licenses ADD COLUMN used_at DATETIME DEFAULT NULL");
+      console.log("Added column 'used_at' to 'product_licenses' table.");
+    }
+
+    // Migration for public/guest reviews
+    const [revNameCols] = await pool.query("SHOW COLUMNS FROM reviews LIKE 'reviewer_name'");
+    if (revNameCols.length === 0) {
+      await pool.query("ALTER TABLE reviews ADD COLUMN reviewer_name VARCHAR(255) DEFAULT NULL");
+      console.log("Added column 'reviewer_name' to 'reviews' table.");
+    }
+
+    const [revEmailCols] = await pool.query("SHOW COLUMNS FROM reviews LIKE 'reviewer_email'");
+    if (revEmailCols.length === 0) {
+      await pool.query("ALTER TABLE reviews ADD COLUMN reviewer_email VARCHAR(255) DEFAULT NULL");
+      console.log("Added column 'reviewer_email' to 'reviews' table.");
+    }
+
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS coupons (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          code VARCHAR(50) NOT NULL UNIQUE,
+          discount_type ENUM('percentage', 'fixed') NOT NULL DEFAULT 'percentage',
+          discount_value DECIMAL(10, 2) NOT NULL,
+          min_order_amount DECIMAL(10, 2) DEFAULT 0,
+          max_discount_amount DECIMAL(10, 2) DEFAULT NULL,
+          usage_limit INT DEFAULT NULL,
+          used_count INT DEFAULT 0,
+          is_active TINYINT DEFAULT 1,
+          expires_at DATETIME DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("Coupons table verified/created.");
+    } catch (err) {
+      console.error("Error creating coupons table:", err.message);
+    }
+
+    const [couponCodeCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'coupon_code'");
+    if (couponCodeCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50) DEFAULT NULL");
+      await pool.query("ALTER TABLE orders ADD COLUMN discount_amount DECIMAL(10, 2) DEFAULT 0");
+      console.log("Added coupon_code and discount_amount columns to orders table.");
+    }
+
+    try {
+      await pool.query("ALTER TABLE reviews MODIFY user_id INT DEFAULT NULL");
+    } catch (err) {
+      // Ignore if already nullable
+    }
+
+    try {
+      await pool.query("ALTER TABLE reviews DROP INDEX unique_user_product");
+    } catch (err) {
+      // Ignore if index doesn't exist
     }
   } catch (error) {
     console.error("Error updating database schema:", error.message);

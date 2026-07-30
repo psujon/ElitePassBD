@@ -2,7 +2,7 @@ const db = require('../config/db');
 
 // Create Order (User)
 exports.createOrder = async (req, res) => {
-  const { items, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email } = req.body;
+  const { items, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, coupon_code, discount_amount } = req.body;
   const userId = req.user.id;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -27,10 +27,17 @@ exports.createOrder = async (req, res) => {
 
     // 1. Insert order record
     const [orderResult] = await connection.query(
-      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, client_ip, client_user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [userId, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || null, cleanIp, userAgent]
+      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, client_ip, client_user_agent, coupon_code, discount_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || null, cleanIp, userAgent, coupon_code || null, discount_amount ? parseFloat(discount_amount) : 0]
     );
     const orderId = orderResult.insertId;
+
+    if (coupon_code && coupon_code.trim()) {
+      await connection.query(
+        'UPDATE coupons SET used_count = used_count + 1 WHERE UPPER(code) = ?',
+        [coupon_code.trim().toUpperCase()]
+      );
+    }
 
     // 2. Insert order items & update product stock
     for (const item of items) {
@@ -162,9 +169,10 @@ exports.getMyOrders = async (req, res) => {
       // Fetch associated license keys for each order item
       for (const item of items) {
         const [licenses] = await db.query(
-          'SELECT license_key FROM product_licenses WHERE order_item_id = ?',
+          'SELECT license_key, rules FROM product_licenses WHERE order_item_id = ?',
           [item.id]
         );
+        item.licenses = licenses;
         item.license_keys = licenses.map(l => l.license_key);
       }
 
@@ -212,9 +220,10 @@ exports.trackOrder = async (req, res) => {
     // Fetch associated license keys for each order item
     for (const item of items) {
       const [licenses] = await db.query(
-        'SELECT license_key FROM product_licenses WHERE order_item_id = ?',
+        'SELECT license_key, rules FROM product_licenses WHERE order_item_id = ?',
         [item.id]
       );
+      item.licenses = licenses;
       item.license_keys = licenses.map(l => l.license_key);
     }
 
@@ -252,9 +261,10 @@ exports.getAllOrders = async (req, res) => {
       // Fetch associated license keys for each order item
       for (const item of items) {
         const [licenses] = await db.query(
-          'SELECT license_key FROM product_licenses WHERE order_item_id = ?',
+          'SELECT license_key, rules FROM product_licenses WHERE order_item_id = ?',
           [item.id]
         );
+        item.licenses = licenses;
         item.license_keys = licenses.map(l => l.license_key);
       }
 
@@ -374,6 +384,53 @@ exports.updateOrderStatus = async (req, res) => {
     connection.release();
   }
 };
+
+// Delete Order (Admin)
+exports.deleteOrder = async (req, res) => {
+  const { id } = req.params;
+  const pool = db.getPool();
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [orderCheck] = await connection.query(
+      'SELECT id FROM orders WHERE id = ? FOR UPDATE',
+      [id]
+    );
+
+    if (orderCheck.length === 0) {
+      connection.release();
+      return res.status(404).json({ message: 'Order not found.' });
+    }
+
+    const [orderItems] = await connection.query(
+      'SELECT id FROM order_items WHERE order_id = ?',
+      [id]
+    );
+    
+    if (orderItems.length > 0) {
+      const itemIds = orderItems.map(item => item.id);
+      await connection.query(
+        'UPDATE product_licenses SET is_used = 0, order_item_id = NULL WHERE order_item_id IN (?)',
+        [itemIds]
+      );
+    }
+
+    await connection.query('DELETE FROM order_items WHERE order_id = ?', [id]);
+    await connection.query('DELETE FROM orders WHERE id = ?', [id]);
+
+    await connection.commit();
+    res.json({ message: `Order #${id} deleted successfully!` });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Delete order error:', error);
+    res.status(500).json({ message: error.message || 'Failed to delete order.' });
+  } finally {
+    connection.release();
+  }
+};
+
 
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');

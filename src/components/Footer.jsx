@@ -10,7 +10,8 @@ import {
   Mail,
   ShieldCheck,
   Zap,
-  Headphones
+  Headphones,
+  Phone
 } from 'lucide-react';
 
 export default function Footer() {
@@ -35,7 +36,7 @@ export default function Footer() {
 
   return (
     <footer className="bg-white border-t border-slate-200 px-4 sm:px-6 mt-auto text-slate-800 text-left relative z-30">
-      <div className="max-w-full mx-auto">
+      <div className="w-full max-w-[95%] mx-auto">
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-10">
@@ -164,79 +165,98 @@ export default function Footer() {
 
       </div>
 
-      {/* ================= FLOATING WHATSAPP CHATBOX WIDGET ================= */}
-      {!isProductDetailsPage && (
-        <div className="fixed bottom-18 md:bottom-6 right-6 z-50 flex flex-col items-end">
+      {/* ================= FLOATING WHATSAPP / CALL SUPPORT WIDGET ================= */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
 
-          {/* Chat window bubble */}
-          {isChatOpen && (
-            <div className="mb-3 w-80 bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-2xl animate-fade-in-up text-left">
-              {/* Header */}
-              <div className="bg-emerald-600 text-white p-4 flex justify-between items-center">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-full bg-white/20 border border-white/20 flex items-center justify-center text-white font-extrabold text-sm relative">
-                    EP
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 border-2 border-emerald-600 rounded-full" />
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-black leading-tight">ElitePassBD Support</h5>
-                    <span className="text-[10px] text-emerald-100 font-medium">Replies within minutes</span>
-                  </div>
+        {/* Options Popup Menu matching screenshot */}
+        {isChatOpen && (
+          <div className="mb-4 flex flex-col items-end gap-3.5 animate-fade-in-up">
+            
+            {/* Phone Call Option Pill */}
+            <a
+              href="tel:01925112444"
+              className="w-72 sm:w-80 bg-white/95 backdrop-blur-xl border border-purple-200/90 hover:border-blue-500 p-3 rounded-full shadow-2xl hover:shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-between group text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-500/30 flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform">
+                  <Phone className="w-5 h-5 text-white" />
                 </div>
-                <button
-                  onClick={() => setIsChatOpen(false)}
-                  className="text-white hover:text-emerald-100 hover:scale-105 transition-all cursor-pointer bg-transparent border-none p-1 focus:outline-none"
-                >
-                  <X className="w-4.5 h-4.5" />
-                </button>
-              </div>
-
-              {/* Chat Body */}
-              <div className="p-4 bg-slate-50 min-h-[110px] flex flex-col justify-end text-slate-800">
-                <div className="bg-white border border-slate-150 p-3 rounded-xl rounded-tl-none text-[11px] md:text-xs font-semibold leading-relaxed shadow-xxs max-w-[90%] text-left">
-                  Hello! Welcome to ElitePassBD Support. How can we help you today? Type your query below.
+                <div>
+                  <h5 className="text-sm font-black text-slate-900 leading-tight">ফোন করুন</h5>
+                  <p className="text-xs text-slate-500 font-semibold mt-0.5">সরাসরি কল করুন</p>
                 </div>
               </div>
+              <div className="pr-3 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all font-bold text-sm">
+                →
+              </div>
+            </a>
 
-              {/* Chat Input Footer */}
-              <form onSubmit={handleStartChat} className="p-3 border-t border-slate-200 bg-white flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Type a message..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="flex-grow bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-600 text-slate-800 placeholder-slate-400"
-                />
-                <button
-                  type="submit"
-                  className="w-9 h-9 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center shadow-xs cursor-pointer hover:scale-105 active:scale-95 transition-all shrink-0 border-none"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                </button>
-              </form>
+            {/* WhatsApp Chat Option Pill */}
+            <a
+              href="https://wa.me/8801925112444?text=Hello%20ElitePassBD%20Support,%20I%20need%20assistance."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-72 sm:w-80 bg-white/95 backdrop-blur-xl border border-purple-200/90 hover:border-emerald-500 p-3 rounded-full shadow-2xl hover:shadow-emerald-500/20 transition-all cursor-pointer flex items-center justify-between group text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-emerald-600 shadow-md shadow-emerald-500/30 flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform">
+                  <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.008c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                </div>
+                <div>
+                  <h5 className="text-sm font-black text-slate-900 leading-tight">WhatsApp</h5>
+                  <p className="text-xs text-slate-500 font-semibold mt-0.5">সরাসরি কথা বলুন</p>
+                </div>
+              </div>
+              <div className="pr-3 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all font-bold text-sm">
+                →
+              </div>
+            </a>
+
+            {/* Bottom "Which do you prefer?" Header Pill */}
+            <div className="bg-white/95 backdrop-blur-xl border border-purple-200/90 px-4 py-1.5 rounded-full shadow-lg text-xs font-black text-violet-900 flex items-center gap-2 mr-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+              <span>কোনটি পছন্দ করবেন?</span>
             </div>
+
+          </div>
+        )}
+
+        {/* Floating Button Toggle Container */}
+        <div className="relative group flex items-center justify-center">
+
+          {/* Layer 1 & 2: Glowing Animated Pulsing Rings (When closed) */}
+          {!isChatOpen && (
+            <>
+              <span className="absolute w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-purple-400/40 animate-ping opacity-75"></span>
+              <span className="absolute w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-500 opacity-40 blur-md group-hover:opacity-80 transition-opacity animate-pulse"></span>
+            </>
           )}
 
-          {/* Floating buttons row */}
-          <div className="flex items-center gap-3">
-            {/* Green WhatsApp button */}
-            <button
-              onClick={() => setIsChatOpen(!isChatOpen)}
-              className="w-12 h-12 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer border-none"
-              aria-label="Contact Support on WhatsApp"
-            >
-              {isChatOpen ? (
-                <X className="w-5 h-5 text-white" />
-              ) : (
-                <svg viewBox="0 0 24 24" className="w-6.5 h-6.5 fill-white">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.008c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+          {/* Main Floating Button */}
+          <button
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            className={`relative rounded-full flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer backdrop-blur-md z-10 ${isChatOpen
+              ? 'w-13 h-13 bg-purple-50/90 text-purple-700 border-2 border-purple-200 shadow-purple-500/10'
+              : 'w-13 h-13 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-400 via-indigo-500 to-violet-600 text-white border-2 border-white/50'
+              }`}
+            aria-label="Contact Support Options"
+          >
+            {isChatOpen ? (
+              <X className="w-6 h-6 text-purple-700 stroke-[2.5]" />
+            ) : (
+              <div className="relative flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="w-7 h-7 fill-none stroke-white stroke-[2] drop-shadow-md">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.635m3.365 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h.01m3.365 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-              )}
-            </button>
-          </div>
-
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 border-2 border-white rounded-full shadow-md z-20" />
+              </div>
+            )}
+          </button>
         </div>
-      )}
+
+      </div>
 
     </footer>
   );

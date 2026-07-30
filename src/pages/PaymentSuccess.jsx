@@ -113,7 +113,7 @@ export default function PaymentSuccess() {
               <div className="flex items-start space-x-3">
                 <ShieldCheck className="w-5 h-5 text-violet-600 shrink-0 mt-0.5" />
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  <strong className="text-slate-800">Instant Dispatch</strong>: Your digital keys have been sent to your delivery email address. You can also view them instantly in your dashboard.
+                  <strong className="text-slate-800">Instant Dispatch</strong>: Your digital keys have been sent to your delivery email address. You can also view them instantly in your dashboard. <span className='text-red-500 font-bold'>Note: If no email found, check your spam folder. Sometimes email marked as spam.</span>
                 </p>
               </div>
               <div className="flex items-start space-x-3 pt-3 border-t border-violet-100/50">

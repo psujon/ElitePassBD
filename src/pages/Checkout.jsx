@@ -16,8 +16,11 @@ import {
   DollarSign,
   Mail,
   FileText,
-  Lock
+  Lock,
+  Tag
 } from 'lucide-react';
+
+import { toast } from 'react-hot-toast';
 
 export default function Checkout() {
   const { cartItems, cartTotal, clearCart } = useCart();
@@ -38,12 +41,49 @@ export default function Checkout() {
   const [address, setAddress] = useState(user?.address || '');
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [phone, setPhone] = useState(user?.whatsapp_number || '');
-  const [deliveryEmail, setDeliveryEmail] = useState('');
+  const [deliveryEmail, setDeliveryEmail] = useState(user?.email || '');
   const [guestName, setGuestName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('online_payment');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [orderSuccess, setOrderSuccess] = useState(null);
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+
+  const handleApplyCoupon = async (e) => {
+    e.preventDefault();
+    if (!couponCode.trim()) {
+      toast.error('Please enter a coupon code.');
+      return;
+    }
+    try {
+      setCouponLoading(true);
+      const res = await api.post('/coupons/apply', {
+        code: couponCode.trim(),
+        cartTotal
+      });
+      setAppliedCoupon(res);
+      toast.success(res.message);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to apply coupon.');
+      setAppliedCoupon(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    toast.success('Coupon code removed.');
+  };
+
+  const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0;
+  const grandTotal = Math.max(0, cartTotal - discountAmount);
 
   // Trigger InitiateCheckout event when checkout page loads with cart items
   useEffect(() => {
@@ -108,8 +148,10 @@ export default function Checkout() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!phone || !deliveryEmail) {
-      setError('Please provide phone number, and email for delivery keys.');
+    const effectiveDeliveryEmail = user?.email || deliveryEmail;
+
+    if (!phone || !effectiveDeliveryEmail) {
+      setError('Please provide phone number and email address.');
       return;
     }
 
@@ -131,12 +173,14 @@ export default function Checkout() {
           selected_device: item.selected_device || null,
           selected_activation: item.selected_activation || null
         })),
-        total_amount: cartTotal,
+        total_amount: grandTotal,
         shipping_address: address || "",
         phone: phone,
         payment_method: 'Online Payment',
         additional_notes: additionalNotes,
-        delivery_email: deliveryEmail
+        delivery_email: effectiveDeliveryEmail,
+        coupon_code: appliedCoupon ? appliedCoupon.code : null,
+        discount_amount: discountAmount
       };
 
       let res;
@@ -146,7 +190,7 @@ export default function Checkout() {
         res = await api.post('/orders/guest', {
           ...orderPayload,
           guest_name: guestName,
-          guest_email: deliveryEmail
+          guest_email: effectiveDeliveryEmail
         });
       }
 
@@ -298,9 +342,10 @@ export default function Checkout() {
                 </p>
               </div>
 
-              {user && (
+              {/* Commented out separate delivery email field as requested */}
+              {/* {user && (
                 <div>
-                  <label className="block text-xxs font-bold text-slate-500  tracking-wider mb-1.5">
+                  <label className="block text-xxs font-bold text-slate-500 tracking-wider mb-1.5">
                     Email (For Delivery Keys)
                   </label>
                   <div className="relative">
@@ -318,7 +363,7 @@ export default function Checkout() {
                     Your digital codes / subscription activation keys will be sent to this email address.
                   </p>
                 </div>
-              )}
+              )} */}
 
               <div>
                 <label className="block text-xxs font-bold text-slate-500 tracking-wider mb-1.5">
@@ -399,7 +444,7 @@ export default function Checkout() {
                 ) : (
                   <>
                     <CheckCircle2 className="w-5 h-5" />
-                    <span>Place Order (৳{cartTotal.toFixed(2)})</span>
+                    <span>Place Order (৳{grandTotal.toFixed(2)})</span>
                   </>
                 )}
               </button>
@@ -467,12 +512,60 @@ export default function Checkout() {
                 ))}
               </div>
 
+              {/* Coupon Code Input Box Section */}
+              <div className="pt-2 border-t border-slate-150 space-y-2">
+                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider">
+                  Coupon / Promo Code
+                </label>
+                {appliedCoupon ? (
+                  <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3 flex justify-between items-center text-xs">
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div>
+                        <span className="font-extrabold text-emerald-950 block">{appliedCoupon.code}</span>
+                        <span className="text-[10px] text-emerald-700 font-semibold">Discount: -৳{discountAmount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="text-red-500 hover:text-red-700 text-xs font-bold transition-colors border-none bg-transparent cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      placeholder="Enter promo code (e.g. SAVE10)"
+                      className="flex-1 bg-slate-50 border border-slate-200 focus:border-violet-500 focus:outline-none rounded-xl px-3 py-2 text-xs font-mono uppercase text-slate-800"
+                    />
+                    <button
+                      type="submit"
+                      disabled={couponLoading || !couponCode.trim()}
+                      className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl text-xs transition-all shadow-2xs flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50"
+                    >
+                      {couponLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Apply'}
+                    </button>
+                  </form>
+                )}
+              </div>
+
               {/* Calculations and payment info */}
               <div className="pt-4 border-t border-slate-150 space-y-2.5 text-xs text-slate-500">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span className="text-slate-800 font-bold">৳{cartTotal.toFixed(2)}</span>
                 </div>
+                {appliedCoupon && (
+                  <div className="flex justify-between text-emerald-600 font-bold">
+                    <span>Coupon Discount ({appliedCoupon.code})</span>
+                    <span>-৳{discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Shipping & Handling</span>
                   <span className="text-slate-800 font-bold">৳0.00</span>
@@ -484,8 +577,8 @@ export default function Checkout() {
 
                 <div className="pt-4 border-t border-slate-150 flex justify-between items-end">
                   <span className="text-sm font-bold text-slate-800">Grand Total</span>
-                  <span className="text-xl font-extrabold text-slate-855">
-                    ৳{cartTotal.toFixed(2)}
+                  <span className="text-xl font-extrabold text-violet-700">
+                    ৳{grandTotal.toFixed(2)}
                   </span>
                 </div>
               </div>

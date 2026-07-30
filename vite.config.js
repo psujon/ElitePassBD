@@ -8,6 +8,11 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     define: {
       'process.env.BACKEND_URL': JSON.stringify(env.BACKEND_URL)
+    },
+    server: {
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups'
+      }
     }
   };
 })

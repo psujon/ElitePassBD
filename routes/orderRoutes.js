@@ -12,5 +12,6 @@ router.get('/track/:id', authenticateToken, orderController.trackOrder);
 // Admin specific order routes
 router.get('/', authenticateToken, authorizeAdmin, orderController.getAllOrders);
 router.put('/:id/status', authenticateToken, authorizeAdmin, orderController.updateOrderStatus);
+router.delete('/:id', authenticateToken, authorizeAdmin, orderController.deleteOrder);
 
 module.exports = router;
