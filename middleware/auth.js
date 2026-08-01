@@ -3,7 +3,6 @@ require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_for_elitepass_bd';
 
-// Middleware to authenticate any logged-in user
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Format: Bearer TOKEN
@@ -21,7 +20,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Middleware to optionally attach user if token exists
 const optionalAuth = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -38,7 +36,6 @@ const optionalAuth = (req, res, next) => {
   });
 };
 
-// Middleware to restrict access to Admins only
 const authorizeAdmin = (req, res, next) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Access denied. Administrator privileges required.' });

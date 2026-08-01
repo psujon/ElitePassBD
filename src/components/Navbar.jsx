@@ -19,7 +19,6 @@ export default function Navbar({ onCartClick }) {
   const [isMobileCategoriesOpen, setIsMobileCategoriesOpen] = useState(false);
   const dropdownTimeoutRef = useRef(null);
 
-  // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchProducts, setSearchProducts] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -27,7 +26,6 @@ export default function Navbar({ onCartClick }) {
   const mobileSearchRef = useRef(null);
   const desktopSearchRef = useRef(null);
 
-  // Currency Dropdown State
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('BDT');
 
@@ -115,11 +113,9 @@ export default function Navbar({ onCartClick }) {
 
   return (
     <header className="w-full relative z-40 text-left">
-      {/* ================= TOP ANNOUNCEMENT BAR (SHAHEDSTORE STYLE) ================= */}
       <div className="bg-slate-50/95 border-b border-slate-200/60 py-1.5 text-[11px] font-semibold text-slate-600 select-none">
         <div className="w-full max-w-[95%] mx-auto px-4 sm:px-6 flex items-center justify-between gap-4 overflow-x-auto whitespace-nowrap scrollbar-none">
 
-          {/* Left Side: Contact Phone & Email Pills */}
           <div className="flex items-center gap-2 shrink-0">
             <a
               href="tel:01925112444"
@@ -138,7 +134,6 @@ export default function Navbar({ onCartClick }) {
             </a>
           </div>
 
-          {/* Center Moving Ticker / Running Notice Text */}
           <div className="flex-1 overflow-hidden mx-2 sm:mx-4 relative flex items-center h-6">
             <div className="animate-topbar-marquee flex items-center gap-10 text-xs font-bold text-slate-700">
               <div className="flex items-center gap-2">
@@ -152,7 +147,6 @@ export default function Navbar({ onCartClick }) {
                 <span>⭐ Trusted by 5,000+ Happy Customers in Bangladesh</span>
               </div>
 
-              {/* Seamless Duplicate Set for Loop */}
               <div className="flex items-center gap-2">
                 <span className="bg-purple-100/90 text-purple-700 font-extrabold text-[10px] px-2 py-0.5 rounded-full">বিশেষ অফার</span>
                 <span className="text-violet-700 font-extrabold">সব অর্ডারে ফ্রি ইনস্ট্যান্ট ডেলিভারি — সর্বোচ্চ ৭০% পর্যন্ত ছাড় পান</span>
@@ -166,22 +160,18 @@ export default function Navbar({ onCartClick }) {
             </div>
           </div>
 
-          {/* Right Side: Trust Badges & Social Icons */}
           <div className="flex items-center gap-2.5 shrink-0">
 
-            {/* Rating Badge */}
             <div className="flex items-center gap-1 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full text-amber-800 font-extrabold text-[10px] shadow-2xs">
               <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
               <span>4.9</span>
             </div>
 
-            {/* Secured Badge */}
             <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full text-emerald-800 font-extrabold text-[10px] shadow-2xs">
               <ShieldCheck className="w-3 h-3 text-emerald-600" />
               <span>Secured</span>
             </div>
 
-            {/* Social Icon Pills */}
             <div className="flex items-center gap-1 ml-1">
               <a
                 href="https://facebook.com"
@@ -217,19 +207,14 @@ export default function Navbar({ onCartClick }) {
         </div>
       </div>
 
-      {/* ================= MAIN NAVBAR ================= */}
       <nav className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-xl border-b border-slate-200/90 shadow-sm transition-all duration-300">
-        {/* Aligned Container Content */}
         <div className="w-full max-w-[95%] mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-2 md:gap-4">
 
-          {/* LEFT SECTION: Logo Badge + Brand Text */}
           <Link to="/" className="flex items-center space-x-2.5 shrink-0 group">
-            {/* Left Side Logo Icon Badge */}
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white border border-slate-200/90 shadow-2xs p-1 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
               <img src={logo} alt="ElitePass BD Icon" className="w-full h-full object-contain" />
             </div>
 
-            {/* Right Side Brand Text matching logo colors (#005F4B & #FF6D00) */}
             <div className="flex flex-col text-left">
               <div className="text-base xs:text-lg sm:text-xl font-black tracking-tight leading-none flex items-center gap-1">
                 <span className="text-[#005F4B]">ELITE</span>
@@ -241,7 +226,6 @@ export default function Navbar({ onCartClick }) {
             </div>
           </Link>
 
-          {/* MIDDLE SECTION: Search Bar (Desktop) */}
           <div ref={desktopSearchRef} className="relative hidden xl:block w-72 lg:w-80">
             <div className="relative">
               <input
@@ -258,7 +242,6 @@ export default function Navbar({ onCartClick }) {
               </kbd>
             </div>
 
-            {/* Search Dropdown Results */}
             {showSearchResults && searchQuery && (
               <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl py-2 z-50 max-h-80 overflow-y-auto animate-fade-in text-left">
                 {isSearching ? (
@@ -306,7 +289,6 @@ export default function Navbar({ onCartClick }) {
             )}
           </div>
 
-          {/* MIDDLE SECTION: Navigation Links */}
           <div className="hidden md:flex items-center space-x-1.5">
             <Link
               to="/"
@@ -318,7 +300,6 @@ export default function Navbar({ onCartClick }) {
               Home
             </Link>
 
-            {/* Products Dropdown Pill */}
             <div
               className="relative"
               onMouseEnter={handleMouseEnter}
@@ -376,10 +357,8 @@ export default function Navbar({ onCartClick }) {
             </Link>
           </div>
 
-          {/* RIGHT SECTION: User Account & Currency & Cart */}
           <div className="flex items-center space-x-1.5 sm:space-x-2">
 
-            {/* User Account / Login Pill */}
             {user ? (
               <div className="flex items-center space-x-1.5">
                 {isAdmin && (
@@ -419,7 +398,6 @@ export default function Navbar({ onCartClick }) {
               </Link>
             )}
 
-            {/* Currency Dropdown Pill Badge */}
             <div className="relative hidden sm:block">
               <button
                 onClick={() => setIsCurrencyOpen(!isCurrencyOpen)}
@@ -433,7 +411,6 @@ export default function Navbar({ onCartClick }) {
               </button>
             </div>
 
-            {/* Cart Button Pill */}
             <button
               onClick={onCartClick}
               className="bg-gradient-to-r from-[#005F4B]/90 via-[#005F4B] to-[#FF6D00] hover:from-[#005F4B] hover:to-[#FF6D00] text-white font-extrabold px-3.5 py-1.5 sm:px-4 sm:py-1.5 rounded-full text-xs flex items-center space-x-1.5 shadow-md shadow-[#005F4B]/20 backdrop-blur-md border border-white/20 transition-all active:scale-95 cursor-pointer shrink-0"
@@ -448,7 +425,6 @@ export default function Navbar({ onCartClick }) {
               )}
             </button>
 
-            {/* Mobile Hamburger Menu Toggle */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="md:hidden p-1.5 text-slate-700 hover:bg-slate-100 rounded-full transition-colors cursor-pointer ml-1"
@@ -460,10 +436,8 @@ export default function Navbar({ onCartClick }) {
           </div>
         </div>
 
-        {/* MOBILE MENU DROPDOWN */}
         {isMobileMenuOpen && (
           <div className="md:hidden mt-2 bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-4 shadow-xl text-left animate-fade-in space-y-3">
-            {/* Mobile Search */}
             <div ref={mobileSearchRef} className="relative w-full">
               <input
                 type="text"
@@ -476,7 +450,6 @@ export default function Navbar({ onCartClick }) {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             </div>
 
-            {/* Mobile Navigation Links */}
             <div className="space-y-1 pt-1">
               <Link
                 to="/"

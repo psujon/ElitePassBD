@@ -14,7 +14,6 @@ export default function PaymentSuccess() {
     if (orderId && pixelParam && !trackedRef.current) {
       trackedRef.current = true;
       try {
-        // Safely decode Base64 JSON supporting UTF-8 (Bengali names, etc.)
         let decodedJson;
         if (typeof TextDecoder !== 'undefined') {
           decodedJson = new TextDecoder().decode(
@@ -26,7 +25,6 @@ export default function PaymentSuccess() {
 
         const pixelData = JSON.parse(decodedJson);
 
-        // Fire browser-side purchase event (skip CAPI tracking since it's already fired from backend)
         trackEvent(
           'Purchase',
           {
@@ -45,7 +43,6 @@ export default function PaymentSuccess() {
           true // skipServer = true
         );
 
-        // Trigger GA4 purchase event
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({ 'ecommerce': null });
         window.dataLayer.push({
@@ -69,10 +66,8 @@ export default function PaymentSuccess() {
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] py-20 flex flex-col justify-center items-center text-left animate-fade-in">
       <div className="max-w-md w-full mx-auto px-4">
         <div className="bg-white border border-slate-250/80 rounded-3xl p-8 text-center shadow-lg relative overflow-hidden">
-          {/* Decorative Top Accent */}
           <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-500"></div>
 
-          {/* Success Icon */}
           <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-emerald-50 text-emerald-600 mb-6 shadow-sm border border-emerald-100/50 animate-bounce">
             <CheckCircle2 className="h-12 w-12" />
           </div>
@@ -84,7 +79,6 @@ export default function PaymentSuccess() {
             Your transaction was processed successfully. Thank you for your purchase with ElitePass BD.
           </p>
 
-          {/* Order Details Badge */}
           {orderId && (
             <div className="my-6 p-4 bg-slate-50 border border-slate-200/60 rounded-2xl inline-flex flex-col items-center justify-center min-w-[200px]">
               <span className="text-xxs font-extrabold text-slate-400 uppercase tracking-wider">Order Reference</span>
@@ -92,7 +86,6 @@ export default function PaymentSuccess() {
             </div>
           )}
 
-          {/* Instructions Box */}
           {activationType === 'manual' ? (
             <div className="bg-amber-50/40 border border-amber-100/60 rounded-2xl p-5 mb-8 text-left space-y-3.5">
               <div className="flex items-start space-x-3">
@@ -125,7 +118,6 @@ export default function PaymentSuccess() {
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="space-y-3">
             <Link
               to="/dashboard"

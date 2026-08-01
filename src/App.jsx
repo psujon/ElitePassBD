@@ -3,18 +3,15 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { Toaster } from 'react-hot-toast';
 import { initPixel } from './utils/fbPixel';
 
-// Context Providers
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { ThemeProvider } from './context/ThemeContext';
 
-// Components
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import CartDrawer from './components/CartDrawer';
 import MobileBottomNav from './components/MobileBottomNav';
 
-// Pages
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -33,7 +30,6 @@ import PaymentFail from './pages/PaymentFail';
 import PaymentCancel from './pages/PaymentCancel';
 
 
-// Protected Route Guard (For Logged in Users)
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -41,7 +37,6 @@ const ProtectedRoute = ({ children }) => {
   return user ? children : <Navigate to="/login" replace state={{ from: location }} />;
 };
 
-// Admin Route Guard (For Administrators Only)
 const AdminRoute = ({ children }) => {
   const { user, isAdmin, loading } = useAuth();
   if (loading) return null;
@@ -52,9 +47,6 @@ function AppContent() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { pathname } = useLocation();
 
-  // useEffect(() => {
-  //   initPixel();
-  // }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -62,13 +54,10 @@ function AppContent() {
 
   return (
     <div className="flex flex-col min-h-screen w-full pb-16 md:pb-0">
-      {/* Global Navbar */}
       <Navbar onCartClick={() => setIsCartOpen(true)} />
 
-      {/* Main Container (95% Width Layout) */}
       <main className="flex-grow w-full max-w-[95%] mx-auto px-2 sm:px-4">
         <Routes>
-          {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -81,7 +70,6 @@ function AppContent() {
           <Route path="/products" element={<Products />} />
 
 
-          {/* User Dashboard & Order Tracking */}
           <Route
             path="/dashboard"
             element={
@@ -91,15 +79,12 @@ function AppContent() {
             }
           />
 
-          {/* Checkout Page */}
           <Route path="/checkout" element={<Checkout />} />
 
-          {/* Payment Gateway Callbacks */}
           <Route path="/payment/success" element={<PaymentSuccess />} />
           <Route path="/payment/fail" element={<PaymentFail />} />
           <Route path="/payment/cancel" element={<PaymentCancel />} />
 
-          {/* Admin Product CRUD & Order Updates */}
           <Route
             path="/admin"
             element={
@@ -109,18 +94,14 @@ function AppContent() {
             }
           />
 
-          {/* Wildcard Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
-      {/* Shopping Cart Slider */}
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
 
-      {/* Global Footer */}
       <Footer />
 
-      {/* Mobile Bottom Navigation */}
       <MobileBottomNav onCartClick={() => setIsCartOpen(true)} />
     </div>
   );

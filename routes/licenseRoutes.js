@@ -3,7 +3,6 @@ const router = express.Router();
 const licenseController = require('../controllers/licenseController');
 const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 
-// Require authentication and admin role for all license endpoints
 router.use(authenticateToken);
 router.use(authorizeAdmin);
 

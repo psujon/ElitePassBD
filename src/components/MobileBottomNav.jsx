@@ -51,7 +51,6 @@ export default function MobileBottomNav({ onCartClick }) {
         {navItems.map((item, index) => {
           const Icon = item.icon;
           
-          // Determine if active
           const isActive = item.isButton 
             ? false 
             : (item.to === '/' ? currentPath === '/' : currentPath.startsWith(item.to));

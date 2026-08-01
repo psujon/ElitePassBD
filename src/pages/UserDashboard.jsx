@@ -11,11 +11,9 @@ export default function UserDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // Selected order for full tracking detail
   const [trackingOrder, setTrackingOrder] = useState(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
 
-  // Review Modal State
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewProductId, setReviewProductId] = useState(null);
   const [reviewProductName, setReviewProductName] = useState('');
@@ -25,7 +23,6 @@ export default function UserDashboard() {
   const [reviewError, setReviewError] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState('');
 
-  // Support Tickets State
   const [tickets, setTickets] = useState([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -49,7 +46,6 @@ export default function UserDashboard() {
       const data = await api.get('/orders/my-orders');
       setOrders(data);
       if (data.length > 0) {
-        // Auto-select the first/latest order for tracking display
         handleTrackOrder(data[0].id);
       }
     } catch (err) {
@@ -97,14 +93,12 @@ export default function UserDashboard() {
       setNewTicketSuccess('Support ticket submitted successfully!');
       setNewTicketForm({ subject: '', message: '' });
       
-      // Refresh tickets list
       const data = await api.get('/tickets/my-tickets');
       setTickets(data);
       if (data.length > 0) {
         setSelectedTicket(data[0]);
       }
       
-      // Return to tickets list details after a delay
       setTimeout(() => {
         setNewTicketSuccess('');
         setShowNewTicketForm(false);
@@ -141,7 +135,6 @@ export default function UserDashboard() {
     setShowReviewModal(true);
 
     try {
-      // Check if user has already reviewed this product to pre-populate form
       const data = await api.get(`/products/${productId}/my-review`);
       if (data) {
         setReviewRating(data.rating);
@@ -191,7 +184,6 @@ export default function UserDashboard() {
     }
   };
 
-  // Helper to determine status step number
   const getStatusStep = (status) => {
     switch (status) {
       case 'Pending': return 1;
@@ -208,9 +200,7 @@ export default function UserDashboard() {
   return (
     <div className="w-full min-h-[calc(100vh-64px)] flex flex-col md:flex-row bg-[#f5f7fa] text-slate-800">
       
-      {/* Left Side: Navigation Sidebar */}
       <div className="w-full md:w-64 bg-[#111e35] text-slate-300 p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-850">
-        {/* Logo and brand name */}
         <div className="flex items-center space-x-2.5 px-2 mb-6 text-left">
           <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
             E
@@ -224,7 +214,6 @@ export default function UserDashboard() {
           </span>
         </div>
 
-        {/* Navigation Sidebar List */}
         <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible gap-1 pb-2 md:pb-0 scrollbar-none snap-x md:space-y-1">
           <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-4 text-left">
             General
@@ -271,10 +260,8 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      {/* Right Side Content Panel */}
       <div className="flex-1 bg-[#f5f7fa] p-6 sm:p-8 overflow-y-auto space-y-6 min-w-0">
         
-        {/* Header Row */}
         <div className="flex justify-between items-center border-b border-slate-200/60 pb-5 shrink-0">
           <div className="text-left">
             <h1 className="text-2xl font-extrabold text-slate-850 tracking-tight">
@@ -285,7 +272,6 @@ export default function UserDashboard() {
             </p>
           </div>
           
-          {/* User Profile Info on Right */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2.5 bg-white border border-slate-200/60 px-3 py-1.5 rounded-xl shadow-xs">
               <div className="w-7 h-7 rounded-full bg-violet-650 flex items-center justify-center text-white font-extrabold text-xs uppercase shadow-sm">
@@ -299,9 +285,7 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* Row of 3 Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Total Spend */}
           <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
             <div className="flex justify-between items-start">
               <div>
@@ -322,7 +306,6 @@ export default function UserDashboard() {
             </button>
           </div>
 
-          {/* Card 2: Orders Count */}
           <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
             <div className="flex justify-between items-start">
               <div>
@@ -341,7 +324,6 @@ export default function UserDashboard() {
             </button>
           </div>
 
-          {/* Card 3: Support Tickets */}
           <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
             <div className="flex justify-between items-start">
               <div>
@@ -361,11 +343,9 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* Tab Content Areas */}
         {activeTab === 'orders' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in text-left">
             
-            {/* Left Column: Purchase History */}
             <div className="lg:col-span-1 space-y-4">
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700">Order History</h3>
 
@@ -428,7 +408,6 @@ export default function UserDashboard() {
               )}
             </div>
 
-            {/* Right Column: Live Track Status */}
             <div className="lg:col-span-2">
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700 mb-4">Live Track Status</h3>
 
@@ -443,7 +422,6 @@ export default function UserDashboard() {
                 </div>
               ) : (
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-6 space-y-6 shadow-xs">
-                  {/* Top details card */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-150 pb-4 gap-2">
                     <div className="text-left">
                       <h4 className="text-base font-extrabold text-slate-800">Tracking Order #{trackingOrder.id}</h4>
@@ -455,7 +433,6 @@ export default function UserDashboard() {
                     </div>
                   </div>
 
-                  {/* Step-by-step progress visualizer */}
                   {trackingOrder.status === 'Cancelled' ? (
                     <div className="p-5 bg-red-50 border border-red-150 rounded-xl text-center space-y-2.5">
                       <p className="text-sm font-extrabold text-red-650">This order has been Cancelled.</p>
@@ -469,7 +446,6 @@ export default function UserDashboard() {
                   ) : (
                     <div className="py-6 px-2">
                       <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 sm:gap-2">
-                        {/* Horizontal Line connector (desktop only) */}
                         <div className="absolute top-4 left-[12%] right-[12%] h-0.5 bg-slate-200 -z-10 hidden sm:block">
                           <div 
                             className="h-full bg-violet-600 transition-all duration-700" 
@@ -477,7 +453,6 @@ export default function UserDashboard() {
                           />
                         </div>
 
-                        {/* Step 1: Pending */}
                         <div className="flex sm:flex-col items-center gap-3 sm:gap-2 text-left sm:text-center w-full sm:w-1/4">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
                             currentStep >= 1 ? 'bg-violet-600 text-white shadow-md shadow-violet-500/20' : 'bg-slate-100 text-slate-400 border border-slate-200'
@@ -490,7 +465,6 @@ export default function UserDashboard() {
                           </div>
                         </div>
 
-                        {/* Step 2: Processing */}
                         <div className="flex sm:flex-col items-center gap-3 sm:gap-2 text-left sm:text-center w-full sm:w-1/4">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
                             currentStep >= 2 ? 'bg-violet-600 text-white shadow-md shadow-violet-500/20' : 'bg-slate-100 text-slate-400 border border-slate-200'
@@ -503,7 +477,6 @@ export default function UserDashboard() {
                           </div>
                         </div>
 
-                        {/* Step 3: Shipped */}
                         <div className="flex sm:flex-col items-center gap-3 sm:gap-2 text-left sm:text-center w-full sm:w-1/4">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
                             currentStep >= 3 ? 'bg-violet-600 text-white shadow-md shadow-violet-500/20' : 'bg-slate-100 text-slate-400 border border-slate-200'
@@ -516,7 +489,6 @@ export default function UserDashboard() {
                           </div>
                         </div>
 
-                        {/* Step 4: Delivered */}
                         <div className="flex sm:flex-col items-center gap-3 sm:gap-2 text-left sm:text-center w-full sm:w-1/4">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
                             currentStep >= 4 ? 'bg-violet-600 text-white shadow-md shadow-violet-500/20' : 'bg-slate-100 text-slate-400 border border-slate-200'
@@ -532,7 +504,6 @@ export default function UserDashboard() {
                     </div>
                   )}
 
-                  {/* Items Summary list */}
                   <div className="border-t border-slate-150 pt-5">
                     <h5 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Ordered Items</h5>
                     <div className="space-y-2">
@@ -541,7 +512,6 @@ export default function UserDashboard() {
                           <div className="min-w-0 flex-1 text-left">
                             <p className="font-bold text-slate-800 truncate">{item.product_name}</p>
                             
-                            {/* Selected Options display */}
                             {(item.package_name || item.selected_device || item.selected_activation) && (
                               <div className="text-[10px] text-slate-500 mt-1 space-y-1 flex flex-col leading-relaxed">
                                 <div className="space-x-1.5 flex flex-wrap gap-y-1">
@@ -604,7 +574,6 @@ export default function UserDashboard() {
                     </div>
                   </div>
 
-                  {/* Shipping address & phone */}
                   <div className="border-t border-slate-150 pt-5 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-2 text-left">
                       <span className="text-xxs font-bold text-slate-450 uppercase block tracking-wider">Delivery Details</span>
@@ -635,7 +604,6 @@ export default function UserDashboard() {
 
         {activeTab === 'tickets' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in text-left">
-            {/* Left Column: Support Tickets History */}
             <div className="lg:col-span-1 space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700">Ticket History</h3>
@@ -707,7 +675,6 @@ export default function UserDashboard() {
               )}
             </div>
 
-            {/* Right Column: Support Ticket Detail / Creator */}
             <div className="lg:col-span-2">
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700 mb-4">
                 {showNewTicketForm ? 'Submit Query' : 'Ticket Visualizer'}
@@ -787,7 +754,6 @@ export default function UserDashboard() {
                 </div>
               ) : selectedTicket ? (
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-6 space-y-6 shadow-xs text-left">
-                  {/* Header */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-150 pb-4 gap-2">
                     <div className="text-left">
                       <h4 className="text-base font-extrabold text-slate-800">Ticket #T{selectedTicket.id}</h4>
@@ -804,7 +770,6 @@ export default function UserDashboard() {
                     </div>
                   </div>
 
-                  {/* Subject & Message */}
                   <div className="space-y-1 text-left">
                     <span className="text-xxs font-bold text-slate-450 uppercase block tracking-wider">Subject</span>
                     <h5 className="text-sm font-extrabold text-slate-800 leading-relaxed">{selectedTicket.subject}</h5>
@@ -817,7 +782,6 @@ export default function UserDashboard() {
                     </div>
                   </div>
 
-                  {/* Admin Remarks */}
                   <div className="border-t border-slate-150 pt-5 space-y-2.5 text-left">
                     <span className="text-xxs font-bold text-slate-450 uppercase block tracking-wider">Resolution Status & Remarks</span>
                     {selectedTicket.remarks ? (
@@ -844,7 +808,6 @@ export default function UserDashboard() {
         )}
       </div>
 
-      {/* REVIEW SUBMISSION MODAL */}
       {showReviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs animate-fade-in" onClick={handleCloseReviewModal} />
@@ -873,7 +836,6 @@ export default function UserDashboard() {
             )}
 
             <form onSubmit={handleSubmitReview} className="space-y-4">
-              {/* Star Rating Picker */}
               <div>
                 <label className="block text-xxs font-bold text-slate-455 uppercase tracking-wider mb-2">Rating</label>
                 <div className="flex space-x-2">
@@ -896,7 +858,6 @@ export default function UserDashboard() {
                 </div>
               </div>
 
-              {/* Review Text Area */}
               <div>
                 <label className="block text-xxs font-bold text-slate-455 uppercase tracking-wider mb-2">Your Review</label>
                 <textarea

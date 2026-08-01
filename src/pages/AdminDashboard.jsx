@@ -15,7 +15,6 @@ const parseJSON = (str, fallback) => {
   }
 };
 
-// Jodit Editor configuration
 const joditConfig = {
   readonly: false,
   height: 300,
@@ -42,7 +41,6 @@ export default function AdminDashboard() {
   const { theme, updateTheme, selectPreset, THEME_PRESETS } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'products', 'orders', 'tickets', 'categories', 'backup', 'licenses', 'theme_settings'
 
-  // Data lists
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [tickets, setTickets] = useState([]);
@@ -62,7 +60,6 @@ export default function AdminDashboard() {
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Modal State for Product Create/Edit
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null); // null means adding new
   const [productForm, setProductForm] = useState({
@@ -96,7 +93,6 @@ export default function AdminDashboard() {
   const [formError, setFormError] = useState('');
   const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // Modal State for License Keys
   const [showLicenseModal, setShowLicenseModal] = useState(false);
   const [editingLicense, setEditingLicense] = useState(null);
   const [licenseForm, setLicenseForm] = useState({
@@ -113,13 +109,11 @@ export default function AdminDashboard() {
   const [licenseProductSearch, setLicenseProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
 
-  // Modal State for Order Cancellation
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
   const [cancelRemarks, setCancelRemarks] = useState('');
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
-  // Modal State for Tickets / Admin
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [activeTicket, setActiveTicket] = useState(null);
   const [ticketForm, setTicketForm] = useState({
@@ -128,7 +122,6 @@ export default function AdminDashboard() {
   });
   const [ticketSubmitting, setTicketSubmitting] = useState(false);
 
-  // Modal State for Coupons
   const [coupons, setCoupons] = useState([]);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [couponForm, setCouponForm] = useState({
@@ -248,7 +241,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Compute stats metrics
   const totalSales = orders
     .filter(o => o.payment_status === 'Paid')
     .reduce((sum, o) => sum + parseFloat(o.total_amount), 0);
@@ -261,7 +253,6 @@ export default function AdminDashboard() {
   const completedOrdersCount = orders.filter(o => o.status === 'Delivered').length;
   const cancelledOrdersCount = orders.filter(o => o.status === 'Cancelled').length;
 
-  // PRODUCT CRUD HANDLERS
   const handleOpenProductModal = (product = null) => {
     if (product) {
       setEditingProduct(product);
@@ -340,11 +331,9 @@ export default function AdminDashboard() {
 
     try {
       if (editingProduct) {
-        // Edit existing product
         await api.put(`/products/${editingProduct.id}`, submissionData);
         toast.success('Product updated successfully!');
       } else {
-        // Create new product
         await api.post('/products', submissionData);
         toast.success('Product created successfully!');
       }
@@ -370,7 +359,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // CATEGORY CRUD HANDLERS
   const handleOpenCategoryModal = (category = null) => {
     if (category) {
       setEditingCategory(category);
@@ -401,11 +389,9 @@ export default function AdminDashboard() {
 
     try {
       if (editingCategory) {
-        // Edit existing category
         await api.put(`/products/categories/${editingCategory.id}`, categoryForm);
         toast.success('Category updated successfully!');
       } else {
-        // Create new category
         await api.post('/products/categories', categoryForm);
         toast.success('Category created successfully!');
       }
@@ -431,7 +417,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ORDER STATUS CHANGE HANDLER
   const handleStatusChange = async (orderId, newStatus) => {
     if (newStatus === 'Cancelled') {
       setCancellingOrderId(orderId);
@@ -486,7 +471,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // TICKET ACTION HANDLERS
   const handleOpenTicketModal = (ticket) => {
     setActiveTicket(ticket);
     setTicketForm({
@@ -591,7 +575,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // LICENSE KEY HANDLERS
   const handleOpenLicenseModal = () => {
     setEditingLicense(null);
     setLicenseForm({
@@ -674,7 +657,6 @@ export default function AdminDashboard() {
     );
   });
 
-  // Pagination calculation
   const itemsPerPage = 10;
   const totalProductPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const activePage = Math.min(currentPage, totalProductPages || 1);
@@ -683,7 +665,6 @@ export default function AdminDashboard() {
     activePage * itemsPerPage
   );
 
-  // License calculations
   const filteredLicenses = licenses.filter((lic) => {
     if (!licenseSearchQuery) return true;
     const query = licenseSearchQuery.toLowerCase();
@@ -735,9 +716,7 @@ export default function AdminDashboard() {
   return (
     <div className="w-full min-h-[calc(100vh-64px)] flex flex-col md:flex-row bg-[#f5f7fa] text-slate-800">
 
-      {/* Left Side: Navigation Sidebar */}
       <div className="w-full md:w-64 bg-[#111e35] text-slate-300 p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-800">
-        {/* Logo and brand name */}
         <div className="flex items-center space-x-2.5 px-2 mb-6 text-left">
           <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
             E
@@ -751,7 +730,6 @@ export default function AdminDashboard() {
           </span>
         </div>
 
-        {/* Navigation Sidebar List */}
         <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible gap-1 pb-2 md:pb-0 scrollbar-none snap-x md:space-y-1">
           <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-4 text-left">
             General
@@ -898,24 +876,18 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Right Side Content Panel */}
       <div className="flex-1 bg-[#f5f7fa] p-6 sm:p-8 overflow-y-auto space-y-6 min-w-0">
 
-        {/* Header Row */}
         <div className="flex justify-between items-center border-b border-slate-200/60 pb-2 shrink-0">
           <div className="text-left">
             <h1 className="text-2xl font-extrabold text-slate-850 tracking-tight">Dashboard</h1>
           </div>
         </div>
 
-        {/* Tab Panel Content */}
         <div className="space-y-6">
-          {/* DASHBOARD OVERVIEW TAB */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6 animate-fade-in text-left">
-              {/* Row of 3 Stat Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Card 1: Revenue */}
                 <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
                   <div className="flex justify-between items-start">
                     <div>
@@ -934,7 +906,6 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
-                {/* Card 2: Orders */}
                 <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
                   <div className="flex justify-between items-start">
                     <div>
@@ -953,7 +924,6 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
-                {/* Card 3: Products */}
                 <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
                   <div className="flex justify-between items-start">
                     <div>
@@ -973,9 +943,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Quick Actions & Recent Activity Grid */}
               <div className="grid grid-cols-1 gap-6">
-                {/* Recent Orders Section */}
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
                   <div className="flex justify-between items-center mb-4">
                     <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">Recent Customer Orders</h4>
@@ -1059,7 +1027,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Recent Support Tickets Section */}
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
                   <div className="flex justify-between items-center mb-4">
                     <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">Recent Support Tickets</h4>
@@ -1111,7 +1078,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* PRODUCTS TAB */}
           {activeTab === 'products' && (
             <div className="space-y-4 animate-fade-in text-left">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
@@ -1142,7 +1108,6 @@ export default function AdminDashboard() {
                   <table className="w-full text-left text-xs border-collapse table-auto">
                     <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xxs tracking-wider border-b border-slate-200/60">
                       <tr>
-                        {/* <th className="pl-4 pr-2 py-3 whitespace-nowrap">ID</th> */}
                         <th className="px-2 py-3 whitespace-nowrap">Item Details</th>
                         <th className="px-2 py-3 whitespace-nowrap">Category</th>
                         <th className="px-2 py-3 whitespace-nowrap">Description</th>
@@ -1167,10 +1132,7 @@ export default function AdminDashboard() {
                       ) : (
                         displayedProducts.map((prod) => (
                           <tr key={prod.id} className="hover:bg-slate-50/40 transition-colors border-b border-slate-100 text-slate-700 font-medium text-xs">
-                            {/* 1. ID */}
-                            {/* <td className="pl-4 pr-2 py-3 font-bold text-slate-800 whitespace-nowrap">{prod.id}</td> */}
 
-                            {/* 2. Item Details (Image & Name) */}
                             <td className="px-2 py-3">
                               <div className="flex items-center space-x-2 shrink-0">
                                 {prod.image_url ? (
@@ -1197,7 +1159,6 @@ export default function AdminDashboard() {
                               </div>
                             </td>
 
-                            {/* 3. Category */}
                             <td className="px-2 py-3 whitespace-nowrap">
                               {prod.category_name ? (
                                 <span className="bg-violet-50 text-violet-600 border border-violet-100/60 px-2 py-0.5 rounded-lg text-[10px] font-bold wrap-break-word">{prod.category_name}</span>
@@ -1206,15 +1167,12 @@ export default function AdminDashboard() {
                               )}
                             </td>
 
-                            {/* 4. Description */}
                             <td className="px-2 py-3 max-w-[130px] whitespace-normal break-words line-clamp-2 text-slate-500 text-[11px]" title={prod.description ? prod.description.replace(/<[^>]*>?/gm, '') : ''}>
                               {prod.description ? prod.description.replace(/<[^>]*>?/gm, '') : ''}
                             </td>
 
-                            {/* 5. Price */}
                             <td className="px-2 py-3 font-bold text-slate-850 whitespace-nowrap">৳{parseFloat(prod.price).toFixed(2)}</td>
 
-                            {/* 6. Stock */}
                             <td className="px-2 py-3 whitespace-nowrap">
                               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${prod.stock === 0 ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-slate-100 text-slate-700'
                                 }`}>
@@ -1222,7 +1180,6 @@ export default function AdminDashboard() {
                               </span>
                             </td>
 
-                            {/* 7. Tags */}
                             <td className="px-2 py-3">
                               {prod.tags ? (
                                 <div className="flex flex-wrap gap-1 max-w-[100px]">
@@ -1235,7 +1192,6 @@ export default function AdminDashboard() {
                               )}
                             </td>
 
-                            {/* 8. Devices */}
                             <td className="px-2 py-3">
                               {prod.device_options ? (
                                 <div className="flex flex-wrap gap-1 max-w-[100px]">
@@ -1248,7 +1204,6 @@ export default function AdminDashboard() {
                               )}
                             </td>
 
-                            {/* 9. Activation */}
                             <td className="px-2 py-3">
                               <div className="flex flex-col gap-1.5 text-left">
                                 {prod.activation_options ? (
@@ -1271,12 +1226,10 @@ export default function AdminDashboard() {
                               </div>
                             </td>
 
-                            {/* 10. Additional Info */}
                             <td className="px-2 py-3 max-w-[110px] whitespace-normal break-words line-clamp-2 text-slate-500 text-[11px]" title={prod.additional_info}>
                               {prod.additional_info || <span className="text-slate-450 italic">-</span>}
                             </td>
 
-                            {/* 11. Packages */}
                             <td className="px-2 py-3">
                               {prod.packages && prod.packages.length > 0 ? (
                                 <div className="space-y-1 max-w-[100px] whitespace-normal">
@@ -1299,7 +1252,6 @@ export default function AdminDashboard() {
                               )}
                             </td>
 
-                            {/* 12. FAQs */}
                             <td className="px-2 py-3 whitespace-nowrap">
                               {prod.faqs && prod.faqs.length > 0 ? (
                                 <span className="text-[10px] text-slate-650 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded font-bold cursor-help" title={prod.faqs.map(f => `Q: ${f.q}\nA: ${f.a}`).join('\n\n')}>
@@ -1310,7 +1262,6 @@ export default function AdminDashboard() {
                               )}
                             </td>
 
-                            {/* 13. Actions */}
                             <td className="flex flex-col gap-3 items-center justify-center py-3">
                               <button
                                 onClick={() => handleOpenProductModal(prod)}
@@ -1332,7 +1283,6 @@ export default function AdminDashboard() {
                   </table>
                 </div>
 
-                {/* Pagination Controls */}
                 {totalProductPages > 1 && (
                   <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4 bg-slate-50/50">
                     <div className="text-xxs text-slate-500 font-semibold uppercase tracking-wider">
@@ -1393,12 +1343,9 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ORDERS TAB */}
           {activeTab === 'orders' && (
             <div className="space-y-6 animate-fade-in text-left">
-              {/* Order Status Breakdown Sub-Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                {/* Pending Card */}
                 <div className="bg-white border border-slate-200/60 p-4 rounded-xl flex items-center justify-between shadow-xs">
                   <div className="text-left">
                     <span className="text-xxxxs font-bold text-slate-500 uppercase tracking-wider block">Pending</span>
@@ -1407,7 +1354,6 @@ export default function AdminDashboard() {
                   <span className="text-base select-none">⏳</span>
                 </div>
 
-                {/* Processing Card */}
                 <div className="bg-white border border-slate-200/60 p-4 rounded-xl flex items-center justify-between shadow-xs">
                   <div className="text-left">
                     <span className="text-xxxxs font-bold text-slate-500 uppercase tracking-wider block">Processing</span>
@@ -1416,7 +1362,6 @@ export default function AdminDashboard() {
                   <span className="text-base select-none">⚙️</span>
                 </div>
 
-                {/* Shipped Card */}
                 <div className="bg-white border border-slate-200/60 p-4 rounded-xl flex items-center justify-between shadow-xs">
                   <div className="text-left">
                     <span className="text-xxxxs font-bold text-slate-500 uppercase tracking-wider block">Shipped</span>
@@ -1425,7 +1370,6 @@ export default function AdminDashboard() {
                   <span className="text-base select-none">🚚</span>
                 </div>
 
-                {/* Completed Card */}
                 <div className="bg-white border border-slate-200/60 p-4 rounded-xl flex items-center justify-between shadow-xs">
                   <div className="text-left">
                     <span className="text-xxxxs font-bold text-slate-500 uppercase tracking-wider block">Completed</span>
@@ -1434,7 +1378,6 @@ export default function AdminDashboard() {
                   <span className="text-base select-none">✅</span>
                 </div>
 
-                {/* Cancelled Card */}
                 <div className="bg-white border border-slate-200/60 p-4 rounded-xl flex items-center justify-between shadow-xs">
                   <div className="text-left">
                     <span className="text-xxxxs font-bold text-slate-500 uppercase tracking-wider block">Cancelled</span>
@@ -1584,12 +1527,9 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* SUPPORT TICKETS TAB */}
           {activeTab === 'tickets' && (
             <div className="space-y-6 animate-fade-in text-left">
-              {/* Support Desk Overview Stats */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {/* Total Tickets */}
                 <div className="bg-white border border-slate-200/60 p-4 rounded-xl flex items-center justify-between shadow-xs">
                   <div className="text-left">
                     <span className="text-xxxxs font-bold text-slate-500 uppercase tracking-wider block">Total Support Tickets</span>
@@ -1598,7 +1538,6 @@ export default function AdminDashboard() {
                   <span className="text-base select-none">📨</span>
                 </div>
 
-                {/* Pending Tickets */}
                 <div className="bg-white border border-slate-200/60 p-4 rounded-xl flex items-center justify-between shadow-xs">
                   <div className="text-left">
                     <span className="text-xxxxs font-bold text-slate-500 uppercase tracking-wider block">Pending Tickets</span>
@@ -1607,7 +1546,6 @@ export default function AdminDashboard() {
                   <span className="text-base select-none">⏳</span>
                 </div>
 
-                {/* Resolved Tickets */}
                 <div className="bg-white border border-slate-200/60 p-4 rounded-xl flex items-center justify-between shadow-xs">
                   <div className="text-left">
                     <span className="text-xxxxs font-bold text-slate-500 uppercase tracking-wider block">Resolved Tickets</span>
@@ -1616,7 +1554,6 @@ export default function AdminDashboard() {
                   <span className="text-base select-none">✅</span>
                 </div>
 
-                {/* Closed Tickets */}
                 <div className="bg-white border border-slate-200/60 p-4 rounded-xl flex items-center justify-between shadow-xs">
                   <div className="text-left">
                     <span className="text-xxxxs font-bold text-slate-500 uppercase tracking-wider block">Closed Tickets</span>
@@ -1691,7 +1628,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* CATEGORIES TAB */}
           {activeTab === 'categories' && (
             <div className="space-y-6 animate-fade-in text-left">
               <div className="flex justify-between items-center pt-2">
@@ -1749,7 +1685,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* DATABASE BACKUP TAB */}
           {activeTab === 'backup' && (
             <div className="space-y-6 animate-fade-in text-left max-w-2xl">
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700 pt-2">Database Backup Console</h3>
@@ -1787,7 +1722,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* LICENSE KEYS TAB */}
           {activeTab === 'licenses' && (
             <div className="space-y-4 animate-fade-in text-left">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
@@ -1902,7 +1836,6 @@ export default function AdminDashboard() {
                   </table>
                 </div>
 
-                {/* Pagination Controls */}
                 {totalLicensePages > 1 && (
                   <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center select-none">
                     <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider">
@@ -1959,7 +1892,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* COUPONS TAB */}
           {activeTab === 'coupons' && (
             <div className="animate-fade-in space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2058,7 +1990,6 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
-          {/* EPS PAYMENT HISTORY TAB */}
           {activeTab === 'eps_history' && (
             <div className="animate-fade-in space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2151,7 +2082,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* SLIDES TAB (SETUP) */}
           {activeTab === 'slides' && (
             <div className="space-y-6 animate-fade-in text-left">
               <div className="flex justify-between items-center pt-2">
@@ -2159,7 +2089,6 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Form Column */}
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs h-fit">
                   <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-750 mb-4 pb-2 border-b border-slate-100">Add New Slide Image</h4>
                   <form onSubmit={handleSlideSubmit} className="space-y-4">
@@ -2193,7 +2122,6 @@ export default function AdminDashboard() {
                   </form>
                 </div>
 
-                {/* List Column */}
                 <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
                   <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-750 mb-4 pb-2 border-b border-slate-100">Active Slides</h4>
                   {slides.length === 0 ? (
@@ -2204,12 +2132,10 @@ export default function AdminDashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {slides.map((slide) => (
                         <div key={slide.id} className="border border-slate-200 rounded-xl overflow-hidden shadow-xxxxs flex flex-col justify-between bg-slate-50 relative group">
-                          {/* Slide Image Container */}
                           <div className="aspect-[1663/945] w-full bg-slate-900 overflow-hidden flex items-center justify-center relative">
                             <img src={slide.image_url} alt="Slide Preview" className="w-full h-full object-cover" />
                           </div>
 
-                          {/* Info & Action Bar */}
                           <div className="p-3 bg-white border-t border-slate-150 flex items-center justify-between gap-2">
                             <span className="text-[10px] font-mono text-slate-500 truncate select-all flex-1" title={slide.image_url}>
                               {slide.image_url}
@@ -2231,7 +2157,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* THEME SETTINGS TAB */}
           {activeTab === 'theme_settings' && (
             <div className="space-y-6 animate-fade-in text-left">
               <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
@@ -2245,7 +2170,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Preset Themes Grid */}
                 <div className="mb-8">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">Select Theme Preset</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2273,7 +2197,6 @@ export default function AdminDashboard() {
                             <p className="text-[11px] text-slate-500 leading-relaxed mb-3">{item.desc}</p>
                           </div>
                           
-                          {/* Color Palette Swatches */}
                           <div className="flex items-center space-x-2 pt-2 border-t border-slate-100">
                             <div className="flex items-center space-x-1">
                               <span className="w-5 h-5 rounded-full border border-black/10 inline-block" style={{ backgroundColor: item.primaryColor }} title="Primary" />
@@ -2287,7 +2210,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Custom Color Pickers */}
                 <div className="mb-8 p-5 bg-slate-50 border border-slate-200/80 rounded-xl">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-4">Custom Color Configuration</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2329,7 +2251,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Live Preview Box */}
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Live UI Components Preview</h4>
                   <div className="p-6 rounded-2xl border border-slate-200/80 bg-slate-100/60 backdrop-blur-md flex flex-wrap items-center gap-4">
@@ -2365,7 +2286,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* PRODUCT CREATE/EDIT MODAL */}
       {showProductModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs" onClick={() => setShowProductModal(false)} />
@@ -2456,7 +2376,6 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Highlighted Bullet Points Text Field */}
               <div>
                 <label className="block text-xxs font-bold text-slate-550 uppercase tracking-wider mb-1">
                   Highlighted Text / Bullet Features (One bullet per line or comma-separated)
@@ -2576,7 +2495,6 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Package Builder */}
                 <div className="border border-slate-200 p-4 rounded-xl space-y-3 bg-slate-50">
                   <div className="flex justify-between items-center">
                     <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider">Product Packages</span>
@@ -2596,7 +2514,6 @@ export default function AdminDashboard() {
                     <p className="text-[11px] text-slate-450 italic">No packages defined. Base price will apply.</p>
                   ) : (
                     <div className="space-y-2">
-                      {/* Grid Headers */}
                       <div className="hidden md:grid gap-2 text-[9px] font-extrabold text-slate-500 uppercase tracking-wider px-1" style={{ gridTemplateColumns: '1.2fr 1.5fr 1.5fr 1fr 1fr 1.2fr 1.2fr 1.2fr auto' }}>
                         <div>Type</div>
                         <div>Activation</div>
@@ -2615,7 +2532,6 @@ export default function AdminDashboard() {
                           : [];
                         return (
                           <div key={idx} className="flex flex-col md:grid gap-3 md:gap-2 md:items-center bg-slate-50 md:bg-transparent p-3 md:p-0 border border-slate-200 md:border-none rounded-xl md:rounded-none mb-3 md:mb-0 shadow-xs md:shadow-none" style={{ gridTemplateColumns: '1.2fr 1.5fr 1.5fr 1fr 1fr 1.2fr 1.2fr 1.2fr auto' }}>
-                            {/* Activation Type */}
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Type</span>
                               <select
@@ -2632,7 +2548,6 @@ export default function AdminDashboard() {
                               </select>
                             </div>
 
-                            {/* Activation Process */}
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Activation</span>
                               {activationOpts.length > 0 ? (
@@ -2666,7 +2581,6 @@ export default function AdminDashboard() {
                               )}
                             </div>
 
-                            {/* Duration / Package */}
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Package/Duration</span>
                               <input
@@ -2683,7 +2597,6 @@ export default function AdminDashboard() {
                               />
                             </div>
 
-                            {/* Stock */}
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Stock</span>
                               <input
@@ -2699,7 +2612,6 @@ export default function AdminDashboard() {
                               />
                             </div>
 
-                            {/* Discount */}
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Discount Amount</span>
                               <input
@@ -2717,7 +2629,6 @@ export default function AdminDashboard() {
                               />
                             </div>
 
-                            {/* Original Price (অরিজিনাল দাম) */}
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Original Price</span>
                               <input
@@ -2734,7 +2645,6 @@ export default function AdminDashboard() {
                               />
                             </div>
 
-                            {/* Retail Price (রিটেইল দাম) */}
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Retail Price</span>
                               <input
@@ -2751,7 +2661,6 @@ export default function AdminDashboard() {
                               />
                             </div>
 
-                            {/* Price */}
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold text-slate-500 md:hidden mb-1">Sell Price</span>
                               <input
@@ -2769,7 +2678,6 @@ export default function AdminDashboard() {
                               />
                             </div>
 
-                            {/* Delete */}
                             <div className="flex justify-end mt-2 md:mt-0">
                               <button
                                 type="button"
@@ -2790,7 +2698,6 @@ export default function AdminDashboard() {
                   )}
                 </div>
 
-                {/* FAQ Builder */}
                 <div className="border border-slate-200 p-4 rounded-xl space-y-3 bg-slate-50">
                   <div className="flex justify-between items-center">
                     <span className="text-xxs font-bold text-slate-500 uppercase tracking-wider">Frequently Asked Questions (FAQ)</span>
@@ -2877,7 +2784,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* CANCELLATION REMARKS MODAL */}
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs" onClick={() => setShowCancelModal(false)} />
@@ -2934,7 +2840,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* TICKET STATUS MODAL */}
       {showTicketModal && activeTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs" onClick={() => setShowTicketModal(false)} />
@@ -3010,7 +2915,6 @@ export default function AdminDashboard() {
 
 
 
-      {/* CATEGORY CREATE/EDIT MODAL */}
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs" onClick={() => setShowCategoryModal(false)} />
@@ -3064,7 +2968,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-      {/* LICENSE CREATE MODAL */}
       {showLicenseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs" onClick={() => setShowLicenseModal(false)} />
@@ -3082,7 +2985,6 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Product Selection Combobox */}
               <div className="relative">
                 <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Product *</label>
 
@@ -3136,9 +3038,7 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              {/* Dynamic Options Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Activation Option Selection */}
                 <div>
                   <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Activation Option</label>
                   {(() => {
@@ -3163,7 +3063,6 @@ export default function AdminDashboard() {
                   })()}
                 </div>
 
-                {/* Package Option Selection */}
                 <div>
                   <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Package Option</label>
                   {(() => {
@@ -3187,7 +3086,6 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* License Rules input */}
               <div>
                 <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
                   License Rules / Instructions (Optional)
@@ -3201,7 +3099,6 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* License Key input */}
               <div>
                 <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
                   {editingLicense ? 'License Key *' : 'License Keys (One per line for bulk) *'}
@@ -3216,7 +3113,6 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* Submit Buttons */}
               <div className="pt-2 flex justify-end space-x-3">
                 <button
                   type="button"
@@ -3242,7 +3138,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* CREATE COUPON MODAL */}
       {showCouponModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 space-y-4">

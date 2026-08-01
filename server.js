@@ -2,10 +2,8 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-// Initialize Express app
 const app = express();
 
-// Middlewares
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
@@ -13,7 +11,6 @@ const allowedOrigins = [
   "https://www.elitepassbd.com",
 ];
 
-// 2. CORS and Preflight Setup
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -30,13 +27,9 @@ app.use(cors({
 
 app.options('*', cors());
 
-// ==========================================
-// 3. PARSERS MUST GO HERE (BEFORE YOUR ROUTES)
-// ==========================================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 4. Custom Middleware / Fallback Headers (Safe position)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
@@ -53,7 +46,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Normalize double /api/api prefixes in case of old cache or config mismatch
 app.use((req, res, next) => {
   if (req.url.startsWith('/api/api')) {
     req.url = req.url.replace('/api/api', '/api');
@@ -63,7 +55,6 @@ app.use((req, res, next) => {
 
 
 
-// Import Routes
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
@@ -74,7 +65,6 @@ const slideRoutes = require('./routes/slideRoutes');
 const pixelRoutes = require('./routes/pixelRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 
-// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
@@ -85,7 +75,6 @@ app.use('/api/slides', slideRoutes);
 app.use('/api/pixel', pixelRoutes);
 app.use('/api/coupons', couponRoutes);
 
-// Database Backup API Route (Admins Only)
 const { authenticateToken, authorizeAdmin } = require('./middleware/auth');
 const db = require('./config/db');
 
@@ -103,7 +92,6 @@ app.get('/api/admin/backup', authenticateToken, authorizeAdmin, async (req, res,
     for (const tableRow of tables) {
       const tableName = tableRow[keyName] || Object.values(tableRow)[0];
 
-      // Get Create Table statement
       const [createTableResult] = await pool.query(`SHOW CREATE TABLE \`${tableName}\``);
       const createTableSql = createTableResult[0]['Create Table'];
 
@@ -111,7 +99,6 @@ app.get('/api/admin/backup', authenticateToken, authorizeAdmin, async (req, res,
       sqlDump += `DROP TABLE IF EXISTS \`${tableName}\`;\n`;
       sqlDump += `${createTableSql};\n\n`;
 
-      // Get Rows
       const [rows] = await pool.query(`SELECT * FROM \`${tableName}\``);
       if (rows.length > 0) {
         sqlDump += `-- Dumping data for table \`${tableName}\`\n`;
@@ -126,7 +113,6 @@ app.get('/api/admin/backup', authenticateToken, authorizeAdmin, async (req, res,
             }
             if (typeof val === 'object') return `'${JSON.stringify(val).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
-            // Escape backslashes first, then escape single quotes
             const escaped = val.toString().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             return `'${escaped}'`;
           }).join(', ');
@@ -147,17 +133,14 @@ app.get('/api/admin/backup', authenticateToken, authorizeAdmin, async (req, res,
   }
 });
 
-// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'E-commerce API is running.' });
 });
 
 const path = require('path');
 
-// Serve static React build files
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Fallback all non-API GET requests to React client SPA router
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) {
     return next();
@@ -167,13 +150,11 @@ app.get('*', (req, res, next) => {
 
 
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled Server Error:', err.stack);
   res.status(500).json({ message: 'Internal Server Error.' });
 });
 
-// Start Server
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

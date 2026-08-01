@@ -2,7 +2,6 @@ const db = require('../config/db');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_for_elitepass_bd';
 
-// Create a new support ticket (Public / Guest / Authenticated)
 exports.createTicket = async (req, res) => {
   const { name, email, subject, message } = req.body;
 
@@ -10,7 +9,6 @@ exports.createTicket = async (req, res) => {
     return res.status(400).json({ message: 'All fields (name, email, subject, message) are required.' });
   }
 
-  // Attempt to parse user ID if JWT token exists in header
   let userId = null;
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -19,7 +17,6 @@ exports.createTicket = async (req, res) => {
       const decoded = jwt.verify(token, JWT_SECRET);
       userId = decoded.id;
     } catch (err) {
-      // Token expired or invalid, ignore and treat as guest
     }
   }
 
@@ -35,7 +32,6 @@ exports.createTicket = async (req, res) => {
   }
 };
 
-// Get all support tickets (Admin)
 exports.getAllTickets = async (req, res) => {
   try {
     const [tickets] = await db.query(
@@ -51,7 +47,6 @@ exports.getAllTickets = async (req, res) => {
   }
 };
 
-// Update support ticket status and remarks (Admin)
 exports.updateTicketStatus = async (req, res) => {
   const { id } = req.params;
   const { status, remarks } = req.body;
@@ -78,7 +73,6 @@ exports.updateTicketStatus = async (req, res) => {
   }
 };
 
-// Get support ticket statistics (Admin)
 exports.getTicketStats = async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -107,7 +101,6 @@ exports.getTicketStats = async (req, res) => {
   }
 };
 
-// Get support tickets for the logged-in user
 exports.getMyTickets = async (req, res) => {
   const userId = req.user.id;
   try {

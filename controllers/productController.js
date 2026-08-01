@@ -1,6 +1,5 @@
 const db = require('../config/db');
 
-// Helpers for JSON fields
 const parseJSON = (str, fallback = null) => {
   if (!str) return fallback;
   try {
@@ -30,7 +29,6 @@ const formatProduct = (prod) => {
   };
 };
 
-// Get all products
 exports.getAllProducts = async (req, res) => {
   try {
     const [products] = await db.query(`
@@ -48,7 +46,6 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
-// Get product by ID
 exports.getProductById = async (req, res) => {
   const { id } = req.params;
   try {
@@ -70,9 +67,7 @@ exports.getProductById = async (req, res) => {
   }
 };
 
-// Create product (Admin)
 exports.createProduct = async (req, res) => {
-  // console.log('CREATE PRODUCT REQUEST BODY:', req.body);
   const {
     name, description, price, image_url, stock, category_id,
     tags, additional_info, faqs, packages, device_options, activation_options,
@@ -84,13 +79,11 @@ exports.createProduct = async (req, res) => {
   }
 
   try {
-    // Parse packages if it is a string
     let parsedPackages = [];
     if (packages) {
       parsedPackages = typeof packages === 'string' ? JSON.parse(packages) : packages;
     }
     
-    // Calculate total stock from packages
     let calculatedStock = 0;
     if (parsedPackages && parsedPackages.length > 0) {
       calculatedStock = parsedPackages.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
@@ -98,7 +91,6 @@ exports.createProduct = async (req, res) => {
       calculatedStock = stock === undefined || stock === '' || stock === null ? 0 : parseInt(stock);
     }
 
-    // Calculate max discount from packages
     let calculatedDiscount = null;
     if (parsedPackages && parsedPackages.length > 0) {
       const discounts = parsedPackages.map(p => parseFloat(p.discount)).filter(d => !isNaN(d));
@@ -107,7 +99,6 @@ exports.createProduct = async (req, res) => {
       calculatedDiscount = discount_percent === undefined || discount_percent === '' || discount_percent === null ? null : parseFloat(discount_percent);
     }
 
-    // Calculate min price from packages
     let calculatedPrice = 0;
     if (parsedPackages && parsedPackages.length > 0) {
       const prices = parsedPackages.map(p => parseFloat(p.price)).filter(p => !isNaN(p));
@@ -145,10 +136,8 @@ exports.createProduct = async (req, res) => {
   }
 };
 
-// Update product (Admin)
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-  // console.log('UPDATE PRODUCT REQUEST BODY:', req.body);
   const {
     name, description, price, image_url, stock, category_id,
     tags, additional_info, faqs, packages, device_options, activation_options,
@@ -160,13 +149,11 @@ exports.updateProduct = async (req, res) => {
   }
 
   try {
-    // Parse packages if it is a string
     let parsedPackages = [];
     if (packages) {
       parsedPackages = typeof packages === 'string' ? JSON.parse(packages) : packages;
     }
     
-    // Calculate total stock from packages
     let calculatedStock = 0;
     if (parsedPackages && parsedPackages.length > 0) {
       calculatedStock = parsedPackages.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
@@ -174,7 +161,6 @@ exports.updateProduct = async (req, res) => {
       calculatedStock = stock === undefined || stock === '' || stock === null ? 0 : parseInt(stock);
     }
 
-    // Calculate max discount from packages
     let calculatedDiscount = null;
     if (parsedPackages && parsedPackages.length > 0) {
       const discounts = parsedPackages.map(p => parseFloat(p.discount)).filter(d => !isNaN(d));
@@ -183,7 +169,6 @@ exports.updateProduct = async (req, res) => {
       calculatedDiscount = discount_percent === undefined || discount_percent === '' || discount_percent === null ? null : parseFloat(discount_percent);
     }
 
-    // Calculate min price from packages
     let calculatedPrice = 0;
     if (parsedPackages && parsedPackages.length > 0) {
       const prices = parsedPackages.map(p => parseFloat(p.price)).filter(p => !isNaN(p));
@@ -224,7 +209,6 @@ exports.updateProduct = async (req, res) => {
   }
 };
 
-// Delete product (Admin)
 exports.deleteProduct = async (req, res) => {
   const { id } = req.params;
   try {
@@ -237,7 +221,6 @@ exports.deleteProduct = async (req, res) => {
     res.json({ message: 'Product deleted successfully!' });
   } catch (error) {
     console.error('Delete product error:', error);
-    // If the product is linked in order items, we might get a foreign key constraint error.
     if (error.code === 'ER_ROW_IS_REFERENCED_2') {
       return res.status(400).json({
         message: 'Cannot delete product because it has associated customer orders. Set its stock to 0 instead.'
@@ -247,7 +230,6 @@ exports.deleteProduct = async (req, res) => {
   }
 };
 
-// Add or update a product review
 exports.addOrUpdateReview = async (req, res) => {
   const { productId } = req.params;
   const { rating, text, reviewer_name, reviewer_email } = req.body;
@@ -282,7 +264,6 @@ exports.addOrUpdateReview = async (req, res) => {
   }
 };
 
-// Get all reviews for a product
 exports.getProductReviews = async (req, res) => {
   const { productId } = req.params;
   try {
@@ -301,7 +282,6 @@ exports.getProductReviews = async (req, res) => {
   }
 };
 
-// Get current user's review for a product (to allow editing)
 exports.getUserReviewForProduct = async (req, res) => {
   const { productId } = req.params;
   const userId = req.user.id;
@@ -320,7 +300,6 @@ exports.getUserReviewForProduct = async (req, res) => {
   }
 };
 
-// Get latest reviews for store/home
 exports.getLatestReviews = async (req, res) => {
   try {
     const [reviews] = await db.query(
@@ -338,7 +317,6 @@ exports.getLatestReviews = async (req, res) => {
   }
 };
 
-// Get all categories
 exports.getAllCategories = async (req, res) => {
   try {
     const [categories] = await db.query('SELECT * FROM categories ORDER BY name ASC');
@@ -349,7 +327,6 @@ exports.getAllCategories = async (req, res) => {
   }
 };
 
-// Create category (Admin)
 exports.createCategory = async (req, res) => {
   const { name } = req.body;
   if (!name || name.trim() === '') {
@@ -369,7 +346,6 @@ exports.createCategory = async (req, res) => {
   }
 };
 
-// Update category (Admin)
 exports.updateCategory = async (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
@@ -393,7 +369,6 @@ exports.updateCategory = async (req, res) => {
   }
 };
 
-// Delete category (Admin)
 exports.deleteCategory = async (req, res) => {
   const { id } = req.params;
   try {
@@ -408,7 +383,6 @@ exports.deleteCategory = async (req, res) => {
   }
 };
 
-// Get Latest Reviews (Top 5-star ratings for home page)
 exports.getLatestReviews = async (req, res) => {
   try {
     const [reviews] = await db.query(`

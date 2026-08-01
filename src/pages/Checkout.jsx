@@ -30,14 +30,12 @@ export default function Checkout() {
 
   const isGuestCheckout = location.state?.isGuest;
 
-  // Protect page: if not logged in and not doing guest checkout, redirect to login
   useEffect(() => {
     if (!user && !isGuestCheckout) {
       navigate('/login', { state: { from: location } });
     }
   }, [user, isGuestCheckout, navigate, location]);
 
-  // State fields
   const [address, setAddress] = useState(user?.address || '');
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [phone, setPhone] = useState(user?.whatsapp_number || '');
@@ -48,7 +46,6 @@ export default function Checkout() {
   const [error, setError] = useState('');
   const [orderSuccess, setOrderSuccess] = useState(null);
 
-  // Coupon state
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
@@ -85,7 +82,6 @@ export default function Checkout() {
   const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0;
   const grandTotal = Math.max(0, cartTotal - discountAmount);
 
-  // Trigger InitiateCheckout event when checkout page loads with cart items
   useEffect(() => {
     if (cartItems.length > 0) {
       const contentIds = cartItems.map(item => String(item.product_id));
@@ -107,7 +103,6 @@ export default function Checkout() {
         phone: user?.whatsapp_number || ''
       });
 
-      // Trigger GA4 begin_checkout event
       window.dataLayer = window.dataLayer || [];
       window.dataLayer.push({ 'ecommerce': null });
       window.dataLayer.push({
@@ -126,14 +121,12 @@ export default function Checkout() {
     }
   }, []);
 
-  // If cart is empty and order wasn't just placed successfully, redirect to home
   useEffect(() => {
     if (cartItems.length === 0 && !orderSuccess) {
       navigate('/');
     }
   }, [cartItems, orderSuccess, navigate]);
 
-  // Pre-fill if user info loads late
   useEffect(() => {
     if (user) {
       if (user.whatsapp_number && !phone) {
@@ -199,7 +192,6 @@ export default function Checkout() {
         message: 'Redirecting to payment gateway...'
       });
 
-      // Initiate EPS payment gateway redirect
       const payRes = await api.post('/payments/initiate', { orderId: res.orderId });
 
       if (payRes && payRes.redirectUrl) {
@@ -240,7 +232,6 @@ export default function Checkout() {
   return (
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] text-slate-800 py-12 text-left animate-fade-in">
       <div className="max-w-full mx-auto px-4 sm:px-6">
-        {/* Back button */}
         <button
           onClick={() => navigate('/')}
           className="flex items-center space-x-2 text-slate-500 hover:text-slate-800 text-xs font-bold mb-6 transition-colors group border-none bg-transparent cursor-pointer"
@@ -260,7 +251,6 @@ export default function Checkout() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Checkout Details Form */}
           <div className="lg:col-span-7 space-y-6">
             <form onSubmit={handleSubmit} className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
               <h3 className="text-base font-extrabold text-slate-800 border-b border-slate-150 pb-3 flex items-center space-x-2">
@@ -342,7 +332,6 @@ export default function Checkout() {
                 </p>
               </div>
 
-              {/* Commented out separate delivery email field as requested */}
               {/* {user && (
                 <div>
                   <label className="block text-xxs font-bold text-slate-500 tracking-wider mb-1.5">
@@ -451,14 +440,12 @@ export default function Checkout() {
             </form>
           </div>
 
-          {/* Right Column: Order Summary Card */}
           <div className="lg:col-span-5">
             <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs sticky top-6 space-y-6 text-left">
               <h3 className="text-base font-extrabold text-slate-850 border-b border-slate-150 pb-3">
                 Order Summary
               </h3>
 
-              {/* Scrollable list of items */}
               <div className="divide-y divide-slate-150 max-h-[40vh] overflow-y-auto pr-1 space-y-4">
                 {cartItems.map((item, index) => (
                   <div
@@ -480,7 +467,6 @@ export default function Checkout() {
                     <div className="flex-1 min-w-0 text-left">
                       <h4 className="text-sm font-bold text-slate-800 truncate">{item.name}</h4>
 
-                      {/* Selected Options display */}
                       {(item.package_name || item.selected_device || item.selected_activation) && (
                         <div className="text-[10px] text-slate-500 mt-1 space-y-0.5 leading-relaxed">
                           {item.package_name && (
@@ -512,7 +498,6 @@ export default function Checkout() {
                 ))}
               </div>
 
-              {/* Coupon Code Input Box Section */}
               <div className="pt-2 border-t border-slate-150 space-y-2">
                 <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider">
                   Coupon / Promo Code
@@ -554,7 +539,6 @@ export default function Checkout() {
                 )}
               </div>
 
-              {/* Calculations and payment info */}
               <div className="pt-4 border-t border-slate-150 space-y-2.5 text-xs text-slate-500">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
@@ -583,7 +567,6 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Safety badge */}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-150 flex items-start space-x-2 text-[10px] text-slate-500 text-left">
                 <span className="text-sm mt-0.5">🛡️</span>
                 <p className="leading-relaxed">
@@ -594,7 +577,6 @@ export default function Checkout() {
           </div>
         </div>
 
-        {/* Checkout Footer Banner */}
         <div className="mt-8">
           <img
             src="/Checkout-Page-Pay_with_EPS.png"

@@ -68,15 +68,12 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [slides, setSlides] = useState([]);
 
-  // Carousel slider state
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Category Sidebar & Filter State for Shahed Store layout
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortOption, setSortOption] = useState('newest');
   const [homeSearch, setHomeSearch] = useState('');
 
-  // Bengali FAQ accordion state
   const [activeFaq, setActiveFaq] = useState(null);
 
   const [latestReviews, setLatestReviews] = useState([]);
@@ -147,13 +144,10 @@ export default function Home() {
     navigate(`/product/${product.id}`);
   };
 
-  // Spotlight Featured Product for Hero Section
   const spotlightProduct = products.find(p => p.is_hot) || products[0];
 
-  // Filter products for sections
   const bestSellers = products.filter(p => p.tags && p.tags.toLowerCase().includes('best sellers')).slice(0, 4);
 
-  // Group products by category dynamically
   const productsByCategory = products.reduce((acc, product) => {
     if (product.category_name) {
       if (!acc[product.category_name]) {
@@ -164,13 +158,11 @@ export default function Home() {
     return acc;
   }, {});
 
-  // Helper to format recent titles
   const formatRecentTitle = (name, maxLen = 35) => {
     if (!name) return "";
     return name.length > maxLen ? name.substring(0, maxLen).trim() + "..." : name;
   };
 
-  // Hot Discount Products (filter where is_hot_discount is set, fallback to products if empty)
   const hotDiscountProducts = products.filter(p => !!p.is_hot_discount);
   const recentProduct1 = hotDiscountProducts[0];
   const recentProduct2 = hotDiscountProducts[1];
@@ -237,7 +229,6 @@ export default function Home() {
     : "OFFICE BUNDLE SALE";
   const recent4Image = recentProduct4?.image_url;
 
-  // Dynamic Hot Selling Product
   const hotProduct = products.filter(p => !!p.is_hot).sort((a, b) => b.id - a.id)[0];
   const hotName = hotProduct?.name;
   const hotImage = hotProduct?.image_url;
@@ -248,7 +239,6 @@ export default function Home() {
   const hotDiscountAmount = hasHotDiscount ? parseFloat(hotProduct.discount_percent) : 45;
   const hotOriginalPrice = hotProduct ? (hasHotDiscount ? hotDiscountAmount : (hotCurrentPrice + 45)) : 244.00;
 
-  // Split description sentences for checkmarks
   let hotBullets = [];
   if (hotProduct && hotProduct.description) {
     const cleanDesc = hotProduct.description.replace(/<[^>]*>/g, '');
@@ -266,7 +256,6 @@ export default function Home() {
     ];
   }
 
-  // Carousel Slides Content
   const idmProd = products.find(p => p.name?.toLowerCase().includes('idm')) || products[0];
   const winProd = products.find(p => p.name?.toLowerCase().includes('windows')) || products[1];
   const offProd = products.find(p => p.name?.toLowerCase().includes('office')) || products[2];
@@ -327,7 +316,6 @@ export default function Home() {
     setCurrentSlide((prev) => (prev - 1 + activeSlides.length) % activeSlides.length);
   };
 
-  // Autoplay slider
   useEffect(() => {
     const timer = setInterval(handleNextSlide, 6000);
     return () => clearInterval(timer);
@@ -368,17 +356,13 @@ export default function Home() {
     <div className="w-full bg-[#f8fafc] text-slate-800 py-6 text-left">
       <div className="max-w-full mx-auto px-4 sm:px-6">
 
-        {/* ================= HERO SECTION (FULL WIDTH GLASS SLIDER) ================= */}
         <div className="w-full mb-8">
 
-          {/* Full Width ShahedStore Style Glassmorphic Hero Slider */}
           <div className="w-full relative rounded-xl overflow-hidden border border-purple-100/90 shadow-xl min-h-95 sm:min-h-105 lg:min-h-130 flex items-center bg-gradient-to-r from-purple-50/90 via-indigo-50/60 to-blue-50/80 group">
 
-            {/* Slide Container */}
             {activeSlides.map((slide, idx) => {
               const isCurrent = idx === currentSlide;
 
-              // Check if slide is a pure full image banner uploaded by admin
               const isPureImageBanner = slide.image_url && !slide.title1 && !slide.price;
 
               return (
@@ -392,10 +376,8 @@ export default function Home() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center h-full">
 
-                      {/* Left Side Content */}
                       <div className="md:col-span-7 flex flex-col justify-center text-left space-y-2.5 sm:space-y-3.5">
 
-                        {/* Top Badges */}
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase tracking-wider shadow-2xs flex items-center gap-1">
                             {slide.badge1 || '🏆 OFFICIAL RESELLER'}
@@ -405,7 +387,6 @@ export default function Home() {
                           </span>
                         </div>
 
-                        {/* Main Title Stack */}
                         <div className="flex flex-col">
                           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-none">
                             {slide.title1 || slide.name || 'IDM'}
@@ -415,17 +396,14 @@ export default function Home() {
                           </h2>
                         </div>
 
-                        {/* Subtitle / Description */}
                         <p className="text-xs sm:text-sm font-extrabold text-slate-500 line-clamp-1">
                           {slide.subtitle || 'Internet Download Manager'}
                         </p>
 
-                        {/* Bengali Tagline */}
                         <p className="text-xs sm:text-sm font-semibold text-slate-700 leading-relaxed">
                           {slide.tagline || 'আমরা IDM-এর অফিসিয়াল রিসেলার। একবার কিনুন, সারাজীবন ব্যবহার করুন।'}
                         </p>
 
-                        {/* Feature Checkmark Badges */}
                         <div className="flex items-center gap-2 flex-wrap pt-1">
                           {(slide.features || ['Official Reseller ✓', 'Lifetime License ✓', 'Instant Delivery ✓']).map((feat, fIdx) => (
                             <span key={fIdx} className="bg-white/80 border border-purple-100/90 text-purple-800 font-bold text-[10px] sm:text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-2xs">
@@ -435,7 +413,6 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* Price Row */}
                         <div className="flex items-baseline gap-3 pt-1">
                           <span className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900">
                             ৳{(slide.price || 2650).toLocaleString()}
@@ -450,7 +427,6 @@ export default function Home() {
                           </span>
                         </div>
 
-                        {/* Action Buttons */}
                         <div className="flex items-center gap-3 pt-2">
                           <button
                             onClick={() => slide.product_id ? navigate(`/product/${slide.product_id}`) : navigate('/products')}
@@ -470,7 +446,6 @@ export default function Home() {
                           </button>
                         </div>
 
-                        {/* Bottom Guarantee Icons */}
                         <div className="flex items-center gap-3 text-[10px] sm:text-xs font-bold text-slate-500 pt-1 flex-wrap">
                           <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" /> Instant Delivery</span>
                           <span>•</span>
@@ -483,7 +458,6 @@ export default function Home() {
 
                       </div>
 
-                      {/* Right Side (3D Showcase Card) */}
                       <div className="hidden md:flex md:col-span-5 items-center justify-center relative">
                         <div className="relative w-full max-w-[280px] lg:max-w-[340px] aspect-square rounded-3xl bg-white/60 backdrop-blur-xl border border-white/90 p-3 shadow-2xl shadow-purple-500/10 flex items-center justify-center overflow-hidden group-hover:scale-103 transition-transform duration-500">
                           {slide.image_url ? (
@@ -508,7 +482,6 @@ export default function Home() {
               );
             })}
 
-            {/* Navigation Floating Arrows */}
             <button
               onClick={handlePrevSlide}
               className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/90 text-slate-700 shadow-md flex items-center justify-center hover:bg-white hover:scale-110 active:scale-95 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
@@ -522,7 +495,6 @@ export default function Home() {
               <ChevronRight className="w-5 h-5" />
             </button>
 
-            {/* Bottom Dots Indicator */}
             <div className="absolute bottom-3 left-0 right-0 flex justify-center z-20 pointer-events-auto">
               <div className="flex items-center gap-1.5 bg-white/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/60 shadow-2xs">
                 {activeSlides.map((_, dotIdx) => (
@@ -538,7 +510,6 @@ export default function Home() {
 
           </div>
 
-          {/* Commented out Spotlight Offer section as requested by user */}
           {/*
           <div className="lg:col-span-4 flex flex-col">
             {spotlightProduct ? (
@@ -592,18 +563,15 @@ export default function Home() {
           */}
         </div>
 
-        {/* ================= LIVE TICKER / MOVING DISCOUNT BAR ================= */}
         {products.length > 0 && (
           <div className="w-full mt-6 mb-4 text-left">
             <div className="bg-slate-100/90 backdrop-blur-md border border-slate-200/80 rounded-full px-3 py-1.5 shadow-2xs overflow-hidden flex items-center gap-3">
-              {/* Left Live Badge */}
               <div className="bg-violet-600 text-white font-black text-[10px] px-2.5 py-1 rounded-full flex items-center gap-1 shrink-0 shadow-2xs animate-pulse z-10">
                 <Zap className="w-3 h-3 fill-current" />
                 <span>LIVE</span>
                 <span className="w-1.5 h-1.5 bg-white rounded-full inline-block animate-ping" />
               </div>
 
-              {/* Scrolling Marquee Container */}
               <div className="overflow-hidden whitespace-nowrap w-full relative">
                 <div className="animate-marquee-slow flex items-center gap-4">
                   {[...products, ...products].map((prod, index) => {
@@ -639,7 +607,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* ================= BEST SELLERS / POPULAR ITEMS SECTION ================= */}
         {(() => {
           const hotProducts = products.filter(p => p.is_hot || p.is_featured);
           const bestSellers = hotProducts.length >= 3 ? hotProducts.slice(0, 5) : products.slice(0, 5);
@@ -648,7 +615,6 @@ export default function Home() {
 
           return (
             <div className="w-full text-left mt-8 mb-6">
-              {/* Best Seller Header Bar */}
               <div className="flex items-center justify-between pb-3.5 mb-5 border-b border-slate-200/70">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-5 bg-amber-500 rounded-full inline-block" />
@@ -668,7 +634,6 @@ export default function Home() {
                 </Link>
               </div>
 
-              {/* 5-Column Responsive Glassmorphism Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
                 {bestSellers.map((prod) => {
                   const currentPrice = getProductDisplayPrice(prod);
@@ -683,7 +648,6 @@ export default function Home() {
                       onClick={() => handleProductClick(prod.id)}
                       className="bg-gradient-to-b from-amber-100/70 via-orange-50/50 to-white/95 backdrop-blur-xl border border-white/90 rounded-3xl p-3.5 shadow-lg shadow-amber-500/5 hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 relative flex flex-col justify-between group cursor-pointer text-left"
                     >
-                      {/* Top Inner Glass Image Box */}
                       <div>
                         <div className="relative aspect-square w-full bg-white/70 backdrop-blur-md border border-white/90 rounded-2xl flex items-center justify-center shadow-inner shadow-white/60 mb-3 overflow-hidden">
                           {prod.image_url ? (
@@ -696,7 +660,6 @@ export default function Home() {
                             <span className="text-xs text-slate-400 font-extrabold uppercase">No Image</span>
                           )}
 
-                          {/* Badges Over Image Box */}
                           <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
                             <span className="bg-slate-900/40 backdrop-blur-md text-white text-[9px] font-black px-2 py-0.5 rounded-full border border-white/40 shadow-2xs">
                               ELITEPASS
@@ -706,7 +669,6 @@ export default function Home() {
                             </span>
                           </div>
 
-                          {/* Bottom Badge Over Image */}
                           <div className="absolute bottom-2 left-2 z-10 pointer-events-none">
                             {hasDiscount ? (
                               <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-2xs">
@@ -720,12 +682,10 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Product Title */}
                         <h4 className="text-xs font-extrabold text-slate-900 line-clamp-2 min-h-[2.4rem] leading-snug group-hover:text-amber-700 transition-colors">
                           {prod.name}
                         </h4>
 
-                        {/* Star Ratings */}
                         <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 font-bold">
                           <div className="flex gap-0.5">
                             {[...Array(5)].map((_, i) => (
@@ -735,7 +695,6 @@ export default function Home() {
                           <span>({prod.avg_rating > 0 ? (prod.avg_rating * 35).toFixed(0) : '170'})</span>
                         </div>
 
-                        {/* Price Line */}
                         <div className="flex items-baseline gap-1.5 mt-2">
                           <span className="text-base font-black text-violet-700">
                             ৳{currentPrice.toFixed(0)}
@@ -748,7 +707,6 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Action Buttons (3 Buttons: Buy Now + WhatsApp + Cart) */}
                       <div className="mt-3 space-y-1.5">
                         <button
                           onClick={(e) => handleOrderNow(e, prod)}
@@ -789,12 +747,9 @@ export default function Home() {
           );
         })()}
 
-        {/* ================= CATEGORY WISE PRODUCTS SECTION ================= */}
         <div className="w-full space-y-8 text-left mt-8">
 
-          {/* Top Navigation Bar: Category Pills + Search & Sort */}
           <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
-            {/* Filter Category Tabs Row */}
             <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto scrollbar-none pb-1 sm:pb-0">
               {['All', ...new Set(products.map(p => p.category_name).filter(Boolean))].map((cat) => (
                 <button
@@ -810,7 +765,6 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Right Search & Sort Controls */}
             <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
               <div className="relative w-full sm:w-60">
                 <input
@@ -835,7 +789,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* DYNAMIC CATEGORY SECTIONS */}
           {loading ? (
             <div className="py-16 text-center text-slate-400 font-bold">Loading product catalog...</div>
           ) : (
@@ -852,7 +805,6 @@ export default function Home() {
 
                 if (filteredCatProducts.length === 0) return null;
 
-                // Vibrant Pastel Gradients Palette per category
                 const gradients = [
                   'from-purple-100/70 via-pink-50/50 to-white/95 shadow-purple-500/5',
                   'from-sky-100/70 via-blue-50/50 to-white/95 shadow-sky-500/5',
@@ -864,7 +816,6 @@ export default function Home() {
 
                 return (
                   <div key={categoryName} className="mb-10 text-left">
-                    {/* Category Header Bar with Vertical Indicator */}
                     <div className="flex items-center justify-between pb-3.5 mb-5 border-b border-slate-200/70">
                       <div className="flex items-center gap-2">
                         <span className="w-1.5 h-5 bg-violet-600 rounded-full inline-block" />
@@ -884,7 +835,6 @@ export default function Home() {
                       </Link>
                     </div>
 
-                    {/* 5-Column Responsive Glassmorphism Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
                       {filteredCatProducts.map((prod) => {
                         const currentPrice = getProductDisplayPrice(prod);
@@ -899,7 +849,6 @@ export default function Home() {
                             onClick={() => handleProductClick(prod.id)}
                             className={`bg-gradient-to-b ${gradientStyle} backdrop-blur-xl border border-white/90 rounded-3xl p-3.5 shadow-lg hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 relative flex flex-col justify-between group cursor-pointer text-left`}
                           >
-                            {/* Top Inner Glass Image Box */}
                             <div>
                               <div className="relative aspect-square w-full bg-white/70 backdrop-blur-md border border-white/90 rounded-2xl flex items-center justify-center shadow-inner shadow-white/60 mb-3 overflow-hidden">
                                 {prod.image_url ? (
@@ -912,7 +861,6 @@ export default function Home() {
                                   <span className="text-xs text-slate-400 font-extrabold uppercase">No Image</span>
                                 )}
 
-                                {/* Badges Over Image Box */}
                                 <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
                                   <span className="bg-slate-900/40 backdrop-blur-md text-white text-[9px] font-black px-2 py-0.5 rounded-full border border-white/40 shadow-2xs">
                                     ELITEPASS
@@ -922,7 +870,6 @@ export default function Home() {
                                   </span>
                                 </div>
 
-                                {/* Bottom Badge Over Image */}
                                 <div className="absolute bottom-2 left-2 z-10 pointer-events-none">
                                   {hasDiscount ? (
                                     <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-2xs">
@@ -936,12 +883,10 @@ export default function Home() {
                                 </div>
                               </div>
 
-                              {/* Product Title */}
                               <h4 className="text-xs font-extrabold text-slate-900 line-clamp-2 min-h-[2.4rem] leading-snug group-hover:text-violet-700 transition-colors">
                                 {prod.name}
                               </h4>
 
-                              {/* Star Ratings */}
                               <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 font-bold">
                                 <div className="flex gap-0.5">
                                   {[...Array(5)].map((_, i) => (
@@ -951,7 +896,6 @@ export default function Home() {
                                 <span>({prod.avg_rating > 0 ? (prod.avg_rating * 35).toFixed(0) : '170'})</span>
                               </div>
 
-                              {/* Price Line */}
                               <div className="flex items-baseline gap-1.5 mt-2">
                                 <span className="text-base font-black text-violet-700">
                                   ৳{currentPrice.toFixed(0)}
@@ -964,7 +908,6 @@ export default function Home() {
                               </div>
                             </div>
 
-                            {/* Action Buttons (3 Buttons: Buy Now + WhatsApp + Cart) */}
                             <div className="mt-3 space-y-1.5">
                               <button
                                 onClick={(e) => handleOrderNow(e, prod)}
@@ -1008,9 +951,7 @@ export default function Home() {
         </div>
 
 
-        {/* ================= SECTION 4: WHY CHOOSE US ================= */}
         <div className="relative bg-slate-50/60 border border-slate-200/60 rounded-3xl p-8 md:p-10 mb-6 shadow-xxs overflow-hidden text-center">
-          {/* Ambient background glow */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-blue-50/30 via-transparent to-transparent opacity-80 pointer-events-none" />
 
           <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-2 relative z-10">
@@ -1022,7 +963,6 @@ export default function Home() {
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 relative z-10">
-            {/* Card 1 */}
             <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-blue-500/8 hover:border-blue-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50/30 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-blue-600 group-hover:to-indigo-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-blue-500/25 group-hover:rotate-[8deg]">
                 <ShieldCheck className="w-6 h-6" />
@@ -1033,7 +973,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Card 2 */}
             <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-orange-500/8 hover:border-orange-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50/30 border border-amber-100 flex items-center justify-center text-amber-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-amber-400 group-hover:to-orange-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-orange-500/25 group-hover:rotate-[8deg]">
                 <Zap className="w-6 h-6" />
@@ -1044,7 +983,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Card 3 */}
             <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-emerald-500/8 hover:border-emerald-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/30 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-emerald-400 group-hover:to-teal-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-emerald-500/25 group-hover:rotate-[8deg]">
                 <Key className="w-6 h-6" />
@@ -1055,7 +993,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Card 4 */}
             <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-indigo-500/8 hover:border-indigo-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50/30 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-indigo-500 group-hover:to-violet-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-indigo-500/25 group-hover:rotate-[8deg]">
                 <Lock className="w-6 h-6" />
@@ -1066,7 +1003,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Card 5 */}
             <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-rose-500/8 hover:border-rose-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-50 to-red-50/30 border border-rose-100 flex items-center justify-center text-rose-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-rose-400 group-hover:to-red-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-rose-500/25 group-hover:rotate-[8deg]">
                 <RotateCcw className="w-6 h-6" />
@@ -1077,7 +1013,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Card 6 */}
             <div className="bg-white border border-slate-200/70 p-6 rounded-2xl flex flex-col items-center group hover:shadow-2xl hover:shadow-purple-500/8 hover:border-purple-500/40 hover:-translate-y-2 transition-all duration-300 ease-out cursor-pointer">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-50 to-fuchsia-50/30 border border-purple-100 flex items-center justify-center text-purple-600 mb-4 transition-all duration-350 group-hover:scale-110 group-hover:from-purple-500 group-hover:to-fuchsia-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-purple-500/25 group-hover:rotate-[8deg]">
                 <Headphones className="w-6 h-6" />
@@ -1091,9 +1026,7 @@ export default function Home() {
         </div>
 
 
-        {/* ================= SECTION 5: HOW IT WORKS ================= */}
         <div className="relative bg-slate-50/60 border border-slate-200/60 rounded-3xl p-8 md:p-10 mb-6 shadow-xxs overflow-hidden text-center">
-          {/* Ambient background glow */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-indigo-50/30 via-transparent to-transparent opacity-80 pointer-events-none" />
 
           <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-2 relative z-10">
@@ -1106,10 +1039,8 @@ export default function Home() {
 
           <div className="relative flex flex-col md:flex-row justify-between gap-8 mt-12 px-4 relative z-10">
 
-            {/* Flowchart connecting line (desktop only) */}
             <div className="hidden md:block absolute top-12 left-24 right-24 h-[3px] bg-gradient-to-r from-blue-400/30 via-indigo-400/40 to-purple-400/30 -z-10" />
 
-            {/* Step 1 */}
             <div className="flex-1 bg-white border border-slate-100 p-6 rounded-2xl flex flex-col items-center group hover:shadow-xl hover:shadow-blue-500/5 hover:-translate-y-1.5 transition-all duration-300 ease-out cursor-pointer">
               <div className="relative mb-6">
                 <span className="absolute -top-3 -right-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 group-hover:shadow-blue-500/30 z-10">
@@ -1125,7 +1056,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Step 2 */}
             <div className="flex-1 bg-white border border-slate-100 p-6 rounded-2xl flex flex-col items-center group hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1.5 transition-all duration-300 ease-out cursor-pointer">
               <div className="relative mb-6">
                 <span className="absolute -top-3 -right-3 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 group-hover:shadow-indigo-500/30 z-10">
@@ -1141,7 +1071,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Step 3 */}
             <div className="flex-1 bg-white border border-slate-100 p-6 rounded-2xl flex flex-col items-center group hover:shadow-xl hover:shadow-violet-500/5 hover:-translate-y-1.5 transition-all duration-300 ease-out cursor-pointer">
               <div className="relative mb-6">
                 <span className="absolute -top-3 -right-3 bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 group-hover:shadow-violet-500/30 z-10">
@@ -1161,7 +1090,6 @@ export default function Home() {
         </div>
 
 
-        {/* ================= SECTION 6: FAQ ACCORDION (BENGALI) ================= */}
         <div className="bg-[#f1f5f9] border border-slate-200/60 rounded-3xl p-6 md:p-8 mb-6">
           <div className="text-center mb-8">
             <h2 className="text-lg md:text-xl font-extrabold text-emerald-800 tracking-tight">
@@ -1199,7 +1127,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ================= SECTION 7: CUSTOMER REVIEWS ================= */}
         <div className="bg-[#f1f5f9] border border-slate-200/60 rounded-3xl p-6 md:p-8 mb-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-2">
             <h2 className="text-lg md:text-xl font-extrabold text-[#0c3944] tracking-tight flex items-center gap-2">

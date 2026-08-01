@@ -68,7 +68,6 @@ export default function ContactSupport() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: Contact Info & WhatsApp Integration */}
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs flex flex-col justify-between h-full">
               <div className="space-y-6">
@@ -93,7 +92,6 @@ export default function ContactSupport() {
                 </div>
               </div>
 
-              {/* Direct WhatsApp Callout */}
               <div className="border-t border-slate-150 pt-6 mt-6 text-center space-y-3">
                 <span className="text-xxs font-bold text-slate-400 uppercase block tracking-wider">Fastest Channel</span>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
@@ -106,7 +104,6 @@ export default function ContactSupport() {
                   rel="noopener noreferrer"
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center space-x-2 active:scale-95 duration-150 cursor-pointer"
                 >
-                  {/* SVG WhatsApp Icon */}
                   <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
                     <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.97-1.861-1.867-4.333-2.897-6.963-2.898-5.437 0-9.864 4.37-9.868 9.801-.001 1.77.463 3.5 1.34 5.013l-.974 3.561 3.661-.958zm11.367-7.24c-.266-.134-1.58-.78-1.822-.867-.243-.088-.419-.133-.596.134-.176.265-.682.866-.837 1.043-.154.177-.309.199-.575.066-.266-.134-1.123-.414-2.139-1.32-.79-.705-1.323-1.575-1.478-1.841-.155-.265-.017-.409.117-.541.12-.12.266-.31.399-.464.133-.155.177-.265.266-.442.088-.177.044-.332-.022-.464-.067-.133-.596-1.437-.817-1.967-.215-.518-.452-.447-.622-.456-.16-.008-.344-.01-.528-.01-.184 0-.485.069-.74.348-.254.278-.97.949-.97 2.316 0 1.367 1.002 2.69 1.14 2.872.139.182 1.97 3.01 4.77 4.21.667.285 1.187.456 1.593.585.67.213 1.28.183 1.76.111.537-.08 1.58-.646 1.802-1.238.221-.593.221-1.096.155-1.203-.066-.107-.242-.177-.508-.31z" />
                   </svg>
@@ -116,7 +113,6 @@ export default function ContactSupport() {
             </div>
           </div>
 
-          {/* Right: Support Contact Form */}
           <div className="lg:col-span-2">
             <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6">Send Message</h3>

@@ -22,7 +22,6 @@ const pool = mysql.createPool({
 async function initDB() {
   try {
 
-    // Try creating the database if privileges allow (mainly for local development)
     try {
       const connection = await mysql.createConnection(dbConfig);
       await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
@@ -32,10 +31,8 @@ async function initDB() {
     }
 
     console.log(`Connected to MySQL database: ${dbName}`);
-    // 3. Create tables if they don't exist
     await createTables();
 
-    // 4. Update schema if columns are missing
     await updateSchema();
 
   } catch (error) {
@@ -214,17 +211,6 @@ async function createTables() {
   await pool.query(productLicensesTable);
   await pool.query(slidesTable);
 
-  // Seed default admin if not exists
-  // const [rows] = await pool.query('SELECT * FROM users WHERE role = "admin" LIMIT 1');
-  // if (rows.length === 0) {
-  //   const bcrypt = require('bcryptjs');
-  //   const hashedPassword = await bcrypt.hash('admin123', 10);
-  //   await pool.query(
-  //     'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-  //     ['Admin User', 'admin@example.com', hashedPassword, 'admin']
-  //   );
-  //   console.log('Seeded default admin user');
-  // }
 
   console.log('Database tables verified/created successfully.');
 }
@@ -293,7 +279,6 @@ async function updateSchema() {
       console.log("Added column 'category_id' to 'products' table.");
     }
 
-    // New Columns for Product Configurations
     const [tagsCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'tags'");
     if (tagsCols.length === 0) {
       await pool.query("ALTER TABLE products ADD COLUMN tags TEXT DEFAULT NULL");
@@ -330,7 +315,6 @@ async function updateSchema() {
       console.log("Added column 'activation_options' to 'products' table.");
     }
 
-    // New Columns for Order Item Selections
     const [packageNameCols] = await pool.query("SHOW COLUMNS FROM order_items LIKE 'package_name'");
     if (packageNameCols.length === 0) {
       await pool.query("ALTER TABLE order_items ADD COLUMN package_name VARCHAR(255) DEFAULT NULL");
@@ -405,7 +389,6 @@ async function updateSchema() {
       console.log("Added column 'used_at' to 'product_licenses' table.");
     }
 
-    // Migration for public/guest reviews
     const [revNameCols] = await pool.query("SHOW COLUMNS FROM reviews LIKE 'reviewer_name'");
     if (revNameCols.length === 0) {
       await pool.query("ALTER TABLE reviews ADD COLUMN reviewer_name VARCHAR(255) DEFAULT NULL");
@@ -449,20 +432,17 @@ async function updateSchema() {
     try {
       await pool.query("ALTER TABLE reviews MODIFY user_id INT DEFAULT NULL");
     } catch (err) {
-      // Ignore if already nullable
     }
 
     try {
       await pool.query("ALTER TABLE reviews DROP INDEX unique_user_product");
     } catch (err) {
-      // Ignore if index doesn't exist
     }
   } catch (error) {
     console.error("Error updating database schema:", error.message);
   }
 }
 
-// Initialize on load
 initDB();
 
 module.exports = {

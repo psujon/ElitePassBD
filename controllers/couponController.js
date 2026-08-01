@@ -1,6 +1,5 @@
 const db = require('../config/db');
 
-// Apply / Validate Coupon Code for Checkout
 exports.applyCoupon = async (req, res) => {
   try {
     const { code, cartTotal } = req.body;
@@ -12,7 +11,6 @@ exports.applyCoupon = async (req, res) => {
     const cleanCode = code.trim().toUpperCase();
     const amount = parseFloat(cartTotal || 0);
 
-    // Find coupon by code
     const [rows] = await db.query(
       'SELECT * FROM coupons WHERE UPPER(code) = ? AND is_active = 1',
       [cleanCode]
@@ -24,17 +22,14 @@ exports.applyCoupon = async (req, res) => {
 
     const coupon = rows[0];
 
-    // Check expiration date
     if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
       return res.status(400).json({ message: 'This coupon code has expired.' });
     }
 
-    // Check usage limit
     if (coupon.usage_limit !== null && coupon.usage_limit > 0 && coupon.used_count >= coupon.usage_limit) {
       return res.status(400).json({ message: 'This coupon code has reached its maximum usage limit.' });
     }
 
-    // Check minimum order amount
     const minOrderAmount = parseFloat(coupon.min_order_amount || 0);
     if (amount < minOrderAmount) {
       return res.status(400).json({
@@ -42,7 +37,6 @@ exports.applyCoupon = async (req, res) => {
       });
     }
 
-    // Calculate discount amount
     let discountAmount = 0;
     const discountVal = parseFloat(coupon.discount_value);
 
@@ -73,7 +67,6 @@ exports.applyCoupon = async (req, res) => {
   }
 };
 
-// Get All Coupons (Admin)
 exports.getAllCoupons = async (req, res) => {
   try {
     const [coupons] = await db.query('SELECT * FROM coupons ORDER BY id DESC');
@@ -84,7 +77,6 @@ exports.getAllCoupons = async (req, res) => {
   }
 };
 
-// Create Coupon (Admin)
 exports.createCoupon = async (req, res) => {
   try {
     const {
@@ -103,7 +95,6 @@ exports.createCoupon = async (req, res) => {
 
     const cleanCode = code.trim().toUpperCase();
 
-    // Check duplicate
     const [existing] = await db.query('SELECT id FROM coupons WHERE UPPER(code) = ?', [cleanCode]);
     if (existing.length > 0) {
       return res.status(400).json({ message: `Coupon code '${cleanCode}' already exists.` });
@@ -131,7 +122,6 @@ exports.createCoupon = async (req, res) => {
   }
 };
 
-// Toggle Coupon Active Status (Admin)
 exports.toggleCouponStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -145,7 +135,6 @@ exports.toggleCouponStatus = async (req, res) => {
   }
 };
 
-// Delete Coupon (Admin)
 exports.deleteCoupon = async (req, res) => {
   try {
     const { id } = req.params;

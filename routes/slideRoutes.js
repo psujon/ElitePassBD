@@ -3,7 +3,6 @@ const router = express.Router();
 const db = require('../config/db');
 const { authenticateToken, authorizeAdmin } = require('../middleware/auth');
 
-// Get all slides
 router.get('/', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM slides ORDER BY id DESC');
@@ -14,7 +13,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Add a slide (Admin)
 router.post('/', authenticateToken, authorizeAdmin, async (req, res) => {
   const { image_url } = req.body;
   if (!image_url) {
@@ -29,7 +27,6 @@ router.post('/', authenticateToken, authorizeAdmin, async (req, res) => {
   }
 });
 
-// Delete a slide (Admin)
 router.delete('/:id', authenticateToken, authorizeAdmin, async (req, res) => {
   const { id } = req.params;
   try {

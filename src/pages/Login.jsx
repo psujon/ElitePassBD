@@ -14,7 +14,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Forgot Password / OTP Flow States
   const [view, setView] = useState('login'); // 'login' | 'forgot' | 'verify' | 'reset'
   const [forgotEmail, setForgotEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -41,10 +40,8 @@ export default function Login() {
       setError('');
       const data = await api.post('/auth/login', { email, password });
 
-      // Store token and user data in Context (which mirrors it to localStorage)
       login(data.token, data.user);
 
-      // Role-based routing redirection with fallback to previous route
       const from = location.state?.from?.pathname || (data.user.role === 'admin' ? '/admin' : '/dashboard');
       navigate(from, { replace: true });
     } catch (err) {
@@ -164,7 +161,6 @@ export default function Login() {
       await api.post('/auth/reset-password', { email: forgotEmail, otp, password: newPassword });
       toast.success('Password reset successfully! Please login.');
 
-      // Reset flow and load credentials into Login
       setEmail(forgotEmail);
       setPassword('');
       setForgotEmail('');
@@ -188,7 +184,6 @@ export default function Login() {
       <div className="max-w-md w-full mx-auto px-4">
         <div className="bg-white border border-slate-200/80 rounded-2xl p-8 shadow-xs animate-fade-in">
 
-          {/* VIEW: LOGIN */}
           {view === 'login' && (
             <>
               <div className="text-center mb-8">
@@ -328,7 +323,6 @@ export default function Login() {
             </>
           )}
 
-          {/* VIEW: FORGOT PASSWORD */}
           {view === 'forgot' && (
             <>
               <div className="text-center mb-6">
@@ -389,7 +383,6 @@ export default function Login() {
             </>
           )}
 
-          {/* VIEW: VERIFY OTP */}
           {view === 'verify' && (
             <>
               <div className="text-center mb-6">
@@ -460,7 +453,6 @@ export default function Login() {
             </>
           )}
 
-          {/* VIEW: RESET PASSWORD */}
           {view === 'reset' && (
             <>
               <div className="text-center mb-6">

@@ -9,7 +9,6 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID'
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 
-// Register User
 exports.register = async (req, res) => {
   const { name, email, password, whatsappNumber, address } = req.body;
 
@@ -18,16 +17,13 @@ exports.register = async (req, res) => {
   }
 
   try {
-    // Check if user already exists
     const [existingUser] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
     if (existingUser.length > 0) {
       return res.status(400).json({ message: 'Email is already registered.' });
     }
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Save user to database
     await db.query(
       'INSERT INTO users (name, email, password, role, whatsapp_number, address) VALUES (?, ?, ?, "user", ?, ?)',
       [name, email, hashedPassword, whatsappNumber, address]
@@ -40,7 +36,6 @@ exports.register = async (req, res) => {
   }
 };
 
-// Login User
 exports.login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -49,7 +44,6 @@ exports.login = async (req, res) => {
   }
 
   try {
-    // Find user
     const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
     if (users.length === 0) {
       return res.status(401).json({ message: 'Invalid email or password.' });
@@ -57,13 +51,11 @@ exports.login = async (req, res) => {
 
     const user = users[0];
 
-    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
 
-    // Generate JWT
     const token = jwt.sign(
       { id: user.id, name: user.name, email: user.email, role: user.role },
       JWT_SECRET,
@@ -88,7 +80,6 @@ exports.login = async (req, res) => {
   }
 };
 
-// Google Login User
 exports.googleLogin = async (req, res) => {
   const { credential } = req.body; // This is the access_token from the frontend
 
@@ -99,7 +90,6 @@ exports.googleLogin = async (req, res) => {
   try {
     console.log('Received googleLogin request. Credential length:', credential ? credential.length : 0);
     
-    // Fetch user info from Google using native https module for cross-version Node compatibility
     const https = require('https');
     const getGoogleUserInfo = (token) => {
       return new Promise((resolve, reject) => {
@@ -138,13 +128,10 @@ exports.googleLogin = async (req, res) => {
       return res.status(400).json({ message: 'Email not found in Google profile.' });
     }
 
-    // Check if user exists
     const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
     let user;
 
     if (users.length === 0) {
-      // Create new user if not exists
-      // Generate a random password for Google-authenticated users
       const randomPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
       const hashedPassword = await bcrypt.hash(randomPassword, 10);
       
@@ -159,7 +146,6 @@ exports.googleLogin = async (req, res) => {
       user = users[0];
     }
 
-    // Generate JWT
     const token = jwt.sign(
       { id: user.id, name: user.name, email: user.email, role: user.role },
       JWT_SECRET,
@@ -186,7 +172,6 @@ exports.googleLogin = async (req, res) => {
 };
 
 
-// Get Profile
 exports.getProfile = async (req, res) => {
   try {
     const [users] = await db.query('SELECT id, name, email, role, whatsapp_number, address, created_at FROM users WHERE id = ?', [req.user.id]);
@@ -202,7 +187,6 @@ exports.getProfile = async (req, res) => {
 
 const nodemailer = require('nodemailer');
 
-// Helper to send email
 const sendOTPEmail = async (email, otp) => {
   try {
     const smtpHost = process.env.SMTP_HOST;
@@ -248,7 +232,6 @@ const sendOTPEmail = async (email, otp) => {
   }
 };
 
-// Forgot Password - Send OTP
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
   if (!email) {
@@ -279,7 +262,6 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-// Verify OTP
 exports.verifyOTP = async (req, res) => {
   const { email, otp } = req.body;
   if (!email || !otp) {
@@ -303,7 +285,6 @@ exports.verifyOTP = async (req, res) => {
   }
 };
 
-// Reset Password
 exports.resetPassword = async (req, res) => {
   const { email, otp, password } = req.body;
   if (!email || !otp || !password) {

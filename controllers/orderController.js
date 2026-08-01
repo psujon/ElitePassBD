@@ -1,6 +1,5 @@
 const db = require('../config/db');
 
-// Create Order (User)
 exports.createOrder = async (req, res) => {
   const { items, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, coupon_code, discount_amount } = req.body;
   const userId = req.user.id;
@@ -12,20 +11,17 @@ exports.createOrder = async (req, res) => {
     return res.status(400).json({ message: 'Phone number are required.' });
   }
 
-  // Get database pool to perform transaction
   const pool = db.getPool();
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
 
-    // Extract IP and User Agent for Facebook Conversions API
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
     const firstIp = ip.split(',')[0].trim();
     const cleanIp = firstIp.startsWith('::ffff:') ? firstIp.substring(7) : firstIp;
     const userAgent = req.headers['user-agent'] || '';
 
-    // 1. Insert order record
     const [orderResult] = await connection.query(
       'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, client_ip, client_user_agent, coupon_code, discount_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [userId, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || null, cleanIp, userAgent, coupon_code || null, discount_amount ? parseFloat(discount_amount) : 0]
@@ -39,7 +35,6 @@ exports.createOrder = async (req, res) => {
       );
     }
 
-    // 2. Insert order items & update product stock
     for (const item of items) {
       const { product_id, quantity, price, package_name, selected_device, selected_activation } = item;
 
@@ -47,7 +42,6 @@ exports.createOrder = async (req, res) => {
         throw new Error('Invalid item details in cart.');
       }
 
-      // Check stock and deduct it
       const [stockCheck] = await connection.query(
         'SELECT stock, name, packages FROM products WHERE id = ? FOR UPDATE',
         [product_id]
@@ -66,7 +60,6 @@ exports.createOrder = async (req, res) => {
         packages = [];
       }
 
-      // If packages exist, verify and deduct stock from the specific package
       if (packages && packages.length > 0) {
         const matchedPkg = packages.find(p => 
           p.duration === package_name && 
@@ -79,10 +72,8 @@ exports.createOrder = async (req, res) => {
             if (pkgStock < quantity) {
               throw new Error(`Insufficient stock for package "${package_name}" of product "${productName}". Available: ${pkgStock}`);
             }
-            // Deduct from package
             matchedPkg.stock = pkgStock - quantity;
             
-            // Re-calculate overall product stock as sum of packages
             const totalStock = packages.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
             
             await connection.query(
@@ -90,7 +81,6 @@ exports.createOrder = async (req, res) => {
               [totalStock, JSON.stringify(packages), product_id]
             );
           } else {
-            // If package has no stock limit specified, check global product stock
             const currentStock = stockCheck[0].stock;
             if (currentStock < quantity) {
               throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
@@ -101,7 +91,6 @@ exports.createOrder = async (req, res) => {
             );
           }
         } else {
-          // If packages exist but none matched, check global product stock
           const currentStock = stockCheck[0].stock;
           if (currentStock < quantity) {
             throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
@@ -112,7 +101,6 @@ exports.createOrder = async (req, res) => {
           );
         }
       } else {
-        // Fallback to standard global stock check
         const currentStock = stockCheck[0].stock;
         if (currentStock < quantity) {
           throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
@@ -123,7 +111,6 @@ exports.createOrder = async (req, res) => {
         );
       }
 
-      // Insert order item
       await connection.query(
         'INSERT INTO order_items (order_id, product_id, quantity, price, package_name, selected_device, selected_activation) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [orderId, product_id, quantity, price, package_name || null, selected_device || null, selected_activation || null]
@@ -145,17 +132,14 @@ exports.createOrder = async (req, res) => {
   }
 };
 
-// Get My Orders (User)
 exports.getMyOrders = async (req, res) => {
   const userId = req.user.id;
   try {
-    // Fetch user orders
     const [orders] = await db.query(
       'SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC',
       [userId]
     );
 
-    // Fetch items for each order
     const ordersWithItems = [];
     for (const order of orders) {
       const [items] = await db.query(
@@ -166,7 +150,6 @@ exports.getMyOrders = async (req, res) => {
         [order.id]
       );
 
-      // Fetch associated license keys for each order item
       for (const item of items) {
         const [licenses] = await db.query(
           'SELECT license_key, rules FROM product_licenses WHERE order_item_id = ?',
@@ -189,7 +172,6 @@ exports.getMyOrders = async (req, res) => {
   }
 };
 
-// Track Specific Order (User / Admin)
 exports.trackOrder = async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
@@ -203,12 +185,10 @@ exports.trackOrder = async (req, res) => {
 
     const order = orders[0];
 
-    // Authorize: Only the placing user or an admin can track the order details
     if (order.user_id !== userId && userRole !== 'admin') {
       return res.status(403).json({ message: 'Access denied. You do not own this order.' });
     }
 
-    // Fetch order items
     const [items] = await db.query(
       `SELECT oi.*, p.name as product_name, p.image_url 
        FROM order_items oi
@@ -217,7 +197,6 @@ exports.trackOrder = async (req, res) => {
       [order.id]
     );
 
-    // Fetch associated license keys for each order item
     for (const item of items) {
       const [licenses] = await db.query(
         'SELECT license_key, rules FROM product_licenses WHERE order_item_id = ?',
@@ -237,10 +216,8 @@ exports.trackOrder = async (req, res) => {
   }
 };
 
-// Get All Orders (Admin)
 exports.getAllOrders = async (req, res) => {
   try {
-    // Fetch all orders with user name and email
     const [orders] = await db.query(
       `SELECT o.*, u.name as user_name, u.email as user_email 
        FROM orders o
@@ -258,7 +235,6 @@ exports.getAllOrders = async (req, res) => {
         [order.id]
       );
 
-      // Fetch associated license keys for each order item
       for (const item of items) {
         const [licenses] = await db.query(
           'SELECT license_key, rules FROM product_licenses WHERE order_item_id = ?',
@@ -281,7 +257,6 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 
-// Update Order Status (Admin)
 exports.updateOrderStatus = async (req, res) => {
   const { id } = req.params;
   const { status, cancel_reason } = req.body;
@@ -298,7 +273,6 @@ exports.updateOrderStatus = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // 1. Fetch current order status
     const [orderCheck] = await connection.query(
       'SELECT status FROM orders WHERE id = ? FOR UPDATE',
       [id]
@@ -311,7 +285,6 @@ exports.updateOrderStatus = async (req, res) => {
 
     const previousStatus = orderCheck[0].status;
 
-    // 2. If status is changing to Cancelled (and wasn't Cancelled already), restock items
     if (status === 'Cancelled' && previousStatus !== 'Cancelled') {
       const [items] = await connection.query(
         'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
@@ -326,14 +299,12 @@ exports.updateOrderStatus = async (req, res) => {
       }
     }
 
-    // 3. If status is changing FROM Cancelled to something else, deduct stock
     if (previousStatus === 'Cancelled' && status !== 'Cancelled') {
       const [items] = await connection.query(
         'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
         [id]
       );
 
-      // Verify stock availability first
       for (const item of items) {
         const [prodCheck] = await connection.query(
           'SELECT stock, name FROM products WHERE id = ? FOR UPDATE',
@@ -352,7 +323,6 @@ exports.updateOrderStatus = async (req, res) => {
         }
       }
 
-      // Deduct stock
       for (const item of items) {
         await connection.query(
           'UPDATE products SET stock = stock - ? WHERE id = ?',
@@ -361,7 +331,6 @@ exports.updateOrderStatus = async (req, res) => {
       }
     }
 
-    // 4. Update the order status and cancel reason
     if (status === 'Cancelled') {
       await connection.query(
         'UPDATE orders SET status = ?, cancel_reason = ? WHERE id = ?',
@@ -385,7 +354,6 @@ exports.updateOrderStatus = async (req, res) => {
   }
 };
 
-// Delete Order (Admin)
 exports.deleteOrder = async (req, res) => {
   const { id } = req.params;
   const pool = db.getPool();
@@ -502,7 +470,6 @@ exports.createGuestOrder = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // 1. Check if email is already registered
     const [existingUser] = await connection.query('SELECT id FROM users WHERE email = ?', [guest_email]);
     let userId;
     let isNewUser = false;
@@ -512,7 +479,6 @@ exports.createGuestOrder = async (req, res) => {
       connection.release();
       return res.status(400).json({ message: 'This email is already registered. Please log in to complete your checkout.' });
     } else {
-      // Create new user
       isNewUser = true;
       randomPassword = Math.floor(100000 + Math.random() * 900000).toString();
       const hashedPassword = await bcrypt.hash(randomPassword, 10);
@@ -524,20 +490,17 @@ exports.createGuestOrder = async (req, res) => {
       userId = userResult.insertId;
     }
 
-    // Extract IP and User Agent for Facebook Conversions API
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
     const firstIp = ip.split(',')[0].trim();
     const cleanIp = firstIp.startsWith('::ffff:') ? firstIp.substring(7) : firstIp;
     const userAgent = req.headers['user-agent'] || '';
 
-    // 2. Insert order record
     const [orderResult] = await connection.query(
       'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, client_ip, client_user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [userId, total_amount, shipping_address, phone || 'Not Provided', payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || guest_email || null, cleanIp, userAgent]
     );
     const orderId = orderResult.insertId;
 
-    // 3. Insert order items & update product stock
     for (const item of items) {
       const { product_id, quantity, price, package_name, selected_device, selected_activation } = item;
 
@@ -545,7 +508,6 @@ exports.createGuestOrder = async (req, res) => {
         throw new Error('Invalid item details in cart.');
       }
 
-      // Check stock and deduct it
       const [stockCheck] = await connection.query(
         'SELECT stock, name, packages FROM products WHERE id = ? FOR UPDATE',
         [product_id]
@@ -564,7 +526,6 @@ exports.createGuestOrder = async (req, res) => {
         packages = [];
       }
 
-      // If packages exist, verify and deduct stock from the specific package
       if (packages && packages.length > 0) {
         const matchedPkg = packages.find(p => 
           p.duration === package_name && 
@@ -577,10 +538,8 @@ exports.createGuestOrder = async (req, res) => {
             if (pkgStock < quantity) {
               throw new Error(`Insufficient stock for package "${package_name}" of product "${productName}". Available: ${pkgStock}`);
             }
-            // Deduct from package
             matchedPkg.stock = pkgStock - quantity;
             
-            // Re-calculate overall product stock as sum of packages
             const totalStock = packages.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
             
             await connection.query(
@@ -588,7 +547,6 @@ exports.createGuestOrder = async (req, res) => {
               [totalStock, JSON.stringify(packages), product_id]
             );
           } else {
-            // If package has no stock limit specified, check global product stock
             const currentStock = stockCheck[0].stock;
             if (currentStock < quantity) {
               throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
@@ -599,7 +557,6 @@ exports.createGuestOrder = async (req, res) => {
             );
           }
         } else {
-          // If packages exist but none matched, check global product stock
           const currentStock = stockCheck[0].stock;
           if (currentStock < quantity) {
             throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
@@ -610,7 +567,6 @@ exports.createGuestOrder = async (req, res) => {
           );
         }
       } else {
-        // Fallback to standard global stock check
         const currentStock = stockCheck[0].stock;
         if (currentStock < quantity) {
           throw new Error(`Insufficient stock for product: "${productName}". Available stock: ${currentStock}`);
@@ -621,17 +577,14 @@ exports.createGuestOrder = async (req, res) => {
         );
       }
 
-      // Insert order item
       await connection.query(
         'INSERT INTO order_items (order_id, product_id, quantity, price, package_name, selected_device, selected_activation) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [orderId, product_id, quantity, price, package_name || null, selected_device || null, selected_activation || null]
       );
     }
 
-    // Commit database changes
     await connection.commit();
 
-    // 4. Send email credentials (asynchronous)
     if (isNewUser) {
       sendGuestAccountEmail(guest_email, guest_name, randomPassword);
     }

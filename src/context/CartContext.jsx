@@ -6,7 +6,6 @@ const CartContext = createContext();
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
 
-  // Load cart on start
   useEffect(() => {
     const storedCart = localStorage.getItem('cart');
     if (storedCart) {
@@ -18,7 +17,6 @@ export const CartProvider = ({ children }) => {
     }
   }, []);
 
-  // Sync cart to localStorage
   const saveCart = (items) => {
     setCartItems(items);
     localStorage.setItem('cart', JSON.stringify(items));
@@ -27,7 +25,6 @@ export const CartProvider = ({ children }) => {
   const addToCart = (product, qty = 1, selectedPackage = null, selectedDevice = null, selectedActivation = null) => {
     const orderQty = parseInt(qty);
     
-    // Resolve values
     const packageName = selectedPackage ? selectedPackage.duration : '';
     const selectedDeviceVal = selectedDevice || '';
     const selectedActivationVal = selectedActivation || '';
@@ -37,7 +34,6 @@ export const CartProvider = ({ children }) => {
       ? parseInt(selectedPackage.stock)
       : product.stock;
 
-    // Create a unique cart key for this combination
     const cartKey = `${product.id}_${packageName}_${selectedDeviceVal}_${selectedActivationVal}`;
 
     const existingIndex = cartItems.findIndex((item) => item.cart_key === cartKey);
@@ -46,7 +42,6 @@ export const CartProvider = ({ children }) => {
       const updated = [...cartItems];
       const newQty = updated[existingIndex].quantity + orderQty;
       
-      // Enforce product stock limit
       if (newQty > activeStock) {
         toast.error(`Cannot add more. Only ${activeStock} items available in stock.`);
         return false;
@@ -73,7 +68,6 @@ export const CartProvider = ({ children }) => {
       }]);
     }
 
-    // Trigger GA4 / Meta add_to_cart event
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({ 'ecommerce': null }); // Clear previous ecommerce object
     window.dataLayer.push({

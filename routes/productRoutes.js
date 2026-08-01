@@ -3,25 +3,20 @@ const router = express.Router();
 const productController = require('../controllers/productController');
 const { authenticateToken, optionalAuth, authorizeAdmin } = require('../middleware/auth');
 
-// Public routes
 router.get('/', productController.getAllProducts);
 router.get('/categories', productController.getAllCategories);
 router.get('/reviews/latest', productController.getLatestReviews);
 router.get('/:id', productController.getProductById);
 router.get('/:productId/reviews', productController.getProductReviews);
 
-// Public/Optional auth review route
 router.post('/:productId/reviews', optionalAuth, productController.addOrUpdateReview);
 
-// Authenticated reviews routes
 router.get('/:productId/my-review', authenticateToken, productController.getUserReviewForProduct);
 
-// Admin-only categories routes
 router.post('/categories', authenticateToken, authorizeAdmin, productController.createCategory);
 router.put('/categories/:id', authenticateToken, authorizeAdmin, productController.updateCategory);
 router.delete('/categories/:id', authenticateToken, authorizeAdmin, productController.deleteCategory);
 
-// Admin-only routes
 router.post('/', authenticateToken, authorizeAdmin, productController.createProduct);
 router.put('/:id', authenticateToken, authorizeAdmin, productController.updateProduct);
 router.delete('/:id', authenticateToken, authorizeAdmin, productController.deleteProduct);

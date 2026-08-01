@@ -12,7 +12,7 @@
   --color-accent-light: rgba(255, 109, 0, 0.25);
 }
 
-/* Base Styles */
+
 body {
   margin: 0;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -73,7 +73,7 @@ body {
   box-shadow: 0 20px 40px -12px rgba(0, 95, 83, 0.12);
 }
 
-/* Premium Scrollbar */
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -93,7 +93,7 @@ body {
   background: #3b82f6;
 }
 
-/* Custom premium design classes */
+
 .glass-card {
   background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(16px);
@@ -112,7 +112,7 @@ body {
   background: rgba(15, 23, 42, 0.8);
 }
 
-/* Premium neon text and glow effects */
+
 .glow-primary {
   text-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
 }
@@ -140,7 +140,7 @@ body {
   left: 100%;
 }
 
-/* Custom order-tracking styles */
+
 .track-step-active {
   background: #8b5cf6;
   box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
@@ -158,7 +158,7 @@ body {
   background: #1e293b;
 }
 
-/* ReactQuill Premium Overrides */
+
 .ql-toolbar.ql-snow {
   border: 1px solid #cbd5e1 !important;
   border-top-left-radius: 0.5rem;
@@ -179,11 +179,11 @@ body {
   min-height: 150px;
 }
 
-/* Style HTML output from ReactQuill inside .prose container */
+
 .prose {
   font-family: inherit;
   color: #475569;
-  /* text-slate-600 */
+  
 }
 
 .prose p {
@@ -199,7 +199,7 @@ body {
 .prose b {
   font-weight: 700;
   color: #1e293b;
-  /* text-slate-800 */
+  
 }
 
 .prose em,
@@ -215,7 +215,7 @@ body {
 .prose h6 {
   font-weight: 800;
   color: #1e293b;
-  /* text-slate-800 */
+  
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
   line-height: 1.25;
@@ -268,7 +268,7 @@ body {
 
 .prose a {
   color: #7c3aed;
-  /* text-violet-600 */
+  
   text-decoration: underline;
   font-weight: 600;
   transition: color 0.2s;
@@ -276,7 +276,7 @@ body {
 
 .prose a:hover {
   color: #6d28d9;
-  /* text-violet-750 */
+  
 }
 
 .prose blockquote {
@@ -294,7 +294,7 @@ body {
   margin: 1rem 0;
 }
 
-/* Quill specific text sizing, alignments and fonts */
+
 .prose .ql-size-small {
   font-size: 0.75rem !important;
 }
@@ -327,7 +327,7 @@ body {
   text-align: justify !important;
 }
 
-/* Table styling for HTML pasted into description/additional info */
+
 .prose table {
   width: 100%;
   border-collapse: collapse;
@@ -341,23 +341,23 @@ body {
 .prose table td {
   padding: 0.75rem 1rem;
   border: 1px solid #e2e8f0;
-  /* border-slate-200 */
+  
 }
 
 .prose table th {
   background-color: #f8fafc;
-  /* bg-slate-50 */
+  
   font-weight: 700;
   color: #1e293b;
-  /* text-slate-800 */
+  
 }
 
 .prose table tr:nth-child(even) {
   background-color: #f1f5f9;
-  /* bg-slate-100 */
+  
 }
 
-/* Smooth Horizontal Marquee Animation */
+
 @keyframes marquee {
   0% {
     transform: translateX(0%);
@@ -378,7 +378,7 @@ body {
   animation-play-state: paused;
 }
 
-/* Fast & Smooth Topbar Marquee Ticker */
+
 .animate-topbar-marquee {
   display: inline-flex;
   width: max-content;

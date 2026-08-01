@@ -6,7 +6,6 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_for_elitepass_bd';
 
-// POST /api/pixel/track
 router.post('/track', async (req, res) => {
   const { eventName, eventId, userData = {}, customData = {} } = req.body;
 
@@ -17,7 +16,6 @@ router.post('/track', async (req, res) => {
   try {
     let finalUserData = { ...userData };
 
-    // Decode token optional logic to extract logged-in user details
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     if (token) {
@@ -35,11 +33,9 @@ router.post('/track', async (req, res) => {
           }
         }
       } catch (err) {
-        // Suppress auth error and treat as guest
       }
     }
 
-    // Call FB CAPI tracking utility
     await sendFbEvent({
       eventName,
       eventId,

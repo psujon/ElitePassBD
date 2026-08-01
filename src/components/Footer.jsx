@@ -24,7 +24,6 @@ export default function Footer() {
     e.preventDefault();
     if (!message.trim()) return;
 
-    // Construct WhatsApp link with support phone number
     const phoneNumber = '8801925112444';
     const encodedText = encodeURIComponent(message.trim());
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedText}`;
@@ -38,10 +37,8 @@ export default function Footer() {
     <footer className="bg-white border-t border-slate-200 px-4 sm:px-6 mt-auto text-slate-800 text-left relative z-30">
       <div className="w-full max-w-[95%] mx-auto">
 
-        {/* Main Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-10">
 
-          {/* Column 1: Brand details */}
           <div className="lg:col-span-2 space-y-4">
             <Link to="/" className="flex items-center space-x-2 text-xl font-bold tracking-tight text-slate-900">
               <span className="text-blue-600 font-black text-2xl">
@@ -63,7 +60,6 @@ export default function Footer() {
                 </Link>
               </div>
             </div>
-            {/* Social icons */}
             <div className="flex space-x-3.5 pt-2">
               <a href="https://facebook.com/elitepassbd" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs">
                 <Facebook className="w-4 h-4" />
@@ -77,7 +73,6 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Column 2: Products */}
           <div>
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 mb-2">
               Products
@@ -93,7 +88,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 3: Support */}
           <div>
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 mb-4">
               Support
@@ -104,7 +98,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 4: Legal */}
           <div>
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 mb-4">
               Legal
@@ -121,18 +114,14 @@ export default function Footer() {
 
         </div>
 
-        {/* Bottom Bar Payment & Trust Badges */}
         <div className="border-t border-slate-200 justify-between items-center gap-2 text-xs text-slate-500 font-semibold">
 
-          {/* Payment Methods */}
           <div className="w-full">
-            {/* Desktop Version */}
             <img
               src="/Footer-Desktop-Light-Version.png.png"
               alt="ElitePassBD Features"
               className="hidden lg:block w-full h-auto"
             />
-            {/* Mobile Version */}
             <img
               src="/Footer-Mobile-Light-Version.png.png"
               alt="ElitePassBD Features"
@@ -140,7 +129,6 @@ export default function Footer() {
             />
           </div>
 
-          {/* Trust badges */}
           {/* <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider mt-5">
             <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full select-none shadow-xxs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -158,21 +146,17 @@ export default function Footer() {
 
         </div>
 
-        {/* Copyright */}
         <div className="text-center text-[10px] text-slate-400 font-bold border-t border-slate-150 p-2">
           &copy; {new Date().getFullYear()} ElitePassBD. All rights reserved.
         </div>
 
       </div>
 
-      {/* ================= FLOATING WHATSAPP / CALL SUPPORT WIDGET ================= */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
 
-        {/* Options Popup Menu matching screenshot */}
         {isChatOpen && (
           <div className="mb-4 flex flex-col items-end gap-3.5 animate-fade-in-up">
             
-            {/* Phone Call Option Pill */}
             <a
               href="tel:01925112444"
               className="w-72 sm:w-80 bg-white/95 backdrop-blur-xl border border-purple-200/90 hover:border-blue-500 p-3 rounded-full shadow-2xl hover:shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-between group text-left"
@@ -191,7 +175,6 @@ export default function Footer() {
               </div>
             </a>
 
-            {/* WhatsApp Chat Option Pill */}
             <a
               href="https://wa.me/8801925112444?text=Hello%20ElitePassBD%20Support,%20I%20need%20assistance."
               target="_blank"
@@ -214,7 +197,6 @@ export default function Footer() {
               </div>
             </a>
 
-            {/* Bottom "Which do you prefer?" Header Pill */}
             <div className="bg-white/95 backdrop-blur-xl border border-purple-200/90 px-4 py-1.5 rounded-full shadow-lg text-xs font-black text-violet-900 flex items-center gap-2 mr-2">
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
               <span>কোনটি পছন্দ করবেন?</span>
@@ -223,10 +205,8 @@ export default function Footer() {
           </div>
         )}
 
-        {/* Floating Button Toggle Container */}
         <div className="relative group flex items-center justify-center">
 
-          {/* Layer 1 & 2: Glowing Animated Pulsing Rings (When closed) */}
           {!isChatOpen && (
             <>
               <span className="absolute w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-purple-400/40 animate-ping opacity-75"></span>
@@ -234,7 +214,6 @@ export default function Footer() {
             </>
           )}
 
-          {/* Main Floating Button */}
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
             className={`relative rounded-full flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer backdrop-blur-md z-10 ${isChatOpen

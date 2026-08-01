@@ -97,7 +97,6 @@ export function useTheme() {
   return context;
 }
 
-// Utility: Adjust Hex Color Brightness
 function adjustColorBrightness(hex, percent) {
   let num = parseInt(hex.replace('#', ''), 16);
   let amt = Math.round(2.55 * percent);
@@ -113,7 +112,6 @@ function adjustColorBrightness(hex, percent) {
   ).toString(16).slice(1);
 }
 
-// Utility: Convert Hex to RGBA
 function hexToRgba(hex, alpha = 1) {
   let c = hex.replace('#', '');
   if (c.length === 3) {

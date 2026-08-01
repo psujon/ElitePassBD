@@ -1,6 +1,5 @@
 const db = require('../config/db');
 
-// Get all license keys
 exports.getAllLicenses = async (req, res) => {
   try {
     const [licenses] = await db.query(`
@@ -18,7 +17,6 @@ exports.getAllLicenses = async (req, res) => {
   }
 };
 
-// Create license key(s) - supports single or bulk (newline-separated) insertion
 exports.createLicense = async (req, res) => {
   const { product_id, activation_option, package_option, rules, license_key } = req.body;
 
@@ -27,13 +25,11 @@ exports.createLicense = async (req, res) => {
   }
 
   try {
-    // Verify product exists
     const [product] = await db.query('SELECT id FROM products WHERE id = ?', [product_id]);
     if (product.length === 0) {
       return res.status(404).json({ message: 'Selected product not found.' });
     }
 
-    // Split keys by newline and filter out empty strings
     const keys = license_key
       .split('\n')
       .map(k => k.trim())
@@ -43,7 +39,6 @@ exports.createLicense = async (req, res) => {
       return res.status(400).json({ message: 'No valid license keys provided.' });
     }
 
-    // Prepare values for bulk insert
     const values = keys.map(k => [
       parseInt(product_id),
       activation_option ? activation_option.trim() : null,
@@ -67,7 +62,6 @@ exports.createLicense = async (req, res) => {
   }
 };
 
-// Delete license key
 exports.deleteLicense = async (req, res) => {
   const { id } = req.params;
   try {
@@ -84,7 +78,6 @@ exports.deleteLicense = async (req, res) => {
   }
 };
 
-// Update license key
 exports.updateLicense = async (req, res) => {
   const { id } = req.params;
   const { product_id, activation_option, package_option, rules, license_key } = req.body;

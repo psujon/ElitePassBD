@@ -20,7 +20,6 @@ export default function ProductDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Reviews state
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const reviewsRef = React.useRef(null);
@@ -73,30 +72,24 @@ export default function ProductDetails() {
     }
   };
 
-  // User selections
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [selectedDevice, setSelectedDevice] = useState('');
   const [selectedActivation, setSelectedActivation] = useState('');
   const [quantity, setQuantity] = useState(1);
 
-  // Tab State
   const [activeTab, setActiveTab] = useState('description'); // 'description' or 'additional'
 
-  // FAQ Accordion State (stores key-index of open FAQ item)
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
 
-  // Related products
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
 
-  // Favorite button
   const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     fetchProductDetails();
   }, [id]);
 
-  // Sync package selection when activation choice changes
   useEffect(() => {
     if (product && product.packages && product.packages.length > 0) {
       const activations = product.activation_options
@@ -130,7 +123,6 @@ export default function ProductDetails() {
       const prodData = await api.get(`/products/${id}`);
       setProduct(prodData);
 
-      // Trigger ViewContent tracking event
       trackEvent('ViewContent', {
         content_ids: [String(prodData.id)],
         content_name: prodData.name,
@@ -139,7 +131,6 @@ export default function ProductDetails() {
         currency: 'BDT'
       });
 
-      // Trigger GA4 view_item event
       window.dataLayer = window.dataLayer || [];
       window.dataLayer.push({ 'ecommerce': null });
       window.dataLayer.push({
@@ -156,14 +147,12 @@ export default function ProductDetails() {
         }
       });
 
-      // Pre-select first package if packages exist
       if (prodData.packages && prodData.packages.length > 0) {
         setSelectedPackage(prodData.packages[0]);
       } else {
         setSelectedPackage(null);
       }
 
-      // Pre-select first options if device/activation options exist
       if (prodData.device_options) {
         const devices = prodData.device_options.split(',').map(d => d.trim()).filter(Boolean);
         if (devices.length > 0) setSelectedDevice(devices[0]);
@@ -178,13 +167,10 @@ export default function ProductDetails() {
         setSelectedActivation('');
       }
 
-      // Reset quantity
       setQuantity(1);
 
-      // Fetch reviews
       fetchReviews(prodData.id);
 
-      // Fetch related products
       if (prodData.category_id) {
         fetchRelated(prodData.category_id, prodData.id);
       } else {
@@ -215,7 +201,6 @@ export default function ProductDetails() {
     try {
       setRelatedLoading(true);
       const allProds = await api.get('/products');
-      // filter by same category and exclude current product
       const filtered = allProds.filter(p => p.category_id === categoryId && p.id !== currentProdId);
       setRelatedProducts(filtered.slice(0, 4)); // max 4 related products
     } catch (err) {
@@ -242,7 +227,6 @@ export default function ProductDetails() {
           item_price: priceToUse
         }]
       });
-      // Small feedback dialog / confirm
       toast.success(`Added to cart: ${product.name} ${selectedPackage ? `(${selectedPackage.duration})` : ''}`);
     }
   };
@@ -276,7 +260,6 @@ export default function ProductDetails() {
     window.open(`https://wa.me/${supportNumber}?text=${encodedText}`, '_blank');
   };
 
-  // Compute average rating
   const avgRating = reviews.length > 0
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
     : 0;
@@ -360,7 +343,6 @@ export default function ProductDetails() {
     <div className="w-full min-h-[calc(100vh-64px)] bg-[#f5f7fa] text-slate-800 py-8 text-left animate-fade-in">
       <div className="max-w-full mx-auto px-4 sm:px-6">
 
-        {/* Back navigation */}
         <button
           onClick={() => navigate('/')}
           className="flex items-center space-x-2 text-slate-500 hover:text-slate-800 text-xs font-bold mb-8 transition-colors group cursor-pointer border-none bg-transparent"
@@ -369,16 +351,12 @@ export default function ProductDetails() {
           <span>Back to Store Catalog</span>
         </button>
 
-        {/* Main product configuration layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-16">
 
-          {/* Left Column: ShahedStore Style Glass Image Box & Showcase Card */}
           <div className="lg:col-span-5 space-y-4">
             <div className="bg-gradient-to-br from-purple-50/70 via-indigo-50/50 to-blue-50/60 border border-purple-100/90 rounded-xl shadow-xl backdrop-blur-xl relative overflow-hidden flex flex-col items-center justify-center text-left">
 
-              {/* Center 3D Showcase Image Card */}
               <div className="relative w-full aspect-square bg-white/75 backdrop-blur-xl border border-white/90 rounded-xl p-1 shadow-xl shadow-purple-500/10 flex items-center justify-center overflow-hidden group">
-                {/* Heart Icon Overlay Directly On Top of Product Image */}
                 <button
                   onClick={() => {
                     setIsFavorite(!isFavorite);
@@ -411,7 +389,6 @@ export default function ProductDetails() {
               </div>
             </div>
 
-            {/* Feature Checkmark Pills Below Image */}
             <div className="grid grid-cols-3 gap-2 text-[11px] font-extrabold text-slate-700 text-center">
               <div className="bg-white/90 border border-purple-100/90 rounded-2xl p-2.5 flex items-center justify-center space-x-1.5 shadow-2xs">
                 <span className="text-amber-500">⚡</span>
@@ -428,16 +405,12 @@ export default function ProductDetails() {
             </div>
           </div>
 
-          {/* Right Column: Selections and Buy Card */}
           <div className="lg:col-span-7 text-left space-y-5">
 
-            {/* Top Outer Glass Card (Matching 1st Image Design) */}
             <div className="bg-white/80 backdrop-blur-xl border border-purple-200/70 rounded-3xl p-5 sm:p-6 shadow-xl shadow-purple-500/5 relative overflow-hidden space-y-4">
 
-              {/* Top Gradient Border Accent Line */}
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-600"></div>
 
-              {/* Category badge & Share Action row */}
               <div className="flex justify-between items-center pt-1">
                 <span className="px-3 py-1 bg-cyan-50 border border-cyan-200/70 text-cyan-700 text-xs font-black rounded-full uppercase tracking-wider shadow-2xs flex items-center gap-1">
                   DIGITAL PRODUCT
@@ -454,12 +427,10 @@ export default function ProductDetails() {
                 </button>
               </div>
 
-              {/* Product Title */}
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight leading-tight">
                 {product.name}
               </h1>
 
-              {/* Bullet Points / Highlighted Text snippet */}
               {(() => {
                 let bullets = [];
                 if (product.highlighted_text && product.highlighted_text.trim()) {
@@ -492,7 +463,6 @@ export default function ProductDetails() {
                 );
               })()}
 
-              {/* Ratings Summary & Stock Status Badge */}
               <div className="flex items-center space-x-3 text-xs pt-1">
                 <div className="flex items-center space-x-1.5 bg-amber-50 border border-amber-200/70 px-2.5 py-1 rounded-full text-amber-800 font-extrabold shadow-2xs">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -508,7 +478,6 @@ export default function ProductDetails() {
                 </div>
               </div>
 
-              {/* Glass Pricing Box Card */}
               <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-blue-50/60 border border-purple-100/90 rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-2xs">
                 <div className="flex items-baseline space-x-3">
                   <span className="text-3xl sm:text-4xl font-black text-slate-900">
@@ -535,7 +504,6 @@ export default function ProductDetails() {
 
             </div>
 
-            {/* Activation Type / Option Selection Pills */}
             {parsedActivations.length > 0 && (
               <div className="space-y-2 pt-1">
                 <span className="text-xs font-extrabold text-slate-800 block"> Activation Type</span>
@@ -563,7 +531,6 @@ export default function ProductDetails() {
               </div>
             )}
 
-            {/* Device / System Display Badge (Non-clickable Information) */}
             {parsedDevices.length > 0 && (
               <div className="space-y-2 pt-1">
                 <span className="text-xs font-extrabold text-slate-800 block">Compatible Devices/Systems</span>
@@ -581,7 +548,6 @@ export default function ProductDetails() {
               </div>
             )}
 
-            {/* "মেয়াদ ও মূল্য পরিকল্পনা" (Plan Selection Options Box) */}
             <div className="space-y-2 pt-1">
               <span className="text-xs font-extrabold text-slate-800 block">Plans & Pricing</span>
 
@@ -641,7 +607,6 @@ export default function ProductDetails() {
               )}
             </div>
 
-            {/* Quantity Selector */}
             <div className="pt-2">
               <span className="text-xs font-extrabold text-slate-800 block mb-2">Quantity</span>
               <div className="flex items-center bg-slate-100/80 border border-slate-200/80 rounded-full px-3 py-1 shadow-2xs w-max">
@@ -661,9 +626,7 @@ export default function ProductDetails() {
               </div>
             </div>
 
-            {/* ShahedStore Style CTA Action Buttons (Matching Logo Color Gradient) */}
             <div className="space-y-3 pt-3">
-              {/* Row 1: Primary Full Width Buy Now Button */}
               <button
                 onClick={handleBuyNow}
                 disabled={selectedPackageStock === 0}
@@ -673,7 +636,6 @@ export default function ProductDetails() {
                 <span>Buy Now</span>
               </button>
 
-              {/* Row 2: WhatsApp + Add to Cart Grid */}
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={handleWhatsAppOrder}
@@ -694,7 +656,6 @@ export default function ProductDetails() {
               </div>
             </div>
 
-            {/* Product metadata definitions */}
             {product.category_name && (
               <div className="border-t border-slate-200/80 pt-4 space-y-2 text-xxs text-slate-500">
                 <div>
@@ -708,7 +669,6 @@ export default function ProductDetails() {
 
         </div>
 
-        {/* Product Description & Additional Description Section */}
         {(() => {
           const hasAdditionalInfo = product?.additional_info &&
             product.additional_info.replace(/<[^>]*>/g, '').trim().length > 0;
@@ -716,7 +676,6 @@ export default function ProductDetails() {
           if (hasAdditionalInfo) {
             return (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16 text-left">
-                {/* Grid 1: Product Description */}
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2">
                     <span className="w-1.5 h-5 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-full"></span>
@@ -732,7 +691,6 @@ export default function ProductDetails() {
                   </div>
                 </div>
 
-                {/* Grid 2: Additional Description */}
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2">
                     <span className="w-1.5 h-5 bg-gradient-to-b from-indigo-600 to-violet-600 rounded-full"></span>
@@ -751,7 +709,6 @@ export default function ProductDetails() {
             );
           }
 
-          // Single Full-Width Product Description when Additional Description is empty
           return (
             <div className="space-y-3 mb-16 text-left w-full">
               <div className="flex items-center space-x-2">
@@ -770,7 +727,6 @@ export default function ProductDetails() {
           );
         })()}
 
-        {/* FAQs Section */}
         {product.faqs && product.faqs.length > 0 && (
           <div className="mb-16 text-left space-y-6">
             <div className="flex items-center space-x-2">
@@ -806,21 +762,18 @@ export default function ProductDetails() {
           </div>
         )}
 
-        {/* Customer Reviews Details List & Submission Box */}
         <div ref={reviewsRef} id="reviews-section" className="mb-16 text-left space-y-6">
           <div className="flex items-center space-x-2">
             <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
             <h2 className="text-xl font-extrabold text-slate-855 tracking-tight">Customer Reviews</h2>
           </div>
 
-          {/* Review Submission Form Box */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
             <h3 className="text-sm font-extrabold text-slate-800 border-b border-slate-100 pb-3 flex items-center space-x-2">
               <span>Write a Review</span>
             </h3>
 
             <form onSubmit={handleReviewSubmit} className="space-y-4">
-              {/* Rating Star Selection */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Rating Stars *
@@ -842,7 +795,6 @@ export default function ProductDetails() {
                 </div>
               </div>
 
-              {/* Name & Email inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -877,7 +829,6 @@ export default function ProductDetails() {
                 </div>
               </div>
 
-              {/* Review Comments */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Review Comments *
@@ -909,7 +860,6 @@ export default function ProductDetails() {
             </form>
           </div>
 
-          {/* List of Reviews */}
           {reviewsLoading ? (
             <div className="py-8 flex justify-center bg-white border border-slate-200/80 rounded-2xl shadow-xs">
               <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
@@ -954,7 +904,6 @@ export default function ProductDetails() {
           )}
         </div>
 
-        {/* Related Products Grid */}
         {relatedProducts.length > 0 && (
           <div className="text-left space-y-6">
             <div className="flex items-center space-x-2">
@@ -969,7 +918,6 @@ export default function ProductDetails() {
                   onClick={() => navigate(`/product/${prod.id}`)}
                   className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden flex flex-col h-full cursor-pointer group shadow-xs hover:shadow-md hover:-translate-y-1 transition-all duration-300"
                 >
-                  {/* Image */}
                   <div className="relative aspect-video w-full bg-slate-50 flex items-center justify-center overflow-hidden border-b border-slate-100">
                     {prod.image_url ? (
                       <img
@@ -990,7 +938,6 @@ export default function ProductDetails() {
                     )}
                   </div>
 
-                  {/* Details */}
                   <div className="p-4 flex-1 flex flex-col justify-between">
                     <div>
                       <h3 className="text-xs font-extrabold text-slate-800 truncate group-hover:text-violet-650 transition-colors">{prod.name}</h3>

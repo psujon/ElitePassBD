@@ -2,9 +2,7 @@ const { EPS } = require('eps-gateway-nodejs');
 const db = require('../config/db');
 const { sendEmail } = require('../utils/mailer');
 
-// Helper to get EPS instance with configuration checks
 const getEpsInstance = () => {
-  // Use sandbox credentials by default if envs are missing for easy testing
   const config = {
     username: process.env.EPS_USERNAME,
     password: process.env.EPS_PASSWORD,
@@ -17,7 +15,6 @@ const getEpsInstance = () => {
   return new EPS(config);
 };
 
-// 1. Initialize EPS Checkout Session
 exports.initiatePayment = async (req, res) => {
   const { orderId } = req.body;
 
@@ -26,7 +23,6 @@ exports.initiatePayment = async (req, res) => {
   }
 
   try {
-    // Fetch order details (publicly accessible during the redirect handshake)
     const [orders] = await db.query(
       'SELECT o.*, u.name as user_name, u.email as user_email FROM orders o JOIN users u ON o.user_id = u.id WHERE o.id = ?',
       [orderId]
@@ -38,10 +34,8 @@ exports.initiatePayment = async (req, res) => {
 
     const order = orders[0];
 
-    // Generate unique purely numeric transaction ID of at least 10 digits
     const merchantTxnId = String(Date.now()) + String(orderId).padStart(3, '0');
 
-    // Callback endpoints
     const backendUrl = (process.env.BACKEND_URL || 'http://localhost:5000').replace(/\/api\/?$/, '');
     const successUrl = `${backendUrl}/api/payments/success`;
     const failUrl = `${backendUrl}/api/payments/fail`;
@@ -52,7 +46,6 @@ exports.initiatePayment = async (req, res) => {
     let sdkErrorMessage = null;
 
     try {
-      // Call SDK to initialize
       const paymentResult = await eps.initializePayment({
         customerOrderId: String(orderId),
         merchantTransactionId: merchantTxnId,
@@ -85,14 +78,12 @@ exports.initiatePayment = async (req, res) => {
       const isSandbox = process.env.EPS_SANDBOX === undefined || process.env.EPS_SANDBOX === 'true';
       if (isSandbox) {
         console.info('Using mock redirect URL in sandbox mode.');
-        // Redirect directly to backend success handler for simulated successful payment
         redirectUrl = `${backendUrl}/api/payments/success?merchantTransactionId=${merchantTxnId}`;
       } else {
         throw new Error(`Failed to generate payment redirect URL from EPS. Details: ${sdkErrorMessage || 'No redirect URL returned.'}`);
       }
     }
 
-    // Save transaction ID reference in database
     await db.query(
       'UPDATE orders SET transaction_id = ?, payment_status = "Pending" WHERE id = ?',
       [merchantTxnId, orderId]
@@ -105,7 +96,6 @@ exports.initiatePayment = async (req, res) => {
   }
 };
 
-// Helper function to send email containing automatic license keys
 const sendLicenseEmail = async (email, userName, orderId, licenses) => {
   try {
     let keysHtml = '';
@@ -157,9 +147,6 @@ const sendLicenseEmail = async (email, userName, orderId, licenses) => {
   }
 };
 
-// --- Shared Order Fulfillment Logic ---
-// This function handles the atomic database locking, license allocation, and email dispatch
-// It is safely used by both the /success callback and the /ipn webhook.
 const fulfillOrder = async (merchantTransactionId) => {
   const pool = db.getPool();
   const connection = await pool.getConnection();
@@ -174,7 +161,6 @@ const fulfillOrder = async (merchantTransactionId) => {
   try {
     await connection.beginTransaction();
 
-    // Lock the order row to prevent concurrent processing
     const [orders] = await connection.query(
       `SELECT o.*, u.name as user_name, u.email as user_email 
        FROM orders o 
@@ -193,7 +179,6 @@ const fulfillOrder = async (merchantTransactionId) => {
     targetEmail = order.delivery_email || order.user_email;
     userName = order.user_name;
 
-    // Idempotency check: if already processed, skip fulfillment
     if (order.payment_status === 'Paid') {
       await connection.commit();
       const [items] = await db.query(
@@ -247,13 +232,11 @@ const fulfillOrder = async (merchantTransactionId) => {
       return { success: true, alreadyProcessed: true, activationType, orderId, pixelData };
     }
 
-    // Mark order as Paid and status Processing
     await connection.query(
       'UPDATE orders SET payment_status = "Paid", status = "Processing" WHERE id = ?',
       [order.id]
     );
 
-    // Fetch order items to process activation processes
     const [items] = await connection.query(
       `SELECT oi.*, p.name AS product_name, p.activation_process, p.packages 
        FROM order_items oi
@@ -280,7 +263,6 @@ const fulfillOrder = async (merchantTransactionId) => {
       }
 
       if (actProcess === 'Automatic') {
-        // Find unused license keys for this product WITH FOR UPDATE lock
         const [licenses] = await connection.query(
           `SELECT id, license_key, rules FROM product_licenses 
            WHERE product_id = ? AND is_used = 0 
@@ -322,7 +304,6 @@ const fulfillOrder = async (merchantTransactionId) => {
       }
     }
 
-    // If fully automatic and successfully fulfilled, mark status as Delivered
     if (allAutomaticFulfilled && items.length > 0) {
       await connection.query('UPDATE orders SET status = "Delivered" WHERE id = ?', [order.id]);
       activationType = 'automatic';
@@ -332,7 +313,6 @@ const fulfillOrder = async (merchantTransactionId) => {
 
     await connection.commit();
 
-    // Trigger Facebook Conversions API Purchase Event
     try {
       const { sendFbEvent } = require('../utils/facebookCapi');
       const fbContents = items.map(item => ({
@@ -357,7 +337,6 @@ const fulfillOrder = async (merchantTransactionId) => {
         name: order.user_name
       };
 
-      // Fire the purchase event asynchronously
       sendFbEvent({
         eventName: 'Purchase',
         eventId: `purchase_${order.id}`,
@@ -412,7 +391,6 @@ const fulfillOrder = async (merchantTransactionId) => {
 
         let licenseContent = '-';
         if (actProcess === 'Automatic') {
-          // Filter by product_id and package to match precisely if there are multiple items
           const itemLicenses = fulfilledLicenses.filter(lic => lic.product_id === item.product_id && lic.package_name === item.package_name);
           if (itemLicenses.length > 0) {
             licenseContent = itemLicenses.map(l => `<code style="background: #e2e8f0; padding: 2px 4px; border-radius: 4px; display: inline-block; margin: 2px 0; word-break: break-all;">${l.license_key}</code>`).join('<br>');
@@ -424,7 +402,6 @@ const fulfillOrder = async (merchantTransactionId) => {
       });
       itemsHtml += `</tbody></table>`;
 
-      // Send admin order completion email asynchronously
       sendEmail({
         to: 'johirul3218@gmail.com',
         subject: `Order Completed (Paid) - Order #${order.id}`,
@@ -452,7 +429,6 @@ const fulfillOrder = async (merchantTransactionId) => {
   }
   connection.release();
 
-  // Dispatch Email with license keys asynchronously if any keys were retrieved
   if (fulfilledLicenses.length > 0) {
     sendLicenseEmail(targetEmail, userName, orderId, fulfilledLicenses);
   }
@@ -461,7 +437,6 @@ const fulfillOrder = async (merchantTransactionId) => {
 };
 
 exports.paymentSuccess = async (req, res) => {
-  // Query parameters returned by EPS callback
   const merchantTransactionId = req.query.merchantTransactionId || req.query.MerchantTransactionId;
 
   if (!merchantTransactionId) {
@@ -471,7 +446,6 @@ exports.paymentSuccess = async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL;
 
   try {
-    // 1. ALWAYS verify with EPS first
     const eps = getEpsInstance();
     let verification;
     try {
@@ -480,11 +454,9 @@ exports.paymentSuccess = async (req, res) => {
       console.warn('EPS Verification API error:', sdkErr.message);
     }
 
-    // Auto-approve in sandbox mode for local testing convenience
     const isSandbox = process.env.EPS_SANDBOX === undefined || process.env.EPS_SANDBOX === 'true';
     const isVerified = (verification && verification.Status === 'Success') || isSandbox;
 
-    // Log the response into our history table
     if (verification && verification.TransactionId) {
       const { MerchantTransactionId, TransactionId, Amount, Status } = verification;
       const rawResponse = JSON.stringify(verification);
@@ -492,7 +464,6 @@ exports.paymentSuccess = async (req, res) => {
       const [existing] = await db.query('SELECT id FROM eps_payment_history WHERE merchant_transaction_id = ?', [MerchantTransactionId]);
 
       if (existing.length === 0) {
-        // Attempt to find order_id based on transaction_id
         const [o] = await db.query('SELECT id FROM orders WHERE transaction_id = ?', [MerchantTransactionId]);
         const matchedOrderId = o.length > 0 ? o[0].id : null;
 
@@ -504,7 +475,6 @@ exports.paymentSuccess = async (req, res) => {
     }
 
     if (!isVerified) {
-      // Verification failed
       await db.query('UPDATE orders SET payment_status = "Failed" WHERE transaction_id = ?', [merchantTransactionId]);
 
       const [orders] = await db.query('SELECT id FROM orders WHERE transaction_id = ?', [merchantTransactionId]);
@@ -512,7 +482,6 @@ exports.paymentSuccess = async (req, res) => {
       return res.redirect(`${frontendUrl}/payment/fail?reason=VerificationFailed${orderIdParam}`);
     }
 
-    // 2. If Verified, fulfill order using shared helper
     try {
       const fulfillmentResult = await fulfillOrder(merchantTransactionId);
       let redirectUrl = `${frontendUrl}/payment/success?orderId=${fulfillmentResult.orderId}&activationType=${fulfillmentResult.activationType}`;
@@ -532,7 +501,6 @@ exports.paymentSuccess = async (req, res) => {
   }
 };
 
-// 3. Failure Callback handler (GET redirect from EPS)
 exports.paymentFail = async (req, res) => {
   const merchantTransactionId = req.query.merchantTransactionId || req.query.MerchantTransactionId;
   const frontendUrl = process.env.FRONTEND_URL;
@@ -553,7 +521,6 @@ exports.paymentFail = async (req, res) => {
   }
 };
 
-// 4. Cancel Callback handler (GET redirect from EPS)
 exports.paymentCancel = async (req, res) => {
   const merchantTransactionId = req.query.merchantTransactionId || req.query.MerchantTransactionId;
   const frontendUrl = process.env.FRONTEND_URL;
@@ -577,7 +544,6 @@ exports.paymentCancel = async (req, res) => {
 const crypto = require('crypto');
 const { default: toast } = require('react-hot-toast');
 
-// 5. IPN (Webhook) Endpoint (POST request from EPS)
 exports.paymentIpn = async (req, res) => {
   const { Data } = req.body;
 
@@ -596,16 +562,13 @@ exports.paymentIpn = async (req, res) => {
 
     const hashKey = process.env.EPS_HASH_KEY || '';
 
-    // Most EPS SDKs use the UTF-8 representation of the hashKey. AES-256 requires 32 bytes.
     let keyBuffer = Buffer.from(hashKey, 'utf8');
     if (keyBuffer.length !== 32) {
-      // Fallback: sha256 hash it to 32 bytes if the raw key is not exactly 32 bytes
       keyBuffer = crypto.createHash('sha256').update(hashKey).digest();
     }
 
     let ivBuffer = Buffer.from(ivStr, 'base64');
     if (ivBuffer.length !== 16) {
-      // If not base64, attempt Hex decoding
       ivBuffer = Buffer.from(ivStr, 'hex');
     }
 
@@ -613,7 +576,6 @@ exports.paymentIpn = async (req, res) => {
       console.warn('IPN Decryption Warning: Invalid IV length derived.');
     }
 
-    // Attempt decryption
     const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, ivBuffer);
     let decrypted = decipher.update(encryptedBase64, 'base64', 'utf8');
     decrypted += decipher.final('utf8');
@@ -635,7 +597,6 @@ exports.paymentIpn = async (req, res) => {
       return res.status(400).json({ status: "ERROR", message: "Transaction ID missing in decrypted payload" });
     }
 
-    // Confirm verification using SDK for ultimate security, even if decrypted payload says Success
     const eps = getEpsInstance();
     let verification;
     try {
@@ -647,7 +608,6 @@ exports.paymentIpn = async (req, res) => {
     const isSandbox = process.env.EPS_SANDBOX === undefined || process.env.EPS_SANDBOX === 'true';
     const isVerified = (verification && verification.Status === 'Success') || (status && status.toString().toLowerCase() === 'success') || isSandbox;
 
-    // Log the response into our history table
     if (verification && verification.TransactionId) {
       const { MerchantTransactionId, TransactionId, Amount, Status } = verification;
       const rawResponse = JSON.stringify(verification);
@@ -655,7 +615,6 @@ exports.paymentIpn = async (req, res) => {
       const [existing] = await db.query('SELECT id FROM eps_payment_history WHERE merchant_transaction_id = ?', [MerchantTransactionId]);
 
       if (existing.length === 0) {
-        // Attempt to find order_id based on transaction_id
         const [o] = await db.query('SELECT id FROM orders WHERE transaction_id = ?', [MerchantTransactionId]);
         const matchedOrderId = o.length > 0 ? o[0].id : null;
 
@@ -671,7 +630,6 @@ exports.paymentIpn = async (req, res) => {
       return res.status(200).json({ status: "OK", message: "IPN received and processed (Failed)" });
     }
 
-    // Fulfill Order
     await fulfillOrder(merchantTransactionId);
 
     return res.status(200).json({ status: "OK", message: "IPN received and saved successfully" });
@@ -688,7 +646,6 @@ exports.testEpsConnection = async (req, res) => {
     const isSandbox = process.env.EPS_SANDBOX === 'true';
     const url = isSandbox ? 'https://sandbox-pgapi.eps.com.bd/v1/EPSEngine/InitializeEPS' : 'https://pgapi.eps.com.bd/v1/EPSEngine/InitializeEPS';
 
-    // We expect a 405 Method Not Allowed or 400 Bad Request, but it proves network connectivity
     await axios.get(url);
     res.json({ success: true, message: "Connected to EPS server successfully", url });
   } catch (error) {
