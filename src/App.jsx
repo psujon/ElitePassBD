@@ -56,7 +56,7 @@ function AppContent() {
     <div className="flex flex-col min-h-screen w-full pb-16 md:pb-0">
       <Navbar onCartClick={() => setIsCartOpen(true)} />
 
-      <main className="flex-grow w-full max-w-[95%] mx-auto px-2 sm:px-4">
+      <main className="flex-grow w-full max-w-full sm:max-w-[95%] mx-auto px-1 sm:px-4">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />

@@ -58,7 +58,7 @@ exports.createLicense = async (req, res) => {
     });
   } catch (error) {
     console.error('Create license error:', error);
-    res.status(500).json({ message: 'Database error occurred while saving license keys.' });
+    res.status(500).json({ message: error.message || 'Database error occurred while saving license keys.' });
   }
 };
 
@@ -108,6 +108,6 @@ exports.updateLicense = async (req, res) => {
     res.json({ message: 'License key updated successfully!' });
   } catch (error) {
     console.error('Update license error:', error);
-    res.status(500).json({ message: 'Database error occurred while updating license key.' });
+    res.status(500).json({ message: error.message || 'Database error occurred while updating license key.' });
   }
 };

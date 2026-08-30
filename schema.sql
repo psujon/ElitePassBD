@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS products (
     device_options TEXT DEFAULT NULL,
     activation_options TEXT DEFAULT NULL,
     highlighted_text TEXT DEFAULT NULL,
+    is_top_selling TINYINT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
@@ -54,6 +55,8 @@ CREATE TABLE IF NOT EXISTS orders (
     additional_notes TEXT DEFAULT NULL,
     transaction_id VARCHAR(255) DEFAULT NULL,
     payment_status ENUM('Pending', 'Paid', 'Failed', 'Cancelled') DEFAULT 'Pending',
+    review_email_sent TINYINT DEFAULT 0,
+    completed_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -107,16 +110,16 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 CREATE TABLE IF NOT EXISTS product_licenses (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
-    activation_option VARCHAR(255) DEFAULT NULL,
-    package_option VARCHAR(255) DEFAULT NULL,
-    rules TEXT DEFAULT NULL,
-    license_key VARCHAR(255) NOT NULL,
+    activation_option TEXT DEFAULT NULL,
+    package_option TEXT DEFAULT NULL,
+    rules LONGTEXT DEFAULT NULL,
+    license_key LONGTEXT NOT NULL,
     is_used TINYINT DEFAULT 0,
     order_item_id INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
     FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert a default Admin account for testing (password is 'admin123' bcrypt hash: $2a$10$wK1F5lCqU.s5/D7fGv3Kfe.Z3FEX2VwE885g9qLDRX2yN60p2G9nK)
 -- We will also handle this in our server startup or code, but inserting it here helps as well.

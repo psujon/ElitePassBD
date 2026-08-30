@@ -132,42 +132,29 @@ export default function Products() {
 
           <div className="w-full lg:w-64 shrink-0 text-left">
 
-            <div className="lg:hidden mb-6">
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <span className="w-1.5 h-4 bg-violet-600 rounded-full"></span>
-                <span className="text-xs font-black text-slate-800">ক্যাটাগরি</span>
-              </div>
-              <div className="flex flex-row overflow-x-auto gap-2 pb-2 scrollbar-none snap-x scroll-smooth">
-                <button
-                  onClick={() => handleCategorySelect('All')}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap snap-start transition-all cursor-pointer flex items-center gap-2 ${selectedCategory === 'All'
-                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white shadow-md'
-                    : 'bg-white border border-slate-200/80 text-slate-700 hover:text-slate-900 shadow-2xs'
-                    }`}
-                >
-                  <ShoppingBag className="w-4 h-4" />
-                  <span>সব</span>
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleCategorySelect(cat.name)}
-                    className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap snap-start transition-all cursor-pointer flex items-center gap-2 ${selectedCategory.toLowerCase() === cat.name.toLowerCase()
-                      ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white shadow-md'
-                      : 'bg-white border border-slate-200/80 text-slate-700 hover:text-slate-900 shadow-2xs'
-                      }`}
-                  >
-                    {getCategoryIcon(cat.name)}
-                    <span>{cat.name}</span>
-                  </button>
-                ))}
-              </div>
+            {/* Mobile Category Dropdown Select */}
+            <div className="lg:hidden w-full mb-6">
+              <select
+                value={selectedCategory}
+                onChange={(e) => handleCategorySelect(e.target.value)}
+                className="w-full bg-white border border-slate-200/80 rounded-2xl px-4 py-2.5 text-xs font-extrabold text-slate-800 focus:outline-none focus:border-violet-600 shadow-2xs cursor-pointer"
+              >
+                <option value="All">All Categories ({products.length})</option>
+                {categories.map((cat) => {
+                  const count = products.filter(p => p.category_name && p.category_name.toLowerCase() === cat.name.toLowerCase()).length;
+                  return (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name} ({count})
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
             <div className="hidden lg:block bg-white/80 backdrop-blur-xl border border-white/90 p-4 rounded-3xl sticky top-24 shadow-xl shadow-purple-500/5 text-slate-700 text-left">
               <div className="flex items-center gap-2 mb-4 px-1 pb-2 border-b border-slate-100">
                 <span className="w-1.5 h-4 bg-violet-600 rounded-full"></span>
-                <span className="text-sm font-black text-slate-900">ক্যাটাগরি</span>
+                <span className="text-sm font-black text-slate-900">Category</span>
               </div>
 
               <div className="space-y-2">
@@ -182,7 +169,7 @@ export default function Products() {
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${selectedCategory === 'All' ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
                       <ShoppingBag className="w-4 h-4" />
                     </div>
-                    <span>সব</span>
+                    <span>All</span>
                   </div>
                   <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-black">
                     {products.length}
@@ -223,7 +210,7 @@ export default function Products() {
               <div className="relative w-full sm:max-w-md">
                 <input
                   type="text"
-                  placeholder="প্রোডাক্ট খুঁজুন..."
+                  placeholder="Search Products..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full bg-white border border-slate-200/80 rounded-full px-4 py-2.5 pl-10 text-xs font-semibold text-slate-800 placeholder-slate-400 shadow-2xs focus:outline-none focus:border-violet-500"
@@ -237,10 +224,10 @@ export default function Products() {
                   onChange={(e) => setSortOrder(e.target.value)}
                   className="bg-white border border-slate-200/80 rounded-full px-5 py-2.5 text-xs font-bold text-slate-700 shadow-2xs focus:outline-none cursor-pointer"
                 >
-                  <option value="latest">সর্বশেষ</option>
-                  <option value="price-asc">দাম: কম থেকে বেশি</option>
-                  <option value="price-desc">দাম: বেশি থেকে কম</option>
-                  <option value="popular">জনপ্রিয়</option>
+                  <option value="latest">Latest</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                  <option value="popular">Popular</option>
                 </select>
               </div>
             </div>
@@ -257,8 +244,8 @@ export default function Products() {
             ) : sortedProducts.length === 0 ? (
               <div className="text-center py-20 text-slate-400 bg-white border border-slate-200/85 rounded-3xl shadow-xs">
                 <span className="text-3xl block mb-2">🔍</span>
-                <p className="text-sm font-bold text-slate-700">কোনো প্রোডাক্ট পাওয়া যায়নি।</p>
-                <p className="text-xs text-slate-400 mt-1">অন্য কোনো কি-ওয়ার্ড দিয়ে খুঁজুন অথবা ক্যাটাগরি পরিবর্তন করুন।</p>
+                <p className="text-sm font-bold text-slate-700">No Products Found</p>
+                <p className="text-xs text-slate-400 mt-1">Enter a keyword to search for or change the category.</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
@@ -278,27 +265,27 @@ export default function Products() {
                       onClick={() => handleProductClick(prod.id)}
                       className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden flex flex-col h-full shadow-xs hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 group cursor-pointer text-left relative"
                     >
-                      <div className="relative w-full aspect-square bg-gradient-to-br from-purple-50/70 via-indigo-50/50 to-blue-50/60 p-2.5 sm:p-3 flex items-center justify-center overflow-hidden border-b border-slate-100">
-                        {hasDiscount ? (
-                          <span className="absolute top-2 left-2 bg-amber-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-xs z-10">
-                            -{discountPercent}%
-                          </span>
-                        ) : (
-                          <span className="absolute top-2 left-2 bg-amber-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-xs z-10">
-                            OFFICIAL
-                          </span>
-                        )}
+                      <div className="relative w-full aspect-square bg-gradient-to-br from-purple-50/70 via-indigo-50/50 to-blue-50/60 flex items-center justify-center overflow-hidden border-b border-slate-100">
+                        <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
+                          {hasDiscount ? (
+                            <span className="bg-red-600 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-md">
+                              -{discountPercent}% OFF
+                            </span>
+                          ) : <div></div>}
 
-                        <span className="absolute top-2 right-2 bg-blue-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-xs z-10">
-                          {statusBadge}
-                        </span>
+                          {(prod.is_instant === 1 || prod.activation_process === 'Instant') && (
+                            <span className="bg-emerald-600/95 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5">
+                              ⚡ Instant
+                            </span>
+                          )}
+                        </div>
 
-                        <div className="relative w-full h-full bg-white/75 backdrop-blur-xl border border-white/90 rounded-2xl p-2 flex items-center justify-center shadow-lg shadow-purple-500/5">
+                        <div className="relative w-full h-full bg-white flex items-center justify-center overflow-hidden">
                           {prod.image_url ? (
                             <img
                               src={prod.image_url}
                               alt={prod.name}
-                              className="max-h-full max-w-full object-contain filter drop-shadow-sm group-hover:scale-105 transition-transform duration-500 rounded-xl"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             />
                           ) : (
                             <span className="text-[10px] text-slate-400 font-extrabold uppercase">No Image</span>
@@ -315,7 +302,7 @@ export default function Products() {
                       </div>
 
                       <div className="p-3 flex flex-col justify-between flex-1">
-                        <h4 className="text-xs font-black text-slate-900 line-clamp-2 leading-snug group-hover:text-violet-600 transition-colors min-h-[2.25rem]">
+                        <h4 className="text-xs font-black text-slate-900 line-clamp-2 min-h-[2.7rem] leading-tight group-hover:text-violet-600 transition-colors">
                           {prod.name}
                         </h4>
 

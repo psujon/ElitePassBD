@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import JoditEditor from 'jodit-react';
 import { api, API_BASE_URL } from '../utils/api';
-import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database, KeyRound, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database, KeyRound, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent, Search } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 const parseJSON = (str, fallback) => {
@@ -124,6 +124,7 @@ export default function AdminDashboard() {
 
   const [coupons, setCoupons] = useState([]);
   const [showCouponModal, setShowCouponModal] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState(null);
   const [couponForm, setCouponForm] = useState({
     code: '',
     discount_type: 'percentage',
@@ -181,16 +182,30 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleOpenCouponModal = () => {
-    setCouponForm({
-      code: '',
-      discount_type: 'percentage',
-      discount_value: '',
-      min_order_amount: '',
-      max_discount_amount: '',
-      usage_limit: '',
-      expires_at: ''
-    });
+  const handleOpenCouponModal = (coupon = null) => {
+    if (coupon && coupon.id) {
+      setEditingCoupon(coupon);
+      setCouponForm({
+        code: coupon.code || '',
+        discount_type: coupon.discount_type || 'percentage',
+        discount_value: coupon.discount_value !== undefined && coupon.discount_value !== null ? coupon.discount_value : '',
+        min_order_amount: coupon.min_order_amount !== undefined && coupon.min_order_amount !== null ? coupon.min_order_amount : '',
+        max_discount_amount: coupon.max_discount_amount !== undefined && coupon.max_discount_amount !== null ? coupon.max_discount_amount : '',
+        usage_limit: coupon.usage_limit !== undefined && coupon.usage_limit !== null ? coupon.usage_limit : '',
+        expires_at: coupon.expires_at ? coupon.expires_at.split('T')[0] : ''
+      });
+    } else {
+      setEditingCoupon(null);
+      setCouponForm({
+        code: '',
+        discount_type: 'percentage',
+        discount_value: '',
+        min_order_amount: '',
+        max_discount_amount: '',
+        usage_limit: '',
+        expires_at: ''
+      });
+    }
     setCouponFormError('');
     setShowCouponModal(true);
   };
@@ -205,13 +220,19 @@ export default function AdminDashboard() {
     try {
       setCouponFormSubmitting(true);
       setCouponFormError('');
-      await api.post('/coupons', couponForm);
-      toast.success('Coupon created successfully!');
+      if (editingCoupon) {
+        await api.put(`/coupons/${editingCoupon.id}`, couponForm);
+        toast.success('Coupon updated successfully!');
+      } else {
+        await api.post('/coupons', couponForm);
+        toast.success('Coupon created successfully!');
+      }
       setShowCouponModal(false);
+      setActiveTab('coupons');
       fetchCoupons();
     } catch (err) {
       console.error(err);
-      setCouponFormError(err.message || 'Failed to create coupon.');
+      setCouponFormError(err.message || 'Failed to save coupon.');
     } finally {
       setCouponFormSubmitting(false);
     }
@@ -283,7 +304,10 @@ export default function AdminDashboard() {
         is_hot: !!product.is_hot,
         is_highlighted: !!product.is_highlighted,
         is_hot_discount: !!product.is_hot_discount,
-        activation_process: product.activation_process || 'Manual'
+        is_top_selling: !!product.is_top_selling,
+        activation_process: product.activation_process || 'Manual',
+        is_instant: product.is_instant === 1 || (product.is_instant !== 0 && product.activation_process === 'Instant'),
+        bullet_points: Array.isArray(product.bullet_points) ? product.bullet_points : []
       });
     } else {
       setEditingProduct(null);
@@ -305,7 +329,10 @@ export default function AdminDashboard() {
         is_hot: false,
         is_highlighted: false,
         is_hot_discount: false,
-        activation_process: 'Manual'
+        is_top_selling: false,
+        activation_process: 'Manual',
+        is_instant: false,
+        bullet_points: []
       });
     }
     setFormError('');
@@ -678,6 +705,16 @@ export default function AdminDashboard() {
     );
   });
 
+  const filteredCoupons = coupons.filter((c) => {
+    if (!couponSearchQuery) return true;
+    const query = couponSearchQuery.toLowerCase();
+    return (
+      c.code?.toLowerCase().includes(query) ||
+      c.discount_type?.toLowerCase().includes(query) ||
+      c.id?.toString().includes(query)
+    );
+  });
+
   const licenseItemsPerPage = 10;
   const totalLicensePages = Math.ceil(filteredLicenses.length / licenseItemsPerPage);
   const activeLicensePage = Math.min(licenseCurrentPage, totalLicensePages || 1);
@@ -717,7 +754,7 @@ export default function AdminDashboard() {
     <div className="w-full min-h-[calc(100vh-64px)] flex flex-col md:flex-row bg-[#f5f7fa] text-slate-800">
 
       <div className="w-full md:w-64 bg-[#111e35] text-slate-300 p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-800">
-        <div className="flex items-center space-x-2.5 px-2 mb-6 text-left">
+        <div className="hidden md:flex items-center space-x-2.5 px-2 mb-6 text-left">
           <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
             E
           </div>
@@ -730,7 +767,35 @@ export default function AdminDashboard() {
           </span>
         </div>
 
-        <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible gap-1 pb-2 md:pb-0 scrollbar-none snap-x md:space-y-1">
+        {/* Mobile Tab Dropdown Select List */}
+        <div className="md:hidden w-full relative mb-3 text-left">
+          <label className="text-[10px] font-extrabold uppercase text-slate-400 block mb-1">
+            Menu List
+          </label>
+          <div className="relative">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              className="w-full bg-[#1b2b48] text-white border border-slate-700 font-extrabold text-xs rounded-xl px-3.5 py-2.5 pr-8 appearance-none focus:outline-none focus:border-amber-400 transition-all cursor-pointer shadow-xs"
+            >
+              <option value="dashboard" className="bg-[#111e35] text-white">📊 Dashboard</option>
+              <option value="products" className="bg-[#111e35] text-white">📦 Catalog Products ({products.length})</option>
+              <option value="orders" className="bg-[#111e35] text-white">📋 Customer Orders ({orders.length})</option>
+              <option value="categories" className="bg-[#111e35] text-white">🥞 Categories ({categories.length})</option>
+              <option value="tickets" className="bg-[#111e35] text-white">💬 Support Tickets ({tickets.length})</option>
+              <option value="licenses" className="bg-[#111e35] text-white">🔑 License Keys ({licenses.length})</option>
+              <option value="coupons" className="bg-[#111e35] text-white">🏷️ Coupons / Promo Codes ({coupons.length})</option>
+              <option value="backup" className="bg-[#111e35] text-white">💾 Database Backup</option>
+              <option value="eps_history" className="bg-[#111e35] text-white">💵 EPS Payments</option>
+              <option value="slides" className="bg-[#111e35] text-white">🖼️ Slides ({slides.length})</option>
+              <option value="theme_settings" className="bg-[#111e35] text-white">🎨 Theme Settings</option>
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Desktop Vertical Menu List */}
+        <div className="hidden md:flex md:flex-col space-y-1">
           <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-4 text-left">
             General
           </div>
@@ -1902,13 +1967,26 @@ export default function AdminDashboard() {
                   </h2>
                   <p className="text-xs font-semibold text-slate-500 mt-1">Manage promotional discount codes for checkout.</p>
                 </div>
-                <button
-                  onClick={handleOpenCouponModal}
-                  className="flex items-center space-x-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-98"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Create New Coupon</span>
-                </button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+                  <button
+                    onClick={() => handleOpenCouponModal()}
+                    className="flex items-center justify-center space-x-1.5 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm active:scale-98 w-full sm:w-auto shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Create New Coupon</span>
+                  </button>
+
+                  <div className="relative w-full sm:w-auto">
+                    <input
+                      type="text"
+                      placeholder="Search coupons..."
+                      value={couponSearchQuery}
+                      onChange={(e) => setCouponSearchQuery(e.target.value)}
+                      className="w-full sm:w-64 bg-white border border-slate-200 focus:border-amber-400 focus:outline-none rounded-xl pl-8 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 shadow-2xs"
+                    />
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                </div>
               </div>
 
               <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
@@ -1928,14 +2006,16 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {coupons.length === 0 ? (
+                      {filteredCoupons.length === 0 ? (
                         <tr>
                           <td colSpan="9" className="p-8 text-center text-slate-400 font-medium">
-                            No coupons created yet. Click "Create New Coupon" to add one!
+                            {coupons.length === 0
+                              ? 'No coupons created yet. Click "Create New Coupon" to add one!'
+                              : 'No coupons match your search query.'}
                           </td>
                         </tr>
                       ) : (
-                        coupons.map((c) => (
+                        filteredCoupons.map((c) => (
                           <tr key={c.id} className="hover:bg-slate-50/40 transition-colors border-b border-slate-100 text-slate-700 font-medium text-xs">
                             <td className="pl-4 pr-2 py-3 font-bold text-slate-800 whitespace-nowrap">#{c.id}</td>
                             <td className="px-2 py-3 font-mono font-extrabold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/60 inline-block text-xs uppercase my-2">
@@ -1972,7 +2052,14 @@ export default function AdminDashboard() {
                             <td className="px-2 py-3 text-slate-500 whitespace-nowrap">
                               {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'No Expiry'}
                             </td>
-                            <td className="pl-2 pr-4 py-3 text-right whitespace-nowrap">
+                            <td className="pl-2 pr-4 py-3 text-right whitespace-nowrap space-x-1.5">
+                              <button
+                                onClick={() => handleOpenCouponModal(c)}
+                                className="p-2 bg-slate-55 hover:bg-amber-50 hover:text-amber-600 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer"
+                                title="Edit Coupon"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 onClick={() => handleDeleteCoupon(c.id)}
                                 className="p-2 bg-slate-55 hover:bg-red-50 hover:text-red-650 border border-slate-200/40 rounded-lg text-slate-500 transition-colors cursor-pointer"
@@ -2398,6 +2485,22 @@ export default function AdminDashboard() {
                   <label className="flex items-center space-x-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
+                      checked={!!productForm.is_instant}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setProductForm({
+                          ...productForm,
+                          is_instant: checked,
+                          activation_process: checked ? 'Instant' : (productForm.activation_process === 'Instant' ? 'Manual' : productForm.activation_process)
+                        });
+                      }}
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                    />
+                    <span className="text-emerald-700 font-extrabold">⚡ Instant Delivery (Auto-key dispatch)</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
                       checked={productForm.is_hot}
                       onChange={(e) => setProductForm({ ...productForm, is_hot: e.target.checked })}
                       className="w-4 h-4 rounded text-violet-600 focus:ring-violet-500 border-slate-300 cursor-pointer"
@@ -2422,7 +2525,69 @@ export default function AdminDashboard() {
                     />
                     <span>🏷️ Hot Discount</span>
                   </label>
+                  <label className="flex items-center space-x-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!productForm.is_top_selling}
+                      onChange={(e) => setProductForm({ ...productForm, is_top_selling: e.target.checked })}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 cursor-pointer"
+                    />
+                    <span className="text-amber-700 font-extrabold">🏆 Top Selling Product</span>
+                  </label>
                 </div>
+              </div>
+
+              {/* Custom Bullet Points Manager */}
+              <div className="border border-purple-200/80 p-4 rounded-xl space-y-3 bg-purple-50/40">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-xxs font-bold text-violet-700 uppercase tracking-wider block">Custom Bullet Points / Feature Highlights</span>
+                    <span className="text-[11px] text-slate-500 font-medium">Add key highlight points displayed below the product title</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = [...(productForm.bullet_points || []), ''];
+                      setProductForm({ ...productForm, bullet_points: updated });
+                    }}
+                    className="px-3 py-1 bg-violet-600 text-white rounded text-[11px] font-bold hover:bg-violet-700 transition-all cursor-pointer shadow-2xs"
+                  >
+                    + Add Bullet Point
+                  </button>
+                </div>
+
+                {(!productForm.bullet_points || productForm.bullet_points.length === 0) ? (
+                  <p className="text-[11px] text-slate-400 italic">No custom bullet points added yet. Click "+ Add Bullet Point" to add features.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {productForm.bullet_points.map((bullet, bIdx) => (
+                      <div key={bIdx} className="flex items-center gap-2">
+                        <span className="text-xs font-black text-violet-600">•</span>
+                        <input
+                          type="text"
+                          value={bullet}
+                          onChange={(e) => {
+                            const updated = [...productForm.bullet_points];
+                            updated[bIdx] = e.target.value;
+                            setProductForm({ ...productForm, bullet_points: updated });
+                          }}
+                          placeholder="e.g. 100% Official License Key with 1 Year Warranty"
+                          className="w-full text-xs bg-white border border-slate-200 focus:border-violet-500 focus:outline-none rounded-lg px-3 py-1.5 text-slate-800"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = productForm.bullet_points.filter((_, i) => i !== bIdx);
+                            setProductForm({ ...productForm, bullet_points: updated });
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-red-500 rounded cursor-pointer shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
@@ -3144,7 +3309,7 @@ export default function AdminDashboard() {
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h4 className="text-base font-bold text-slate-850 flex items-center gap-2">
                 <Tag className="w-4 h-4 text-amber-500" />
-                <span>Create New Coupon</span>
+                <span>{editingCoupon ? 'Edit Coupon' : 'Create New Coupon'}</span>
               </h4>
               <button
                 onClick={() => setShowCouponModal(false)}
@@ -3277,7 +3442,7 @@ export default function AdminDashboard() {
                   {couponFormSubmitting ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <span>Create Coupon</span>
+                    <span>{editingCoupon ? 'Update Coupon' : 'Create Coupon'}</span>
                   )}
                 </button>
               </div>

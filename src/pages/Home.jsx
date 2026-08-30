@@ -146,7 +146,8 @@ export default function Home() {
 
   const spotlightProduct = products.find(p => p.is_hot) || products[0];
 
-  const bestSellers = products.filter(p => p.tags && p.tags.toLowerCase().includes('best sellers')).slice(0, 4);
+  const checkedTopSelling = products.filter(p => p.is_top_selling === 1 || p.is_top_selling === true || p.is_top_selling === '1');
+  const bestSellers = checkedTopSelling;
 
   const productsByCategory = products.reduce((acc, product) => {
     if (product.category_name) {
@@ -256,57 +257,7 @@ export default function Home() {
     ];
   }
 
-  const idmProd = products.find(p => p.name?.toLowerCase().includes('idm')) || products[0];
-  const winProd = products.find(p => p.name?.toLowerCase().includes('windows')) || products[1];
-  const offProd = products.find(p => p.name?.toLowerCase().includes('office')) || products[2];
-
-  const activeSlides = slides.length > 0 ? slides : [
-    {
-      id: 'slide-idm',
-      title1: 'IDM',
-      title2: 'Lifetime',
-      subtitle: 'Internet Download Manager',
-      tagline: 'আমরা IDM-এর অফিসিয়াল রিসেলার। একবার কিনুন, সারাজীবন ব্যবহার করুন।',
-      price: idmProd ? getProductDisplayPrice(idmProd) : 2650,
-      originalPrice: idmProd && idmProd.discount_percent ? parseFloat(idmProd.discount_percent) : 6500,
-      discount: idmProd && idmProd.discount_percent ? Math.round(((parseFloat(idmProd.discount_percent) - getProductDisplayPrice(idmProd)) / parseFloat(idmProd.discount_percent)) * 100) : 59,
-      badge1: '🏆 OFFICIAL RESELLER',
-      badge2: 'OFFICIAL RESELLER',
-      features: ['Official Reseller ✓', 'Lifetime License ✓', 'Instant Delivery ✓'],
-      product_id: idmProd?.id,
-      image_url: idmProd?.image_url
-    },
-    {
-      id: 'slide-win11',
-      title1: 'Windows 11',
-      title2: 'Pro License',
-      subtitle: 'Official Microsoft Windows Key',
-      tagline: '১০০% জেনুইন রিটেল কি। অনলাইন লাইফটাইম অ্যাক্টিভেশন গ্যারান্টি।',
-      price: winProd ? getProductDisplayPrice(winProd) : 599,
-      originalPrice: winProd && winProd.discount_percent ? parseFloat(winProd.discount_percent) : 2499,
-      discount: winProd && winProd.discount_percent ? Math.round(((parseFloat(winProd.discount_percent) - getProductDisplayPrice(winProd)) / parseFloat(winProd.discount_percent)) * 100) : 76,
-      badge1: '⚡ BEST SELLER',
-      badge2: 'GENUINE RETAIL',
-      features: ['1 PC Lifetime ✓', 'Global Activation ✓', 'Official Updates ✓'],
-      product_id: winProd?.id,
-      image_url: winProd?.image_url
-    },
-    {
-      id: 'slide-office365',
-      title1: 'Office 365',
-      title2: 'Personal',
-      subtitle: '5 Devices + 1TB OneDrive Cloud',
-      tagline: 'অফিসিয়াল মাইক্রোসফট অ্যাকাউন্ট সাপোর্ট ও ফুল প্যাকেজ অ্যাক্সেস।',
-      price: offProd ? getProductDisplayPrice(offProd) : 1999,
-      originalPrice: offProd && offProd.discount_percent ? parseFloat(offProd.discount_percent) : 4999,
-      discount: offProd && offProd.discount_percent ? Math.round(((parseFloat(offProd.discount_percent) - getProductDisplayPrice(offProd)) / parseFloat(offProd.discount_percent)) * 100) : 60,
-      badge1: '🌟 HOT OFFER',
-      badge2: 'ORIGINAL LICENSE',
-      features: ['5 Devices Support ✓', '1TB OneDrive ✓', '24/7 Assistance ✓'],
-      product_id: offProd?.id,
-      image_url: offProd?.image_url
-    }
-  ];
+  const activeSlides = slides;
 
   const handleNextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % activeSlides.length);
@@ -354,214 +305,191 @@ export default function Home() {
 
   return (
     <div className="w-full bg-[#f8fafc] text-slate-800 py-6 text-left">
-      <div className="max-w-full mx-auto px-4 sm:px-6">
+      <div className="max-w-full mx-auto px-1 sm:px-6">
 
-        <div className="w-full mb-8">
+        {/* ================= HERO SECTION (FULL WIDTH GLASS SLIDER) ================= */}
+        {activeSlides.length > 0 && (
+          <div className="w-full mb-8">
 
-          <div className="w-full relative rounded-xl overflow-hidden border border-purple-100/90 shadow-xl min-h-95 sm:min-h-105 lg:min-h-130 flex items-center bg-gradient-to-r from-purple-50/90 via-indigo-50/60 to-blue-50/80 group">
+            {/* Full Width ShahedStore Style Glassmorphic Hero Slider */}
+            <div className="w-full relative rounded-xl overflow-hidden border border-purple-100/90 shadow-xl min-h-55 sm:min-h-80 lg:min-h-130 flex items-center bg-gradient-to-r from-purple-50/90 via-indigo-50/60 to-blue-50/80 group">
 
-            {activeSlides.map((slide, idx) => {
-              const isCurrent = idx === currentSlide;
+              {activeSlides.map((slide, idx) => {
+                const isCurrent = idx === currentSlide;
 
-              const isPureImageBanner = slide.image_url && !slide.title1 && !slide.price;
+                // Check if slide is a pure full image banner uploaded by admin
+                const isPureImageBanner = slide.image_url && !slide.title1 && !slide.price;
 
-              return (
-                <div
-                  key={slide.id || idx}
-                  className={`absolute inset-0 transition-all duration-700 ease-in-out flex flex-col justify-between ${isCurrent ? 'opacity-100 scale-100 z-10' : 'opacity-0 scale-95 z-0 pointer-events-none'
-                    }`}
-                >
-                  {isPureImageBanner ? (
-                    <img src={slide.image_url} alt="Hero Banner" className="w-full h-full object-fill rounded" />
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center h-full">
+                return (
+                  <div
+                    key={slide.id || idx}
+                    className={`absolute inset-0 transition-all duration-700 ease-in-out flex flex-col justify-between ${isCurrent ? 'opacity-100 scale-100 z-10' : 'opacity-0 scale-95 z-0 pointer-events-none'
+                      }`}
+                  >
+                    {isPureImageBanner ? (
+                      <img src={slide.image_url} alt="Hero Banner" className="w-full h-full object-fill rounded" />
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center h-full">
 
-                      <div className="md:col-span-7 flex flex-col justify-center text-left space-y-2.5 sm:space-y-3.5">
+                        {/* Left Side Content */}
+                        <div className="md:col-span-7 flex flex-col justify-center text-left space-y-2.5 sm:space-y-3.5">
 
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase tracking-wider shadow-2xs flex items-center gap-1">
-                            {slide.badge1 || '🏆 OFFICIAL RESELLER'}
-                          </span>
-                          <span className="bg-purple-100/80 text-purple-700 font-extrabold text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase">
-                            {slide.badge2 || 'OFFICIAL RESELLER'}
-                          </span>
-                        </div>
+                          {/* Top Badges */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {slide.badge1 && (
+                              <span className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase tracking-wider shadow-2xs flex items-center gap-1">
+                                {slide.badge1}
+                              </span>
+                            )}
+                            {slide.badge2 && (
+                              <span className="bg-purple-100/80 text-purple-700 font-extrabold text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase">
+                                {slide.badge2}
+                              </span>
+                            )}
+                          </div>
 
-                        <div className="flex flex-col">
-                          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-none">
-                            {slide.title1 || slide.name || 'IDM'}
-                          </h1>
-                          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-violet-600 tracking-tight leading-none mt-1">
-                            {slide.title2 || 'Lifetime'}
-                          </h2>
-                        </div>
+                          {/* Main Title Stack */}
+                          <div className="flex flex-col">
+                            {slide.title1 && (
+                              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-none">
+                                {slide.title1}
+                              </h1>
+                            )}
+                            {slide.title2 && (
+                              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-violet-600 tracking-tight leading-none mt-1">
+                                {slide.title2}
+                              </h2>
+                            )}
+                          </div>
 
-                        <p className="text-xs sm:text-sm font-extrabold text-slate-500 line-clamp-1">
-                          {slide.subtitle || 'Internet Download Manager'}
-                        </p>
-
-                        <p className="text-xs sm:text-sm font-semibold text-slate-700 leading-relaxed">
-                          {slide.tagline || 'আমরা IDM-এর অফিসিয়াল রিসেলার। একবার কিনুন, সারাজীবন ব্যবহার করুন।'}
-                        </p>
-
-                        <div className="flex items-center gap-2 flex-wrap pt-1">
-                          {(slide.features || ['Official Reseller ✓', 'Lifetime License ✓', 'Instant Delivery ✓']).map((feat, fIdx) => (
-                            <span key={fIdx} className="bg-white/80 border border-purple-100/90 text-purple-800 font-bold text-[10px] sm:text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-2xs">
-                              <CheckCircle className="w-3 h-3 text-emerald-500" />
-                              <span>{feat}</span>
-                            </span>
-                          ))}
-                        </div>
-
-                        <div className="flex items-baseline gap-3 pt-1">
-                          <span className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900">
-                            ৳{(slide.price || 2650).toLocaleString()}
-                          </span>
-                          {slide.originalPrice > slide.price && (
-                            <span className="text-sm font-bold text-slate-400 line-through">
-                              ৳{slide.originalPrice.toLocaleString()}
-                            </span>
+                          {/* Subtitle / Description */}
+                          {slide.subtitle && (
+                            <p className="text-xs sm:text-sm font-extrabold text-slate-500 line-clamp-1">
+                              {slide.subtitle}
+                            </p>
                           )}
-                          <span className="bg-violet-600 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-2xs">
-                            -{slide.discount || 59}% OFF
-                          </span>
-                        </div>
 
-                        <div className="flex items-center gap-3 pt-2">
-                          <button
-                            onClick={() => slide.product_id ? navigate(`/product/${slide.product_id}`) : navigate('/products')}
-                            className="bg-gradient-to-r from-[#005F4B]/90 via-[#005F4B] to-[#FF6D00] hover:from-[#005F4B] hover:to-[#FF6D00] text-white font-extrabold text-xs sm:text-sm px-6 py-2.5 rounded-full shadow-md shadow-[#005F4B]/20 backdrop-blur-md border border-white/20 flex items-center gap-2 hover:scale-103 cursor-pointer active:scale-98 transition-all"
-                          >
-                            <ShoppingBag className="w-4 h-4" />
-                            <span>Buy Now</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
+                          {/* Bengali Tagline */}
+                          {slide.tagline && (
+                            <p className="text-xs sm:text-sm font-semibold text-slate-700 leading-relaxed">
+                              {slide.tagline}
+                            </p>
+                          )}
 
-                          <button
-                            onClick={() => navigate('/products')}
-                            className="bg-white/90 hover:bg-white text-violet-700 border border-purple-200/80 font-extrabold text-xs sm:text-sm px-5 py-2.5 rounded-full flex items-center gap-1.5 shadow-2xs hover:scale-103 cursor-pointer active:scale-98 transition-all"
-                          >
-                            <Zap className="w-3.5 h-3.5 fill-violet-600 text-violet-600" />
-                            <span>View All Deals</span>
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-3 text-[10px] sm:text-xs font-bold text-slate-500 pt-1 flex-wrap">
-                          <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" /> Instant Delivery</span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /> 100% Genuine</span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1"><Headphones className="w-3 h-3 text-blue-500" /> 24/7 Support</span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-amber-400 text-amber-400" /> 4.9★ Rating</span>
-                        </div>
-
-                      </div>
-
-                      <div className="hidden md:flex md:col-span-5 items-center justify-center relative">
-                        <div className="relative w-full max-w-[280px] lg:max-w-[340px] aspect-square rounded-3xl bg-white/60 backdrop-blur-xl border border-white/90 p-3 shadow-2xl shadow-purple-500/10 flex items-center justify-center overflow-hidden group-hover:scale-103 transition-transform duration-500">
-                          {slide.image_url ? (
-                            <img
-                              src={slide.image_url}
-                              alt={slide.title1 || "Hero Product"}
-                              className="w-full h-full object-contain rounded-2xl filter drop-shadow-xl"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-violet-600 to-indigo-700 rounded-2xl flex flex-col items-center justify-center text-white p-4 text-center">
-                              <Sparkles className="w-12 h-12 mb-2 animate-bounce" />
-                              <span className="font-black text-2xl tracking-tight">{slide.title1}</span>
-                              <span className="text-xs font-bold opacity-80 mt-1">{slide.title2}</span>
+                          {/* Feature Checkmark Badges */}
+                          {slide.features && slide.features.length > 0 && (
+                            <div className="flex items-center gap-2 flex-wrap pt-1">
+                              {slide.features.map((feat, fIdx) => (
+                                <span key={fIdx} className="bg-white/80 border border-purple-100/90 text-purple-800 font-bold text-[10px] sm:text-xs px-2.5 py-1 rounded-full flex items-center gap-1 shadow-2xs">
+                                  <CheckCircle className="w-3 h-3 text-emerald-500" />
+                                  <span>{feat}</span>
+                                </span>
+                              ))}
                             </div>
                           )}
+
+                          {/* Price Row */}
+                          {slide.price && (
+                            <div className="flex items-baseline gap-3 pt-1">
+                              <span className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900">
+                                ৳{parseFloat(slide.price).toLocaleString()}
+                              </span>
+                              {slide.originalPrice > slide.price && (
+                                <span className="text-sm font-bold text-slate-400 line-through">
+                                  ৳{parseFloat(slide.originalPrice).toLocaleString()}
+                                </span>
+                              )}
+                              {slide.discount && (
+                                <span className="bg-violet-600 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-2xs">
+                                  -{slide.discount}% OFF
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-3 pt-2">
+                            <button
+                              onClick={() => slide.product_id ? navigate(`/product/${slide.product_id}`) : navigate('/products')}
+                              className="bg-gradient-to-r from-[#005F4B]/90 via-[#005F4B] to-[#FF6D00] hover:from-[#005F4B] hover:to-[#FF6D00] text-white font-extrabold text-xs sm:text-sm px-6 py-2.5 rounded-full shadow-md shadow-[#005F4B]/20 backdrop-blur-md border border-white/20 flex items-center gap-2 hover:scale-103 cursor-pointer active:scale-98 transition-all"
+                            >
+                              <ShoppingBag className="w-4 h-4" />
+                              <span>Buy Now</span>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => navigate('/products')}
+                              className="bg-white/90 hover:bg-white text-violet-700 border border-purple-200/80 font-extrabold text-xs sm:text-sm px-5 py-2.5 rounded-full flex items-center gap-1.5 shadow-2xs hover:scale-103 cursor-pointer active:scale-98 transition-all"
+                            >
+                              <Zap className="w-3.5 h-3.5 fill-violet-600 text-violet-600" />
+                              <span>View All Deals</span>
+                            </button>
+                          </div>
+
+                          {/* Bottom Guarantee Icons */}
+                          <div className="flex items-center gap-3 text-[10px] sm:text-xs font-bold text-slate-500 pt-1 flex-wrap">
+                            <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" /> Instant Delivery</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /> 100% Genuine</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1"><Headphones className="w-3 h-3 text-blue-500" /> 24/7 Support</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-amber-400 text-amber-400" /> 4.9★ Rating</span>
+                          </div>
+
                         </div>
+
+                        {/* Right Side (3D Showcase Card) */}
+                        {slide.image_url && (
+                          <div className="hidden md:flex md:col-span-5 items-center justify-center relative">
+                            <div className="relative w-full max-w-[280px] lg:max-w-[340px] aspect-square rounded-3xl bg-white/60 backdrop-blur-xl border border-white/90 p-3 shadow-2xl shadow-purple-500/10 flex items-center justify-center overflow-hidden group-hover:scale-103 transition-transform duration-500">
+                              <img
+                                src={slide.image_url}
+                                alt={slide.title1 || "Hero Product"}
+                                className="w-full h-full object-contain rounded-2xl filter drop-shadow-xl"
+                              />
+                            </div>
+                          </div>
+                        )}
+
                       </div>
-
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            <button
-              onClick={handlePrevSlide}
-              className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/90 text-slate-700 shadow-md flex items-center justify-center hover:bg-white hover:scale-110 active:scale-95 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleNextSlide}
-              className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/90 text-slate-700 shadow-md flex items-center justify-center hover:bg-white hover:scale-110 active:scale-95 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-
-            <div className="absolute bottom-3 left-0 right-0 flex justify-center z-20 pointer-events-auto">
-              <div className="flex items-center gap-1.5 bg-white/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/60 shadow-2xs">
-                {activeSlides.map((_, dotIdx) => (
-                  <button
-                    key={dotIdx}
-                    onClick={() => setCurrentSlide(dotIdx)}
-                    className={`h-2 rounded-full cursor-pointer transition-all ${dotIdx === currentSlide ? 'bg-violet-600 w-6' : 'bg-slate-300 w-2 hover:bg-slate-400'
-                      }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-          </div>
-
-          {/*
-          <div className="lg:col-span-4 flex flex-col">
-            {spotlightProduct ? (
-              <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-3xl p-5 shadow-md flex flex-col justify-between h-full hover:shadow-xl transition-all">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-2xs flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> Spotlight Offer
-                  </span>
-                  {spotlightProduct.avg_rating > 0 && (
-                    <div className="flex items-center gap-1 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-full text-xs font-bold text-amber-700">
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      <span>{spotlightProduct.avg_rating}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="relative aspect-video sm:aspect-square w-full bg-gradient-to-br from-slate-50 to-slate-100/60 rounded-2xl border border-slate-200/60 overflow-hidden flex items-center justify-center p-3 mb-4 group cursor-pointer" onClick={() => handleProductClick(spotlightProduct.id)}>
-                  {spotlightProduct.image_url ? (
-                    <img src={spotlightProduct.image_url} alt={spotlightProduct.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
-                  ) : (
-                    <span className="text-xs text-slate-400 font-bold uppercase">Spotlight Offer</span>
-                  )}
-                </div>
-
-                <div className="space-y-2 mb-4 text-left">
-                  <h3 className="text-base font-extrabold text-slate-900 line-clamp-1 hover:text-teal-700 transition-colors cursor-pointer" onClick={() => handleProductClick(spotlightProduct.id)}>
-                    {spotlightProduct.name}
-                  </h3>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl font-black text-teal-700">
-                      ৳{getProductDisplayPrice(spotlightProduct).toFixed(0)}
-                    </span>
-                    {spotlightProduct.discount_percent && (
-                      <span className="text-xs font-bold text-slate-400 line-through">
-                        ৳{parseFloat(spotlightProduct.discount_percent).toFixed(0)}
-                      </span>
                     )}
                   </div>
-                </div>
+                );
+              })}
 
-                <button
-                  onClick={(e) => handleOrderNow(e, spotlightProduct)}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold py-3 px-4 rounded-2xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-                >
-                  <span>Buy Now Instant</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+              {/* Navigation Floating Arrows */}
+              <button
+                onClick={handlePrevSlide}
+                className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/90 text-slate-700 shadow-md flex items-center justify-center hover:bg-white hover:scale-110 active:scale-95 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleNextSlide}
+                className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/90 text-slate-700 shadow-md flex items-center justify-center hover:bg-white hover:scale-110 active:scale-95 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              {/* Bottom Dots Indicator */}
+              <div className="absolute bottom-3 left-0 right-0 flex justify-center z-20 pointer-events-auto">
+                <div className="flex items-center gap-1.5 bg-white/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/60 shadow-2xs">
+                  {activeSlides.map((_, dotIdx) => (
+                    <button
+                      key={dotIdx}
+                      onClick={() => setCurrentSlide(dotIdx)}
+                      className={`h-2 rounded-full cursor-pointer transition-all ${dotIdx === currentSlide ? 'bg-violet-600 w-6' : 'bg-slate-300 w-2 hover:bg-slate-400'
+                        }`}
+                    />
+                  ))}
+                </div>
               </div>
-            ) : null}
+
+            </div>
           </div>
-          */}
-        </div>
+        )}
 
         {products.length > 0 && (
           <div className="w-full mt-6 mb-4 text-left">
@@ -608,10 +536,9 @@ export default function Home() {
         )}
 
         {(() => {
-          const hotProducts = products.filter(p => p.is_hot || p.is_featured);
-          const bestSellers = hotProducts.length >= 3 ? hotProducts.slice(0, 5) : products.slice(0, 5);
+          const topSellingProducts = products.filter(p => p.is_top_selling === 1 || p.is_top_selling === true || p.is_top_selling === '1');
 
-          if (bestSellers.length === 0) return null;
+          if (topSellingProducts.length === 0) return null;
 
           return (
             <div className="w-full text-left mt-8 mb-6">
@@ -635,7 +562,7 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
-                {bestSellers.map((prod) => {
+                {topSellingProducts.map((prod) => {
                   const currentPrice = getProductDisplayPrice(prod);
                   const isOutOfStock = prod.stock === 0;
                   const hasDiscount = prod.discount_percent && parseFloat(prod.discount_percent) > currentPrice;
@@ -646,53 +573,55 @@ export default function Home() {
                     <div
                       key={prod.id}
                       onClick={() => handleProductClick(prod.id)}
-                      className="bg-gradient-to-b from-amber-100/70 via-orange-50/50 to-white/95 backdrop-blur-xl border border-white/90 rounded-3xl p-3.5 shadow-lg shadow-amber-500/5 hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 relative flex flex-col justify-between group cursor-pointer text-left"
+                      className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 relative group cursor-pointer text-left h-full"
                     >
-                      <div>
-                        <div className="relative aspect-square w-full bg-white/70 backdrop-blur-md border border-white/90 rounded-2xl flex items-center justify-center shadow-inner shadow-white/60 mb-3 overflow-hidden">
-                          {prod.image_url ? (
-                            <img
-                              src={prod.image_url}
-                              alt={prod.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          ) : (
-                            <span className="text-xs text-slate-400 font-extrabold uppercase">No Image</span>
+                      <div className="relative aspect-square w-full bg-slate-50 flex items-center justify-center overflow-hidden border-b border-slate-100">
+                        {prod.image_url ? (
+                          <img
+                            src={prod.image_url}
+                            alt={prod.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                        ) : (
+                          <span className="text-xs text-slate-400 font-extrabold uppercase">No Image</span>
+                        )}
+
+                        <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
+                          {hasDiscount ? (
+                            <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
+                              -{discountPercent}% OFF
+                            </span>
+                          ) : <div></div>}
+
+                          {(prod.is_instant === 1 || prod.activation_process === 'Instant') && (
+                            <span className="bg-emerald-600/95 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5">
+                              ⚡ Instant
+                            </span>
                           )}
-
-                          <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
-                            <span className="bg-slate-900/40 backdrop-blur-md text-white text-[9px] font-black px-2 py-0.5 rounded-full border border-white/40 shadow-2xs">
-                              ELITEPASS
-                            </span>
-                            <span className="bg-amber-500/90 backdrop-blur-md text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-white/90 shadow-2xs flex items-center gap-0.5">
-                              ⚡ Best Seller
-                            </span>
-                          </div>
-
-                          <div className="absolute bottom-2 left-2 z-10 pointer-events-none">
-                            {hasDiscount ? (
-                              <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-2xs">
-                                -{discountPercent}%
-                              </span>
-                            ) : (
-                              <span className="bg-slate-900/80 backdrop-blur-md text-amber-300 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                                <Zap className="w-2.5 h-2.5" /> Instant
-                              </span>
-                            )}
-                          </div>
                         </div>
+                      </div>
 
-                        <h4 className="text-xs font-extrabold text-slate-900 line-clamp-2 min-h-[2.4rem] leading-snug group-hover:text-amber-700 transition-colors">
+                      <div className="p-3 flex flex-col justify-between flex-1">
+                        <h4 className="text-xs font-black text-slate-900 line-clamp-2 min-h-[2.7rem] leading-tight group-hover:text-violet-700 transition-colors">
                           {prod.name}
                         </h4>
 
                         <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 font-bold">
                           <div className="flex gap-0.5">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className={`w-3 h-3 ${i < Math.round(prod.avg_rating || 5) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
-                            ))}
+                            {[...Array(5)].map((_, i) => {
+                              const rating = prod.avg_rating ? parseFloat(prod.avg_rating) : 0;
+                              return (
+                                <Star key={i} className={`w-3 h-3 ${i < Math.round(rating) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                              );
+                            })}
                           </div>
-                          <span>({prod.avg_rating > 0 ? (prod.avg_rating * 35).toFixed(0) : '170'})</span>
+                          <span>
+                            ({(() => {
+                              const rating = prod.avg_rating ? parseFloat(prod.avg_rating) : 0;
+                              const count = prod.review_count !== undefined && prod.review_count !== null ? parseInt(prod.review_count, 10) : 0;
+                              return rating > 0 ? (count > 0 ? count : rating.toFixed(1)) : 0;
+                            })()})
+                          </span>
                         </div>
 
                         <div className="flex items-baseline gap-1.5 mt-2">
@@ -750,7 +679,8 @@ export default function Home() {
         <div className="w-full space-y-8 text-left mt-8">
 
           <div className="bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto scrollbar-none pb-1 sm:pb-0">
+            {/* Desktop / Tablet Pills */}
+            <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto scrollbar-none pb-1 sm:pb-0">
               {['All', ...new Set(products.map(p => p.category_name).filter(Boolean))].map((cat) => (
                 <button
                   key={cat}
@@ -763,6 +693,21 @@ export default function Home() {
                   {cat}
                 </button>
               ))}
+            </div>
+
+            {/* Mobile Dropdown Select */}
+            <div className="sm:hidden w-full">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-xs font-extrabold text-slate-800 focus:outline-none focus:border-violet-600 cursor-pointer shadow-2xs"
+              >
+                {['All', ...new Set(products.map(p => p.category_name).filter(Boolean))].map((cat) => (
+                  <option key={cat} value={cat}>
+                    Category: {cat}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
@@ -847,53 +792,55 @@ export default function Home() {
                           <div
                             key={prod.id}
                             onClick={() => handleProductClick(prod.id)}
-                            className={`bg-gradient-to-b ${gradientStyle} backdrop-blur-xl border border-white/90 rounded-3xl p-3.5 shadow-lg hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 relative flex flex-col justify-between group cursor-pointer text-left`}
+                            className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 relative group cursor-pointer text-left h-full"
                           >
-                            <div>
-                              <div className="relative aspect-square w-full bg-white/70 backdrop-blur-md border border-white/90 rounded-2xl flex items-center justify-center shadow-inner shadow-white/60 mb-3 overflow-hidden">
-                                {prod.image_url ? (
-                                  <img
-                                    src={prod.image_url}
-                                    alt={prod.name}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  />
-                                ) : (
-                                  <span className="text-xs text-slate-400 font-extrabold uppercase">No Image</span>
+                            <div className="relative aspect-square w-full bg-slate-50 flex items-center justify-center overflow-hidden border-b border-slate-100">
+                              {prod.image_url ? (
+                                <img
+                                  src={prod.image_url}
+                                  alt={prod.name}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                />
+                              ) : (
+                                <span className="text-xs text-slate-400 font-extrabold uppercase">No Image</span>
+                              )}
+
+                              <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
+                                {hasDiscount ? (
+                                  <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
+                                    -{discountPercent}% OFF
+                                  </span>
+                                ) : <div></div>}
+
+                                {(prod.is_instant === 1 || prod.activation_process === 'Instant') && (
+                                  <span className="bg-emerald-600/95 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5">
+                                    ⚡ Instant
+                                  </span>
                                 )}
-
-                                <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
-                                  <span className="bg-slate-900/40 backdrop-blur-md text-white text-[9px] font-black px-2 py-0.5 rounded-full border border-white/40 shadow-2xs">
-                                    ELITEPASS
-                                  </span>
-                                  <span className="bg-white/90 backdrop-blur-md text-slate-900 text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-white/90 shadow-2xs truncate max-w-[90px]">
-                                    {categoryName}
-                                  </span>
-                                </div>
-
-                                <div className="absolute bottom-2 left-2 z-10 pointer-events-none">
-                                  {hasDiscount ? (
-                                    <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-2xs">
-                                      -{discountPercent}%
-                                    </span>
-                                  ) : (
-                                    <span className="bg-slate-900/80 backdrop-blur-md text-amber-300 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                                      <Zap className="w-2.5 h-2.5" /> Instant
-                                    </span>
-                                  )}
-                                </div>
                               </div>
+                            </div>
 
-                              <h4 className="text-xs font-extrabold text-slate-900 line-clamp-2 min-h-[2.4rem] leading-snug group-hover:text-violet-700 transition-colors">
+                            <div className="p-3 flex flex-col justify-between flex-1">
+                              <h4 className="text-xs font-black text-slate-900 line-clamp-2 min-h-[2.7rem] leading-tight group-hover:text-violet-700 transition-colors">
                                 {prod.name}
                               </h4>
 
                               <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 font-bold">
                                 <div className="flex gap-0.5">
-                                  {[...Array(5)].map((_, i) => (
-                                    <Star key={i} className={`w-3 h-3 ${i < Math.round(prod.avg_rating || 5) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
-                                  ))}
+                                  {[...Array(5)].map((_, i) => {
+                                    const rating = prod.avg_rating ? parseFloat(prod.avg_rating) : 0;
+                                    return (
+                                      <Star key={i} className={`w-3 h-3 ${i < Math.round(rating) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                                    );
+                                  })}
                                 </div>
-                                <span>({prod.avg_rating > 0 ? (prod.avg_rating * 35).toFixed(0) : '170'})</span>
+                                <span>
+                                  ({(() => {
+                                    const rating = prod.avg_rating ? parseFloat(prod.avg_rating) : 0;
+                                    const count = prod.review_count !== undefined && prod.review_count !== null ? parseInt(prod.review_count, 10) : 0;
+                                    return rating > 0 ? (count > 0 ? count : rating.toFixed(1)) : 0;
+                                  })()})
+                                </span>
                               </div>
 
                               <div className="flex items-baseline gap-1.5 mt-2">

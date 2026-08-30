@@ -89,7 +89,7 @@ exports.createCoupon = async (req, res) => {
       expires_at
     } = req.body;
 
-    if (!code || !discount_value) {
+    if (!code || discount_value === undefined || discount_value === null || discount_value === '') {
       return res.status(400).json({ message: 'Coupon code and discount value are required.' });
     }
 
@@ -100,6 +100,19 @@ exports.createCoupon = async (req, res) => {
       return res.status(400).json({ message: `Coupon code '${cleanCode}' already exists.` });
     }
 
+    let parsedExpiresAt = null;
+    if (expires_at) {
+      const d = new Date(expires_at);
+      if (!isNaN(d.getTime())) {
+        parsedExpiresAt = d;
+      }
+    }
+
+    const parsedMinOrder = min_order_amount && !isNaN(parseFloat(min_order_amount)) ? parseFloat(min_order_amount) : 0;
+    const parsedMaxDiscount = max_discount_amount && !isNaN(parseFloat(max_discount_amount)) ? parseFloat(max_discount_amount) : null;
+    const parsedUsageLimit = usage_limit && !isNaN(parseInt(usage_limit)) ? parseInt(usage_limit) : null;
+    const parsedDiscountVal = parseFloat(discount_value);
+
     await db.query(
       `INSERT INTO coupons 
        (code, discount_type, discount_value, min_order_amount, max_discount_amount, usage_limit, expires_at)
@@ -107,18 +120,79 @@ exports.createCoupon = async (req, res) => {
       [
         cleanCode,
         discount_type || 'percentage',
-        parseFloat(discount_value),
-        min_order_amount ? parseFloat(min_order_amount) : 0,
-        max_discount_amount ? parseFloat(max_discount_amount) : null,
-        usage_limit ? parseInt(usage_limit) : null,
-        expires_at ? new Date(expires_at) : null
+        parsedDiscountVal,
+        parsedMinOrder,
+        parsedMaxDiscount,
+        parsedUsageLimit,
+        parsedExpiresAt
       ]
     );
 
     res.status(201).json({ message: `Coupon '${cleanCode}' created successfully!` });
   } catch (error) {
     console.error('Create coupon error:', error);
-    res.status(500).json({ message: 'Database error occurred while creating coupon.' });
+    res.status(500).json({ message: error.message || 'Database error occurred while creating coupon.' });
+  }
+};
+
+exports.updateCoupon = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      code,
+      discount_type,
+      discount_value,
+      min_order_amount,
+      max_discount_amount,
+      usage_limit,
+      expires_at
+    } = req.body;
+
+    if (!code || discount_value === undefined || discount_value === null || discount_value === '') {
+      return res.status(400).json({ message: 'Coupon code and discount value are required.' });
+    }
+
+    const cleanCode = code.trim().toUpperCase();
+
+    const [existing] = await db.query('SELECT id FROM coupons WHERE UPPER(code) = ? AND id != ?', [cleanCode, id]);
+    if (existing.length > 0) {
+      return res.status(400).json({ message: `Coupon code '${cleanCode}' is already in use by another coupon.` });
+    }
+
+    let parsedExpiresAt = null;
+    if (expires_at) {
+      const d = new Date(expires_at);
+      if (!isNaN(d.getTime())) {
+        parsedExpiresAt = d;
+      }
+    }
+
+    const parsedMinOrder = min_order_amount && !isNaN(parseFloat(min_order_amount)) ? parseFloat(min_order_amount) : 0;
+    const parsedMaxDiscount = max_discount_amount && !isNaN(parseFloat(max_discount_amount)) ? parseFloat(max_discount_amount) : null;
+    const parsedUsageLimit = usage_limit && !isNaN(parseInt(usage_limit)) ? parseInt(usage_limit) : null;
+    const parsedDiscountVal = parseFloat(discount_value);
+
+    await db.query(
+      `UPDATE coupons SET 
+       code = ?, discount_type = ?, discount_value = ?, min_order_amount = ?, 
+       max_discount_amount = ?, usage_limit = ?, expires_at = ?
+       WHERE id = ?`,
+      [
+        cleanCode,
+        discount_type || 'percentage',
+        parsedDiscountVal,
+        parsedMinOrder,
+        parsedMaxDiscount,
+        parsedUsageLimit,
+        parsedExpiresAt,
+        id
+      ]
+    );
+
+    res.json({ message: `Coupon '${cleanCode}' updated successfully!` });
+  } catch (error) {
+    console.error('Update coupon error:', error);
+    res.status(500).json({ message: error.message || 'Database error occurred while updating coupon.' });
   }
 };
 

@@ -333,12 +333,17 @@ exports.updateOrderStatus = async (req, res) => {
 
     if (status === 'Cancelled') {
       await connection.query(
-        'UPDATE orders SET status = ?, cancel_reason = ? WHERE id = ?',
+        'UPDATE orders SET status = ?, cancel_reason = ?, completed_at = NULL, review_email_sent = 0 WHERE id = ?',
         [status, cancel_reason || 'No reason provided', id]
+      );
+    } else if (status === 'Delivered') {
+      await connection.query(
+        'UPDATE orders SET status = ?, cancel_reason = NULL, completed_at = IFNULL(completed_at, NOW()) WHERE id = ?',
+        [status, id]
       );
     } else {
       await connection.query(
-        'UPDATE orders SET status = ?, cancel_reason = NULL WHERE id = ?',
+        'UPDATE orders SET status = ?, cancel_reason = NULL, completed_at = NULL, review_email_sent = 0 WHERE id = ?',
         [status, id]
       );
     }

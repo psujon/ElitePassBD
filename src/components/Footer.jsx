@@ -40,10 +40,17 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-10">
 
           <div className="lg:col-span-2 space-y-4">
-            <Link to="/" className="flex items-center space-x-2 text-xl font-bold tracking-tight text-slate-900">
-              <span className="text-blue-600 font-black text-2xl">
-                ElitePassBD
-              </span>
+            <Link to="/" className="flex items-center space-x-2.5 text-xl font-bold tracking-tight text-slate-900">
+              <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
+                <img src="/logo.png" alt="ElitePass BD Logo" className="w-full h-full object-contain" />
+              </div>
+              <div className="text-lg font-black tracking-tight leading-none flex items-center gap-1">
+                <span className="text-[#005F4B]">ELITE</span>
+                <span className="text-[#FF6D00]">PASS</span>
+                <span className="text-[#005F4B] border border-[#005F4B] px-1 py-0.5 rounded-md text-[10px] font-black leading-none">
+                  BD
+                </span>
+              </div>
             </Link>
             <p className="text-xs text-slate-500 leading-relaxed font-semibold">
               Your trusted source for genuine software licenses at affordable prices. Instant delivery, dedicated activation support, and 24/7 customer service.
@@ -152,22 +159,25 @@ export default function Footer() {
 
       </div>
 
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end">
 
         {isChatOpen && (
           <div className="mb-4 flex flex-col items-end gap-3.5 animate-fade-in-up">
-            
+
+            {/* Messenger Option Pill */}
             <a
-              href="tel:01925112444"
+              href="https://m.me/elitepassbd"
+              target="_blank"
+              rel="noopener noreferrer"
               className="w-72 sm:w-80 bg-white/95 backdrop-blur-xl border border-purple-200/90 hover:border-blue-500 p-3 rounded-full shadow-2xl hover:shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-between group text-left"
             >
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-500/30 flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform">
-                  <Phone className="w-5 h-5 text-white" />
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 via-indigo-600 to-blue-600 shadow-md shadow-blue-500/30 flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform">
+                  <MessageSquare className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h5 className="text-sm font-black text-slate-900 leading-tight">ফোন করুন</h5>
-                  <p className="text-xs text-slate-500 font-semibold mt-0.5">সরাসরি কল করুন</p>
+                  <h5 className="text-sm font-black text-slate-900 leading-tight">Messenger</h5>
+                  <p className="text-xs text-slate-500 font-semibold mt-0.5">Chat on Messenger</p>
                 </div>
               </div>
               <div className="pr-3 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all font-bold text-sm">
@@ -175,6 +185,7 @@ export default function Footer() {
               </div>
             </a>
 
+            {/* WhatsApp Chat Option Pill */}
             <a
               href="https://wa.me/8801925112444?text=Hello%20ElitePassBD%20Support,%20I%20need%20assistance."
               target="_blank"
@@ -189,7 +200,7 @@ export default function Footer() {
                 </div>
                 <div>
                   <h5 className="text-sm font-black text-slate-900 leading-tight">WhatsApp</h5>
-                  <p className="text-xs text-slate-500 font-semibold mt-0.5">সরাসরি কথা বলুন</p>
+                  <p className="text-xs text-slate-500 font-semibold mt-0.5">Chat on WhatsApp</p>
                 </div>
               </div>
               <div className="pr-3 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all font-bold text-sm">
@@ -199,7 +210,7 @@ export default function Footer() {
 
             <div className="bg-white/95 backdrop-blur-xl border border-purple-200/90 px-4 py-1.5 rounded-full shadow-lg text-xs font-black text-violet-900 flex items-center gap-2 mr-2">
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-              <span>কোনটি পছন্দ করবেন?</span>
+              <span>Which one do you prefer?</span>
             </div>
 
           </div>

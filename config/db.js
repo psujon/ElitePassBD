@@ -9,7 +9,8 @@ const dbConfig = {
   port: process.env.DB_PORT,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  charset: 'utf8mb4'
 };
 
 const dbName = process.env.DB_NAME;
@@ -182,7 +183,7 @@ async function createTables() {
       activation_option VARCHAR(255) DEFAULT NULL,
       package_option VARCHAR(255) DEFAULT NULL,
       rules TEXT DEFAULT NULL,
-      license_key VARCHAR(255) NOT NULL,
+      license_key TEXT NOT NULL,
       is_used TINYINT DEFAULT 0,
       order_item_id INT DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -371,6 +372,24 @@ async function updateSchema() {
       console.log("Added column 'highlighted_text' to 'products' table.");
     }
 
+    const [isInstantCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'is_instant'");
+    if (isInstantCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN is_instant TINYINT DEFAULT 0");
+      console.log("Added column 'is_instant' to 'products' table.");
+    }
+
+    const [topSellingCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'is_top_selling'");
+    if (topSellingCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN is_top_selling TINYINT DEFAULT 0");
+      console.log("Added column 'is_top_selling' to 'products' table.");
+    }
+
+    const [bulletPointsCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'bullet_points'");
+    if (bulletPointsCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN bullet_points TEXT DEFAULT NULL");
+      console.log("Added column 'bullet_points' to 'products' table.");
+    }
+
     const [addressCols] = await pool.query("SHOW COLUMNS FROM users LIKE 'address'");
     if (addressCols.length === 0) {
       await pool.query("ALTER TABLE users ADD COLUMN address TEXT DEFAULT NULL");
@@ -379,7 +398,7 @@ async function updateSchema() {
 
     const [rulesCols] = await pool.query("SHOW COLUMNS FROM product_licenses LIKE 'rules'");
     if (rulesCols.length === 0) {
-      await pool.query("ALTER TABLE product_licenses ADD COLUMN rules TEXT DEFAULT NULL");
+      await pool.query("ALTER TABLE product_licenses ADD COLUMN rules LONGTEXT DEFAULT NULL");
       console.log("Added column 'rules' to 'product_licenses' table.");
     }
 
@@ -387,6 +406,18 @@ async function updateSchema() {
     if (usedAtCols.length === 0) {
       await pool.query("ALTER TABLE product_licenses ADD COLUMN used_at DATETIME DEFAULT NULL");
       console.log("Added column 'used_at' to 'product_licenses' table.");
+    }
+
+    try {
+      await pool.query(`ALTER DATABASE \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+      await pool.query("ALTER TABLE product_licenses CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+      await pool.query("ALTER TABLE product_licenses MODIFY COLUMN rules LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+      await pool.query("ALTER TABLE product_licenses MODIFY COLUMN license_key LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL");
+      await pool.query("ALTER TABLE product_licenses MODIFY COLUMN activation_option TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+      await pool.query("ALTER TABLE product_licenses MODIFY COLUMN package_option TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+      console.log("Updated product_licenses columns (rules, license_key) to utf8mb4_unicode_ci and LONGTEXT.");
+    } catch (err) {
+      console.error("Error updating product_licenses column types to LONGTEXT/utf8mb4:", err.message);
     }
 
     const [revNameCols] = await pool.query("SHOW COLUMNS FROM reviews LIKE 'reviewer_name'");
@@ -427,6 +458,18 @@ async function updateSchema() {
       await pool.query("ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(50) DEFAULT NULL");
       await pool.query("ALTER TABLE orders ADD COLUMN discount_amount DECIMAL(10, 2) DEFAULT 0");
       console.log("Added coupon_code and discount_amount columns to orders table.");
+    }
+
+    const [reviewEmailSentCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'review_email_sent'");
+    if (reviewEmailSentCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN review_email_sent TINYINT DEFAULT 0");
+      console.log("Added column 'review_email_sent' to 'orders' table.");
+    }
+
+    const [completedAtCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'completed_at'");
+    if (completedAtCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN completed_at TIMESTAMP NULL DEFAULT NULL");
+      console.log("Added column 'completed_at' to 'orders' table.");
     }
 
     try {

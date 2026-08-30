@@ -305,7 +305,7 @@ const fulfillOrder = async (merchantTransactionId) => {
     }
 
     if (allAutomaticFulfilled && items.length > 0) {
-      await connection.query('UPDATE orders SET status = "Delivered" WHERE id = ?', [order.id]);
+      await connection.query('UPDATE orders SET status = "Delivered", completed_at = IFNULL(completed_at, NOW()) WHERE id = ?', [order.id]);
       activationType = 'automatic';
     } else {
       activationType = 'manual';

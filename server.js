@@ -155,7 +155,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Internal Server Error.' });
 });
 
+const { initReviewEmailCron } = require('./services/reviewEmailService');
+
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  initReviewEmailCron();
 });

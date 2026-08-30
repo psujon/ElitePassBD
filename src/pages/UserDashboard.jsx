@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
-import { Loader2, Package, Calendar, Phone, MapPin, Truck, ChevronRight, CheckCircle2, Clock, Star, X, MessageSquare, Send, Inbox, Plus } from 'lucide-react';
+import { Loader2, Package, Calendar, Phone, MapPin, Truck, ChevronRight, ChevronDown, CheckCircle2, Clock, Star, X, MessageSquare, Send, Inbox, Plus } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function UserDashboard() {
@@ -201,7 +201,7 @@ export default function UserDashboard() {
     <div className="w-full min-h-[calc(100vh-64px)] flex flex-col md:flex-row bg-[#f5f7fa] text-slate-800">
       
       <div className="w-full md:w-64 bg-[#111e35] text-slate-300 p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-850">
-        <div className="flex items-center space-x-2.5 px-2 mb-6 text-left">
+        <div className="hidden md:flex items-center space-x-2.5 px-2 mb-6 text-left">
           <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
             E
           </div>
@@ -214,7 +214,39 @@ export default function UserDashboard() {
           </span>
         </div>
 
-        <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible gap-1 pb-2 md:pb-0 scrollbar-none snap-x md:space-y-1">
+        {/* Mobile Menu Dropdown Select List */}
+        <div className="md:hidden w-full relative mb-2 text-left">
+          <label className="text-[10px] font-extrabold uppercase text-slate-400 block mb-1">
+            Menu List
+          </label>
+          <div className="relative">
+            <select
+              value={activeTab}
+              onChange={(e) => {
+                const newTab = e.target.value;
+                setActiveTab(newTab);
+                if (newTab === 'orders' && !trackingOrder && orders.length > 0) {
+                  handleTrackOrder(orders[0].id);
+                }
+                if (newTab === 'tickets' && !selectedTicket && tickets.length > 0) {
+                  setSelectedTicket(tickets[0]);
+                }
+              }}
+              className="w-full bg-[#1b2b48] text-white border border-slate-700 font-extrabold text-xs rounded-xl px-3.5 py-2.5 pr-8 appearance-none focus:outline-none focus:border-amber-400 transition-all cursor-pointer"
+            >
+              <option value="orders" className="bg-[#111e35] text-white">
+                📦 My Purchases ({orders.length})
+              </option>
+              <option value="tickets" className="bg-[#111e35] text-white">
+                💬 Support Tickets ({tickets.length})
+              </option>
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Desktop Vertical Menu List */}
+        <div className="hidden md:flex flex-col gap-1 pb-2 md:pb-0 scrollbar-none snap-x md:space-y-1">
           <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-4 text-left">
             General
           </div>
@@ -267,12 +299,12 @@ export default function UserDashboard() {
             <h1 className="text-2xl font-extrabold text-slate-850 tracking-tight">
               {activeTab === 'orders' ? 'My Purchases' : 'Support Tickets'}
             </h1>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="hidden sm:block text-xs text-slate-500 mt-1">
               Hello, {user?.name}. {activeTab === 'orders' ? 'Check your purchase history and live tracking details.' : 'Submit and manage your support tickets.'}
             </p>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="hidden sm:flex items-center space-x-4">
             <div className="flex items-center space-x-2.5 bg-white border border-slate-200/60 px-3 py-1.5 rounded-xl shadow-xs">
               <div className="w-7 h-7 rounded-full bg-violet-650 flex items-center justify-center text-white font-extrabold text-xs uppercase shadow-sm">
                 {user?.name ? user.name.substring(0, 2) : 'US'}

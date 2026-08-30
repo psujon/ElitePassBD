@@ -21,11 +21,18 @@ const stringifyField = (val) => {
 
 const formatProduct = (prod) => {
   if (!prod) return prod;
+  const ratingVal = prod.avg_rating !== null && prod.avg_rating !== undefined ? parseFloat(prod.avg_rating) : 0;
+  const reviewCountVal = prod.review_count !== null && prod.review_count !== undefined ? parseInt(prod.review_count, 10) : 0;
   return {
     ...prod,
     faqs: parseJSON(prod.faqs, []),
     packages: parseJSON(prod.packages, []),
-    total_sold: parseInt(prod.total_sold || 0, 10)
+    bullet_points: parseJSON(prod.bullet_points, []),
+    is_instant: prod.is_instant !== null && prod.is_instant !== undefined ? (prod.is_instant === 1 ? 1 : 0) : (prod.activation_process === 'Instant' ? 1 : 0),
+    is_top_selling: prod.is_top_selling === 1 ? 1 : 0,
+    total_sold: parseInt(prod.total_sold || 0, 10),
+    avg_rating: isNaN(ratingVal) ? 0 : Number(ratingVal.toFixed(1)),
+    review_count: isNaN(reviewCountVal) ? 0 : reviewCountVal
   };
 };
 
@@ -34,6 +41,7 @@ exports.getAllProducts = async (req, res) => {
     const [products] = await db.query(`
       SELECT p.*, c.name AS category_name,
              (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) as avg_rating,
+             (SELECT COUNT(id) FROM reviews WHERE product_id = p.id) as review_count,
              COALESCE((SELECT SUM(quantity) FROM order_items WHERE product_id = p.id), 0) as total_sold
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
@@ -52,6 +60,7 @@ exports.getProductById = async (req, res) => {
     const [products] = await db.query(`
       SELECT p.*, c.name AS category_name,
              (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) as avg_rating,
+             (SELECT COUNT(id) FROM reviews WHERE product_id = p.id) as review_count,
              COALESCE((SELECT SUM(quantity) FROM order_items WHERE product_id = p.id), 0) as total_sold
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
@@ -71,7 +80,8 @@ exports.createProduct = async (req, res) => {
   const {
     name, description, price, image_url, stock, category_id,
     tags, additional_info, faqs, packages, device_options, activation_options,
-    discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process, highlighted_text
+    discount_percent, is_hot, is_highlighted, is_hot_discount, is_top_selling, activation_process, highlighted_text,
+    is_instant, bullet_points
   } = req.body;
 
   if (!name || !description) {
@@ -81,9 +91,14 @@ exports.createProduct = async (req, res) => {
   try {
     let parsedPackages = [];
     if (packages) {
-      parsedPackages = typeof packages === 'string' ? JSON.parse(packages) : packages;
+      parsedPackages = typeof packages === 'string' ? parseJSON(packages, []) : packages;
     }
-    
+
+    let parsedBullets = [];
+    if (bullet_points) {
+      parsedBullets = typeof bullet_points === 'string' ? parseJSON(bullet_points, []) : bullet_points;
+    }
+
     let calculatedStock = 0;
     if (parsedPackages && parsedPackages.length > 0) {
       calculatedStock = parsedPackages.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
@@ -107,12 +122,16 @@ exports.createProduct = async (req, res) => {
       calculatedPrice = price === undefined || price === '' || price === null ? 0 : parseFloat(price);
     }
 
+    const isInstantValue = is_instant !== undefined && is_instant !== null ? (is_instant ? 1 : 0) : (activation_process === 'Instant' ? 1 : 0);
+    const finalActivationProcess = isInstantValue ? 'Instant' : (activation_process && activation_process !== 'Instant' ? activation_process : 'Manual');
+
     const [result] = await db.query(
       `INSERT INTO products (
         name, description, price, image_url, stock, category_id, 
         tags, additional_info, faqs, packages, device_options, activation_options,
-        discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process, highlighted_text
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        discount_percent, is_hot, is_highlighted, is_hot_discount, is_top_selling, activation_process, highlighted_text,
+        is_instant, bullet_points
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name, description, calculatedPrice, image_url || '', calculatedStock, category_id || null,
         tags || null, additional_info || null, stringifyField(faqs), stringifyField(parsedPackages),
@@ -121,8 +140,11 @@ exports.createProduct = async (req, res) => {
         is_hot ? 1 : 0,
         is_highlighted ? 1 : 0,
         is_hot_discount ? 1 : 0,
-        activation_process || 'Manual',
-        highlighted_text || null
+        is_top_selling ? 1 : 0,
+        finalActivationProcess,
+        highlighted_text || null,
+        isInstantValue,
+        stringifyField(parsedBullets)
       ]
     );
 
@@ -141,7 +163,8 @@ exports.updateProduct = async (req, res) => {
   const {
     name, description, price, image_url, stock, category_id,
     tags, additional_info, faqs, packages, device_options, activation_options,
-    discount_percent, is_hot, is_highlighted, is_hot_discount, activation_process, highlighted_text
+    discount_percent, is_hot, is_highlighted, is_hot_discount, is_top_selling, activation_process, highlighted_text,
+    is_instant, bullet_points
   } = req.body;
 
   if (!name || !description) {
@@ -151,9 +174,14 @@ exports.updateProduct = async (req, res) => {
   try {
     let parsedPackages = [];
     if (packages) {
-      parsedPackages = typeof packages === 'string' ? JSON.parse(packages) : packages;
+      parsedPackages = typeof packages === 'string' ? parseJSON(packages, []) : packages;
     }
-    
+
+    let parsedBullets = [];
+    if (bullet_points) {
+      parsedBullets = typeof bullet_points === 'string' ? parseJSON(bullet_points, []) : bullet_points;
+    }
+
     let calculatedStock = 0;
     if (parsedPackages && parsedPackages.length > 0) {
       calculatedStock = parsedPackages.reduce((sum, p) => sum + (parseInt(p.stock) || 0), 0);
@@ -177,12 +205,15 @@ exports.updateProduct = async (req, res) => {
       calculatedPrice = price === undefined || price === '' || price === null ? 0 : parseFloat(price);
     }
 
+    const isInstantValue = is_instant !== undefined && is_instant !== null ? (is_instant ? 1 : 0) : (activation_process === 'Instant' ? 1 : 0);
+    const finalActivationProcess = isInstantValue ? 'Instant' : (activation_process && activation_process !== 'Instant' ? activation_process : 'Manual');
+
     const [result] = await db.query(
       `UPDATE products SET 
         name = ?, description = ?, price = ?, image_url = ?, stock = ?, category_id = ?, 
         tags = ?, additional_info = ?, faqs = ?, packages = ?, device_options = ?, activation_options = ?,
-        discount_percent = ?, is_hot = ?, is_highlighted = ?, is_hot_discount = ?, activation_process = ?,
-        highlighted_text = ?
+        discount_percent = ?, is_hot = ?, is_highlighted = ?, is_hot_discount = ?, is_top_selling = ?, activation_process = ?,
+        highlighted_text = ?, is_instant = ?, bullet_points = ?
       WHERE id = ?`,
       [
         name, description, calculatedPrice, image_url || '', calculatedStock, category_id || null,
@@ -192,8 +223,11 @@ exports.updateProduct = async (req, res) => {
         is_hot ? 1 : 0,
         is_highlighted ? 1 : 0,
         is_hot_discount ? 1 : 0,
-        activation_process || 'Manual',
+        is_top_selling ? 1 : 0,
+        finalActivationProcess,
         highlighted_text || null,
+        isInstantValue,
+        stringifyField(parsedBullets),
         id
       ]
     );
