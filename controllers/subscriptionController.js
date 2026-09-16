@@ -394,7 +394,7 @@ exports.updateSubscription = async (req, res) => {
 
 exports.renewSubscription = async (req, res) => {
   const { id } = req.params;
-  const { renewal_date, validity_days, new_expiry_date, payment_amount, notes } = req.body;
+  const { renewal_date, validity_days, new_expiry_date, payment_amount, notes, package_plan } = req.body;
 
   const pool = db.getPool();
   const connection = await pool.getConnection();
@@ -447,6 +447,7 @@ exports.renewSubscription = async (req, res) => {
         validity_days = ?,
         expiry_date = ?,
         selling_price = ?,
+        package_plan = COALESCE(?, package_plan),
         payment_status = 'Paid',
         status = 'Renewed',
         updated_at = NOW()
@@ -456,6 +457,7 @@ exports.renewSubscription = async (req, res) => {
       vDays,
       formattedEDate,
       amount,
+      package_plan || null,
       id
     ]);
 

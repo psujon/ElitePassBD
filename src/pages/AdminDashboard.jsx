@@ -814,84 +814,84 @@ export default function AdminDashboard() {
   return (
     <div className="w-full min-h-[calc(100vh-64px)] flex flex-col md:flex-row bg-[#f5f7fa] text-slate-800">
 
-      <div className="w-full md:w-64 bg-[#111e35] text-slate-300 p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-800">
+      <div className="w-full md:w-64 bg-[#f8fafc] text-slate-900 p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-200">
         <div className="hidden md:flex items-center space-x-2.5 px-2 mb-6 text-left">
           <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
             E
           </div>
-          <span className="text-sm font-extrabold tracking-wider text-white uppercase truncate">ElitePass BD</span>
+          <span className="text-sm font-extrabold tracking-wider text-black uppercase truncate">ElitePass BD</span>
         </div>
 
         <div className="mb-6 px-2 hidden md:block text-left">
-          <span className="text-[10px] font-bold text-orange-400 bg-orange-950/45 border border-orange-900/30 px-2.5 py-0.5 rounded-full uppercase tracking-wider block w-fit">
+          <span className="text-[10px] font-bold text-orange-700 bg-orange-100 border border-orange-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider block w-fit">
             Admin Console
           </span>
         </div>
 
         {/* Mobile Tab Dropdown Select List */}
         <div className="md:hidden w-full relative mb-3 text-left">
-          <label className="text-[10px] font-extrabold uppercase text-slate-400 block mb-1">
+          <label className="text-[10px] font-extrabold uppercase text-slate-600 block mb-1">
             Menu List
           </label>
           <div className="relative">
             <select
               value={activeTab}
               onChange={(e) => setActiveTab(e.target.value)}
-              className="w-full bg-[#1b2b48] text-white border border-slate-700 font-extrabold text-xs rounded-xl px-3.5 py-2.5 pr-8 appearance-none focus:outline-none focus:border-amber-400 transition-all cursor-pointer shadow-xs"
+              className="w-full bg-white text-black border border-slate-300 font-bold text-xs rounded-xl px-3.5 py-2.5 pr-8 appearance-none focus:outline-none focus:border-amber-400 transition-all cursor-pointer shadow-xs"
             >
-              <option value="dashboard" className="bg-[#111e35] text-white">📊 Dashboard</option>
-              <option value="subscriptions_manager" className="bg-[#111e35] text-white">🔄 Subscriptions & Renewal Manager</option>
-              <option value="products" className="bg-[#111e35] text-white">📦 Catalog Products ({products.length})</option>
-              <option value="orders" className="bg-[#111e35] text-white">📋 Customer Orders ({orders.length})</option>
-              <option value="categories" className="bg-[#111e35] text-white">🥞 Categories ({categories.length})</option>
-              <option value="tickets" className="bg-[#111e35] text-white">💬 Support Tickets ({tickets.length})</option>
-              <option value="licenses" className="bg-[#111e35] text-white">🔑 License Keys ({licenses.length})</option>
-              <option value="coupons" className="bg-[#111e35] text-white">🏷️ Coupons / Promo Codes ({coupons.length})</option>
-              <option value="backup" className="bg-[#111e35] text-white">💾 Database Backup</option>
-              <option value="eps_history" className="bg-[#111e35] text-white">💵 EPS Payments</option>
-              <option value="slides" className="bg-[#111e35] text-white">🖼️ Slides ({slides.length})</option>
-              <option value="theme_settings" className="bg-[#111e35] text-white">🎨 Theme Settings</option>
+              <option value="dashboard" className="bg-white text-black">📊 Dashboard</option>
+              <option value="subscriptions_manager" className="bg-white text-black">🔄 Subscriptions & Renewal Manager</option>
+              <option value="products" className="bg-white text-black">📦 Catalog Products ({products.length})</option>
+              <option value="orders" className="bg-white text-black">📋 Customer Orders ({orders.length})</option>
+              <option value="categories" className="bg-white text-black">🥞 Categories ({categories.length})</option>
+              <option value="tickets" className="bg-white text-black">💬 Support Tickets ({tickets.length})</option>
+              <option value="licenses" className="bg-white text-black">🔑 License Keys ({licenses.length})</option>
+              <option value="coupons" className="bg-white text-black">🏷️ Coupons / Promo Codes ({coupons.length})</option>
+              <option value="backup" className="bg-white text-black">💾 Database Backup</option>
+              <option value="eps_history" className="bg-white text-black">💵 EPS Payments</option>
+              <option value="slides" className="bg-white text-black">🖼️ Slides ({slides.length})</option>
+              <option value="theme_settings" className="bg-white text-black">🎨 Theme Settings</option>
             </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
 
         {/* Desktop Vertical Menu List */}
         <div className="hidden md:flex md:flex-col space-y-1">
-          <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-4 text-left">
+          <div className="hidden md:block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-3.5 mb-2 mt-4 text-left">
             General
           </div>
 
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'dashboard'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'dashboard'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <LayoutDashboard className={`w-4 h-4 shrink-0 ${activeTab === 'dashboard' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <LayoutDashboard className={`w-4 h-4 shrink-0 ${activeTab === 'dashboard' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>Dashboard</span>
           </button>
 
           <button
             onClick={() => setActiveTab('products')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'products'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'products'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <Package className={`w-4 h-4 shrink-0 ${activeTab === 'products' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <Package className={`w-4 h-4 shrink-0 ${activeTab === 'products' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>Catalog Products</span>
           </button>
 
           <button
             onClick={() => setActiveTab('orders')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'orders'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'orders'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <ClipboardList className={`w-4 h-4 shrink-0 ${activeTab === 'orders' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <ClipboardList className={`w-4 h-4 shrink-0 ${activeTab === 'orders' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>Customer Orders</span>
             {pendingOrdersCount > 0 && (
               <span className="ml-auto bg-[#ff5e3a] text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded-full shrink-0">
@@ -900,40 +900,40 @@ export default function AdminDashboard() {
             )}
           </button>
 
-          <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-6 text-left">
+          <div className="hidden md:block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-3.5 mb-2 mt-6 text-left">
             Management
           </div>
 
           <button
             onClick={() => setActiveTab('subscriptions_manager')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'subscriptions_manager'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'subscriptions_manager'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <RefreshCw className={`w-4 h-4 shrink-0 ${activeTab === 'subscriptions_manager' ? 'text-emerald-400' : 'text-slate-500'}`} />
+            <RefreshCw className={`w-4 h-4 shrink-0 ${activeTab === 'subscriptions_manager' ? 'text-emerald-500' : 'text-slate-500'}`} />
             <span>Subscriptions</span>
           </button>
 
           <button
             onClick={() => setActiveTab('categories')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'categories'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'categories'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <Layers className={`w-4 h-4 shrink-0 ${activeTab === 'categories' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <Layers className={`w-4 h-4 shrink-0 ${activeTab === 'categories' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>Categories</span>
           </button>
 
           <button
             onClick={() => setActiveTab('tickets')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'tickets'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'tickets'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <MessageSquare className={`w-4 h-4 shrink-0 ${activeTab === 'tickets' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <MessageSquare className={`w-4 h-4 shrink-0 ${activeTab === 'tickets' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>Support Tickets</span>
             {ticketStats.pending > 0 && (
               <span className="ml-auto bg-orange-500 text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded-full shrink-0">
@@ -944,71 +944,71 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('licenses')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'licenses'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'licenses'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <KeyRound className={`w-4 h-4 shrink-0 ${activeTab === 'licenses' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <KeyRound className={`w-4 h-4 shrink-0 ${activeTab === 'licenses' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>License Keys</span>
           </button>
 
           <button
             onClick={() => setActiveTab('coupons')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'coupons'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'coupons'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <Tag className={`w-4 h-4 shrink-0 ${activeTab === 'coupons' ? 'text-amber-400' : 'text-slate-500'}`} />
+            <Tag className={`w-4 h-4 shrink-0 ${activeTab === 'coupons' ? 'text-amber-500' : 'text-slate-500'}`} />
             <span>Coupons / Promo Codes</span>
           </button>
 
           <button
             onClick={() => setActiveTab('backup')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'backup'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'backup'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <Database className={`w-4 h-4 shrink-0 ${activeTab === 'backup' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <Database className={`w-4 h-4 shrink-0 ${activeTab === 'backup' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>Database Backup</span>
           </button>
 
           <button
             onClick={() => setActiveTab('eps_history')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'eps_history'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'eps_history'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <Banknote className={`w-4 h-4 shrink-0 ${activeTab === 'eps_history' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <Banknote className={`w-4 h-4 shrink-0 ${activeTab === 'eps_history' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>EPS Payments</span>
           </button>
 
-          <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-6 text-left">
+          <div className="hidden md:block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-3.5 mb-2 mt-6 text-left">
             Setup
           </div>
 
           <button
             onClick={() => setActiveTab('slides')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'slides'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'slides'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <Layers className={`w-4 h-4 shrink-0 ${activeTab === 'slides' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <Layers className={`w-4 h-4 shrink-0 ${activeTab === 'slides' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>Slides</span>
           </button>
 
           <button
             onClick={() => setActiveTab('theme_settings')}
-            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'theme_settings'
-              ? 'bg-white/10 text-white shadow-xs'
-              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'theme_settings'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
               }`}
           >
-            <Palette className={`w-4 h-4 shrink-0 ${activeTab === 'theme_settings' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <Palette className={`w-4 h-4 shrink-0 ${activeTab === 'theme_settings' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>Theme Settings</span>
           </button>
         </div>

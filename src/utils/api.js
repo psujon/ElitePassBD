@@ -28,8 +28,23 @@ const apiRequest = async (endpoint, options = {}) => {
 };
 
 export const api = {
-  get: (endpoint) => apiRequest(endpoint, { method: 'GET' }),
-  post: (endpoint, body) => apiRequest(endpoint, { method: 'POST', body: JSON.stringify(body) }),
-  put: (endpoint, body) => apiRequest(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
-  delete: (endpoint) => apiRequest(endpoint, { method: 'DELETE' }),
+  get: (endpoint, options = {}) => {
+    let url = endpoint;
+    if (options && options.params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(options.params).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          searchParams.append(key, val);
+        }
+      });
+      const qs = searchParams.toString();
+      if (qs) {
+        url += (url.includes('?') ? '&' : '?') + qs;
+      }
+    }
+    return apiRequest(url, { ...options, method: 'GET' });
+  },
+  post: (endpoint, body, options = {}) => apiRequest(endpoint, { ...options, method: 'POST', body: JSON.stringify(body) }),
+  put: (endpoint, body, options = {}) => apiRequest(endpoint, { ...options, method: 'PUT', body: JSON.stringify(body) }),
+  delete: (endpoint, options = {}) => apiRequest(endpoint, { ...options, method: 'DELETE' }),
 };
