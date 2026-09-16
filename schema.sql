@@ -121,9 +121,67 @@ CREATE TABLE IF NOT EXISTS product_licenses (
     FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 8. Subscriptions Table
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_name VARCHAR(255) NOT NULL,
+    whatsapp_number VARCHAR(30) NOT NULL,
+    email VARCHAR(255) DEFAULT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    package_plan VARCHAR(255) NOT NULL,
+    customer_source ENUM('Website', 'WhatsApp', 'Facebook', 'Manual') DEFAULT 'Manual',
+    purchase_date DATE NOT NULL,
+    validity_days INT NOT NULL,
+    expiry_date DATE NOT NULL,
+    account_given TEXT DEFAULT NULL,
+    selling_price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    payment_status ENUM('Paid', 'Pending', 'Failed') DEFAULT 'Paid',
+    status ENUM('Active', 'Expiring Soon', 'Expired', 'Renewed', 'Cancelled') DEFAULT 'Active',
+    notes TEXT DEFAULT NULL,
+    order_id INT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
+);
+
+-- 9. Renewal History Table
+CREATE TABLE IF NOT EXISTS subscription_renewals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    subscription_id INT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    validity_days INT NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    status ENUM('Current', 'Previous') DEFAULT 'Current',
+    notes TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+);
+
+-- 10. Reminder History Table
+CREATE TABLE IF NOT EXISTS subscription_reminders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    subscription_id INT NOT NULL,
+    reminder_type ENUM('3_DAYS_BEFORE', '1_DAY_BEFORE', 'EXPIRY_DAY') NOT NULL,
+    channel ENUM('WhatsApp', 'Email', 'AdminAlert') NOT NULL,
+    recipient VARCHAR(255) NOT NULL,
+    status ENUM('Sent', 'Failed') DEFAULT 'Sent',
+    failure_reason TEXT DEFAULT NULL,
+    scheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sent_at TIMESTAMP NULL DEFAULT NULL,
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+);
+
+-- 11. Subscription Settings Table
+CREATE TABLE IF NOT EXISTS subscription_settings (
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value LONGTEXT DEFAULT NULL
+);
+
 -- Insert a default Admin account for testing (password is 'admin123' bcrypt hash: $2a$10$wK1F5lCqU.s5/D7fGv3Kfe.Z3FEX2VwE885g9qLDRX2yN60p2G9nK)
 -- We will also handle this in our server startup or code, but inserting it here helps as well.
 -- Default credentials: admin@example.com / admin123
 INSERT INTO users (name, email, password, role)
 VALUES ('Admin User', 'admin@example.com', '$2a$10$wK1F5lCqU.s5/D7fGv3Kfe.Z3FEX2VwE885g9qLDRX2yN60p2G9nK', 'admin')
 ON DUPLICATE KEY UPDATE id=id;
+

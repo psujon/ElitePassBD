@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '../utils/api';
 import { useCart } from '../context/CartContext';
 import {
@@ -13,6 +13,7 @@ import { trackEvent } from '../utils/fbPixel';
 export default function ProductDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToCart } = useCart();
   const { user } = useAuth();
 
@@ -35,6 +36,31 @@ export default function ProductDetails() {
       if (user.email && !reviewerEmail) setReviewerEmail(user.email);
     }
   }, [user]);
+
+  useEffect(() => {
+    const targetHash = (location.hash || window.location.hash || '').toLowerCase();
+    if (!loading && targetHash.includes('review')) {
+      const doScroll = () => {
+        const el = document.getElementById('reviews') || document.getElementById('reviews-section') || reviewsRef.current;
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
+
+      doScroll();
+      const t1 = setTimeout(doScroll, 100);
+      const t2 = setTimeout(doScroll, 350);
+      const t3 = setTimeout(doScroll, 800);
+      const t4 = setTimeout(doScroll, 1500);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+        clearTimeout(t4);
+      };
+    }
+  }, [loading, location.hash, id]);
 
   const handleReviewClick = () => {
     if (reviewsRef.current) {
@@ -758,7 +784,8 @@ export default function ProductDetails() {
           </div>
         )}
 
-        <div ref={reviewsRef} id="reviews-section" className="mb-16 text-left space-y-6">
+        <a id="reviews" name="reviews" className="block relative -top-28 invisible" style={{ scrollMarginTop: '110px' }}></a>
+        <div ref={reviewsRef} id="reviews-section" className="mb-16 text-left space-y-6 scroll-mt-28">
           <div className="flex items-center space-x-2">
             <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
             <h2 className="text-xl font-extrabold text-slate-855 tracking-tight">Customer Reviews</h2>

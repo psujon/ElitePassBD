@@ -1,6 +1,7 @@
 const { EPS } = require('eps-gateway-nodejs');
 const db = require('../config/db');
 const { sendEmail } = require('../utils/mailer');
+const { sendPurchaseConfirmationEmail } = require('../services/purchaseEmailService');
 
 const getEpsInstance = () => {
   const config = {
@@ -312,6 +313,10 @@ const fulfillOrder = async (merchantTransactionId) => {
     }
 
     await connection.commit();
+
+    sendPurchaseConfirmationEmail(orderId).catch(err => {
+      console.error('Failed to send purchase email in fulfillOrder:', err);
+    });
 
     try {
       const { sendFbEvent } = require('../utils/facebookCapi');

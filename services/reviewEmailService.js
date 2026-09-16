@@ -3,7 +3,11 @@ const db = require('../config/db');
 const { sendEmail } = require('../utils/mailer');
 
 const getFrontendUrl = () => {
-  return process.env.FRONTEND_URL || 'https://elitepassbd.com';
+  const url = process.env.FRONTEND_URL;
+  if (url && !url.includes('localhost')) {
+    return url;
+  }
+  return 'https://elitepassbd.com';
 };
 
 const generateReviewEmailHtml = (userName, items, orderId) => {
@@ -117,7 +121,7 @@ const processPendingReviewEmails = async () => {
     const pool = db.getPool();
     if (!pool) return;
 
-    // Fetch orders delivered over 10 minutes ago that haven't received review emails
+    // Fetch orders delivered over 24 hours ago that haven't received review emails
     const [orders] = await pool.query(`
       SELECT o.id as order_id, o.user_id, o.delivery_email, u.email as user_email, COALESCE(u.name, 'Customer') as user_name
       FROM orders o
@@ -125,7 +129,7 @@ const processPendingReviewEmails = async () => {
       WHERE o.status = 'Delivered'
         AND o.review_email_sent = 0
         AND o.completed_at IS NOT NULL
-        AND o.completed_at <= NOW() - INTERVAL 10 MINUTE
+        AND o.completed_at <= NOW() - INTERVAL 24 HOUR
       LIMIT 20
     `);
 
@@ -177,10 +181,10 @@ const processPendingReviewEmails = async () => {
 };
 
 const initReviewEmailCron = () => {
-  console.log('[ReviewEmailService] Initializing 10-minute delayed review email cron scheduler (runs every 2 minutes)...');
-  
-  // Run every 2 minutes
-  cron.schedule('*/2 * * * *', async () => {
+  console.log('[ReviewEmailService] Initializing 24-hour delayed review email cron scheduler (runs every 10 minutes)...');
+
+  // Check every 10 minutes for orders delivered 24+ hours ago
+  cron.schedule('*/10 * * * *', async () => {
     await processPendingReviewEmails();
   });
 

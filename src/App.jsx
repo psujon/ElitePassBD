@@ -43,14 +43,25 @@ const AdminRoute = ({ children }) => {
   return user && isAdmin ? children : <Navigate to="/" replace />;
 };
 
+const DashboardRouter = () => {
+  const { user, isAdmin, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (isAdmin) {
+    return <AdminDashboard />;
+  }
+  return <UserDashboard />;
+};
+
 function AppContent() {
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const { pathname } = useLocation();
-
+  const { pathname, hash } = useLocation();
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
+    if (!hash) {
+      window.scrollTo(0, 0);
+    }
+  }, [pathname, hash]);
 
   return (
     <div className="flex flex-col min-h-screen w-full pb-16 md:pb-0">
@@ -69,30 +80,19 @@ function AppContent() {
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/products" element={<Products />} />
 
-
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <UserDashboard />
-              </ProtectedRoute>
-            }
-          />
-
           <Route path="/checkout" element={<Checkout />} />
 
           <Route path="/payment/success" element={<PaymentSuccess />} />
           <Route path="/payment/fail" element={<PaymentFail />} />
           <Route path="/payment/cancel" element={<PaymentCancel />} />
 
-          <Route
-            path="/admin"
-            element={
-              <AdminRoute>
-                <AdminDashboard />
-              </AdminRoute>
-            }
-          />
+          {/* Admin Redirect Routes */}
+          <Route path="/admin" element={<AdminRoute><Navigate to="/dashboard/overview" replace /></AdminRoute>} />
+          <Route path="/admin/:tab" element={<AdminRoute><DashboardRouter /></AdminRoute>} />
+
+          {/* Dashboard Routes for Admin & Customer */}
+          <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+          <Route path="/dashboard/:tab" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

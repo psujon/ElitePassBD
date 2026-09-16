@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import JoditEditor from 'jodit-react';
 import { api, API_BASE_URL } from '../utils/api';
-import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database, KeyRound, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent, Search } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database, KeyRound, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent, Search, RefreshCw } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import SubscriptionManager from '../components/admin/SubscriptionManager';
 
 const parseJSON = (str, fallback) => {
   if (!str) return fallback;
@@ -37,9 +39,68 @@ const joditConfig = {
   toolbarAdaptive: false
 };
 
+const tabSlugToKey = {
+  '': 'dashboard',
+  'overview': 'dashboard',
+  'dashboard': 'dashboard',
+  'products': 'products',
+  'catalog-products': 'products',
+  'orders': 'orders',
+  'customer-orders': 'orders',
+  'subscriptions': 'subscriptions_manager',
+  'subscriptions_manager': 'subscriptions_manager',
+  'categories': 'categories',
+  'tickets': 'tickets',
+  'support-tickets': 'tickets',
+  'licenses': 'licenses',
+  'license-keys': 'licenses',
+  'coupons': 'coupons',
+  'promo-codes': 'coupons',
+  'backup': 'backup',
+  'database-backup': 'backup',
+  'eps-payments': 'eps_history',
+  'eps_history': 'eps_history',
+  'slides': 'slides',
+  'theme-settings': 'theme_settings',
+  'theme_settings': 'theme_settings'
+};
+
+const keyToTabSlug = {
+  'dashboard': '/dashboard/overview',
+  'products': '/dashboard/products',
+  'orders': '/dashboard/orders',
+  'subscriptions_manager': '/dashboard/subscriptions',
+  'categories': '/dashboard/categories',
+  'tickets': '/dashboard/tickets',
+  'licenses': '/dashboard/licenses',
+  'coupons': '/dashboard/coupons',
+  'backup': '/dashboard/backup',
+  'eps_history': '/dashboard/eps-payments',
+  'slides': '/dashboard/slides',
+  'theme_settings': '/dashboard/theme-settings'
+};
+
 export default function AdminDashboard() {
   const { theme, updateTheme, selectPreset, THEME_PRESETS } = useTheme();
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'products', 'orders', 'tickets', 'categories', 'backup', 'licenses', 'theme_settings'
+  const { tab: urlTab } = useParams();
+  const navigate = useNavigate();
+
+  const [activeTab, setActiveTabState] = useState(() => {
+    return tabSlugToKey[urlTab || ''] || 'dashboard';
+  });
+
+  useEffect(() => {
+    if (urlTab !== undefined) {
+      const targetKey = tabSlugToKey[urlTab] || 'dashboard';
+      setActiveTabState(targetKey);
+    }
+  }, [urlTab]);
+
+  const setActiveTab = (newKey) => {
+    setActiveTabState(newKey);
+    const targetSlug = keyToTabSlug[newKey] || '/dashboard/overview';
+    navigate(targetSlug);
+  };
 
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -779,6 +840,7 @@ export default function AdminDashboard() {
               className="w-full bg-[#1b2b48] text-white border border-slate-700 font-extrabold text-xs rounded-xl px-3.5 py-2.5 pr-8 appearance-none focus:outline-none focus:border-amber-400 transition-all cursor-pointer shadow-xs"
             >
               <option value="dashboard" className="bg-[#111e35] text-white">📊 Dashboard</option>
+              <option value="subscriptions_manager" className="bg-[#111e35] text-white">🔄 Subscriptions & Renewal Manager</option>
               <option value="products" className="bg-[#111e35] text-white">📦 Catalog Products ({products.length})</option>
               <option value="orders" className="bg-[#111e35] text-white">📋 Customer Orders ({orders.length})</option>
               <option value="categories" className="bg-[#111e35] text-white">🥞 Categories ({categories.length})</option>
@@ -841,6 +903,17 @@ export default function AdminDashboard() {
           <div className="hidden md:block text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3.5 mb-2 mt-6 text-left">
             Management
           </div>
+
+          <button
+            onClick={() => setActiveTab('subscriptions_manager')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'subscriptions_manager'
+              ? 'bg-white/10 text-white shadow-xs'
+              : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+          >
+            <RefreshCw className={`w-4 h-4 shrink-0 ${activeTab === 'subscriptions_manager' ? 'text-emerald-400' : 'text-slate-500'}`} />
+            <span>Subscriptions</span>
+          </button>
 
           <button
             onClick={() => setActiveTab('categories')}
@@ -950,6 +1023,11 @@ export default function AdminDashboard() {
         </div>
 
         <div className="space-y-6">
+          {activeTab === 'subscriptions_manager' && (
+            <div className="animate-fade-in text-left">
+              <SubscriptionManager />
+            </div>
+          )}
           {activeTab === 'dashboard' && (
             <div className="space-y-6 animate-fade-in text-left">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
