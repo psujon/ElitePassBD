@@ -1,4 +1,9 @@
-const cron = require('node-cron');
+let cron;
+try {
+  cron = require('node-cron');
+} catch (err) {
+  console.warn('[ReviewEmailService] node-cron module is not installed. Review email cron will be disabled until installed.');
+}
 const db = require('../config/db');
 const { sendEmail } = require('../utils/mailer');
 
@@ -172,7 +177,8 @@ const processPendingReviewEmails = async () => {
         await pool.query('UPDATE orders SET review_email_sent = 1 WHERE id = ?', [order.order_id]);
         console.log(`[ReviewEmailService] Successfully sent review email for Order #${order.order_id} to ${recipientEmail}`);
       } else {
-        console.error(`[ReviewEmailService] Failed to send review email for Order #${order.order_id}`);
+        await pool.query('UPDATE orders SET review_email_sent = 2 WHERE id = ?', [order.order_id]);
+        console.warn(`[ReviewEmailService] Delivery failed for Order #${order.order_id}. Marked as attempted/skipped to prevent continuous retry.`);
       }
     }
   } catch (err) {
@@ -181,6 +187,10 @@ const processPendingReviewEmails = async () => {
 };
 
 const initReviewEmailCron = () => {
+  if (!cron) {
+    console.warn('[ReviewEmailService] Skipping cron initialization: node-cron is not installed.');
+    return;
+  }
   console.log('[ReviewEmailService] Initializing 24-hour delayed review email cron scheduler (runs every 10 minutes)...');
 
   // Check every 10 minutes for orders delivered 24+ hours ago

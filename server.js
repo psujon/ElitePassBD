@@ -65,6 +65,7 @@ const slideRoutes = require('./routes/slideRoutes');
 const pixelRoutes = require('./routes/pixelRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -76,6 +77,7 @@ app.use('/api/slides', slideRoutes);
 app.use('/api/pixel', pixelRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/settings', settingsRoutes);
 
 const { authenticateToken, authorizeAdmin } = require('./middleware/auth');
 const db = require('./config/db');
@@ -160,7 +162,7 @@ app.use((err, req, res, next) => {
 const { initReviewEmailCron } = require('./services/reviewEmailService');
 const { initSubscriptionCron } = require('./services/subscriptionCronService');
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   initReviewEmailCron();

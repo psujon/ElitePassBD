@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import JoditEditor from 'jodit-react';
 import { api, API_BASE_URL } from '../utils/api';
-import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database, KeyRound, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent, Search, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, Database, KeyRound, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent, Search, RefreshCw, Megaphone, ArrowUp, ArrowDown, Headphones, ExternalLink, Globe, Mail, Phone } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import SubscriptionManager from '../components/admin/SubscriptionManager';
 
@@ -61,6 +61,12 @@ const tabSlugToKey = {
   'eps-payments': 'eps_history',
   'eps_history': 'eps_history',
   'slides': 'slides',
+  'marquee': 'marquee_settings',
+  'marquee-settings': 'marquee_settings',
+  'marquee_settings': 'marquee_settings',
+  'support': 'support_settings',
+  'support-links': 'support_settings',
+  'support_settings': 'support_settings',
   'theme-settings': 'theme_settings',
   'theme_settings': 'theme_settings'
 };
@@ -77,6 +83,8 @@ const keyToTabSlug = {
   'backup': '/dashboard/backup',
   'eps_history': '/dashboard/eps-payments',
   'slides': '/dashboard/slides',
+  'marquee_settings': '/dashboard/marquee',
+  'support_settings': '/dashboard/support-links',
   'theme_settings': '/dashboard/theme-settings'
 };
 
@@ -199,8 +207,200 @@ export default function AdminDashboard() {
   const [couponFormError, setCouponFormError] = useState('');
   const [couponSearchQuery, setCouponSearchQuery] = useState('');
 
+  const [marqueeEnabled, setMarqueeEnabled] = useState(true);
+  const [marqueeSpeed, setMarqueeSpeed] = useState(35);
+  const [marqueeItems, setMarqueeItems] = useState([
+    {
+      id: '1',
+      badge: 'বিশেষ অফার',
+      text: 'সব অর্ডারে ফ্রি ইনস্ট্যান্ট ডেলিভারি — ১০% পর্যন্ত ছাড় পান',
+      badgeColor: 'purple',
+      textColor: 'violet'
+    },
+    {
+      id: '2',
+      badge: '🛡️ 100% Genuine',
+      text: 'Genuine Digital License & Instant Email Delivery',
+      badgeColor: 'emerald',
+      textColor: 'emerald'
+    },
+    {
+      id: '3',
+      badge: '⭐ 50,000+',
+      text: 'Trusted by Happy Customers in Bangladesh',
+      badgeColor: 'amber',
+      textColor: 'amber'
+    }
+  ]);
+  const [marqueeLoading, setMarqueeLoading] = useState(false);
+  const [marqueeSaving, setMarqueeSaving] = useState(false);
+
+  const fetchMarqueeSettings = async () => {
+    try {
+      setMarqueeLoading(true);
+      const data = await api.get('/settings/public');
+      if (data) {
+        if (data.marquee_enabled !== undefined) setMarqueeEnabled(data.marquee_enabled);
+        if (data.marquee_speed) setMarqueeSpeed(data.marquee_speed);
+        if (Array.isArray(data.marquee_items) && data.marquee_items.length > 0) {
+          setMarqueeItems(data.marquee_items);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load marquee settings', e);
+    } finally {
+      setMarqueeLoading(false);
+    }
+  };
+
+  const handleSaveMarquee = async () => {
+    try {
+      setMarqueeSaving(true);
+      const payload = {
+        marquee_enabled: marqueeEnabled,
+        marquee_speed: parseInt(marqueeSpeed, 10) || 35,
+        marquee_items: marqueeItems
+      };
+      await api.put('/settings/marquee', payload);
+      toast.success('Moving text announcements updated successfully!');
+      window.dispatchEvent(new CustomEvent('marquee-updated', { detail: payload }));
+    } catch (err) {
+      toast.error(err.message || 'Failed to save marquee settings');
+    } finally {
+      setMarqueeSaving(false);
+    }
+  };
+
+  const handleAddMarqueeItem = () => {
+    const newItem = {
+      id: String(Date.now()),
+      badge: 'অফার',
+      text: 'নতুন অফার বা নোটিশ এখানে লিখুন',
+      badgeColor: 'purple',
+      textColor: 'violet'
+    };
+    setMarqueeItems(prev => [...prev, newItem]);
+  };
+
+  const handleUpdateMarqueeItem = (index, field, value) => {
+    setMarqueeItems(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleDeleteMarqueeItem = (index) => {
+    setMarqueeItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMoveMarqueeItem = (index, direction) => {
+    setMarqueeItems(prev => {
+      if ((direction === -1 && index === 0) || (direction === 1 && index === prev.length - 1)) return prev;
+      const updated = [...prev];
+      const targetIdx = index + direction;
+      const temp = updated[index];
+      updated[index] = updated[targetIdx];
+      updated[targetIdx] = temp;
+      return updated;
+    });
+  };
+
+  const handleResetMarqueeDefaults = () => {
+    const defaultItems = [
+      {
+        id: '1',
+        badge: 'বিশেষ অফার',
+        text: 'সব অর্ডারে ফ্রি ইনস্ট্যান্ট ডেলিভারি — ১০% পর্যন্ত ছাড় পান',
+        badgeColor: 'purple',
+        textColor: 'violet'
+      },
+      {
+        id: '2',
+        badge: '🛡️ 100% Genuine',
+        text: 'Genuine Digital License & Instant Email Delivery',
+        badgeColor: 'emerald',
+        textColor: 'emerald'
+      },
+      {
+        id: '3',
+        badge: '⭐ 50,000+',
+        text: 'Trusted by Happy Customers in Bangladesh',
+        badgeColor: 'amber',
+        textColor: 'amber'
+      }
+    ];
+    setMarqueeEnabled(true);
+    setMarqueeSpeed(35);
+    setMarqueeItems(defaultItems);
+    toast.success('Reset to default announcements (click Save Changes to apply)');
+  };
+
+  const [supportForm, setSupportForm] = useState({
+    support_whatsapp: '8801925112444',
+    support_email: 'info@elitepassbd.com',
+    social_facebook: 'https://facebook.com/ElitePassBD',
+    social_instagram: 'https://instagram.com/elitepassbd',
+    social_youtube: 'https://youtube.com/elitepassbd',
+    social_linkedin: 'https://linkedin.com/elitepassbd',
+    social_messenger: 'https://m.me/elitepassbd'
+  });
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [supportSaving, setSupportSaving] = useState(false);
+
+  const fetchSupportSettings = async () => {
+    try {
+      setSupportLoading(true);
+      const data = await api.get('/settings/public');
+      if (data) {
+        setSupportForm({
+          support_whatsapp: data.support_whatsapp || '8801925112444',
+          support_email: data.support_email || 'info@elitepassbd.com',
+          social_facebook: data.social_facebook || 'https://facebook.com/ElitePassBD',
+          social_instagram: data.social_instagram || 'https://instagram.com/elitepassbd',
+          social_youtube: data.social_youtube || 'https://youtube.com/elitepassbd',
+          social_linkedin: data.social_linkedin || 'https://linkedin.com/elitepassbd',
+          social_messenger: data.social_messenger || 'https://m.me/elitepassbd'
+        });
+      }
+    } catch (e) {
+      console.error('Failed to load support settings', e);
+    } finally {
+      setSupportLoading(false);
+    }
+  };
+
+  const handleSaveSupportSettings = async () => {
+    try {
+      setSupportSaving(true);
+      await api.put('/settings/support', supportForm);
+      toast.success('Support and social links updated successfully!');
+      window.dispatchEvent(new CustomEvent('support-settings-updated', { detail: supportForm }));
+    } catch (err) {
+      toast.error(err.message || 'Failed to save support settings');
+    } finally {
+      setSupportSaving(false);
+    }
+  };
+
+  const handleResetSupportDefaults = () => {
+    const defaults = {
+      support_whatsapp: '8801925112444',
+      support_email: 'info@elitepassbd.com',
+      social_facebook: 'https://facebook.com/ElitePassBD',
+      social_instagram: 'https://instagram.com/elitepassbd',
+      social_youtube: 'https://youtube.com/elitepassbd',
+      social_linkedin: 'https://linkedin.com/elitepassbd',
+      social_messenger: 'https://m.me/elitepassbd'
+    };
+    setSupportForm(defaults);
+    toast.success('Reset to default contact links (click Save Changes to apply)');
+  };
+
   useEffect(() => {
     fetchAdminData();
+    fetchMarqueeSettings();
+    fetchSupportSettings();
   }, []);
 
   const fetchAdminData = async () => {
@@ -850,6 +1050,8 @@ export default function AdminDashboard() {
               <option value="backup" className="bg-white text-black">💾 Database Backup</option>
               <option value="eps_history" className="bg-white text-black">💵 EPS Payments</option>
               <option value="slides" className="bg-white text-black">🖼️ Slides ({slides.length})</option>
+              <option value="marquee_settings" className="bg-white text-black">📢 Moving Text / Marquee</option>
+              <option value="support_settings" className="bg-white text-black">🎧 Support & Social Links</option>
               <option value="theme_settings" className="bg-white text-black">🎨 Theme Settings</option>
             </select>
             <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -999,6 +1201,28 @@ export default function AdminDashboard() {
           >
             <Layers className={`w-4 h-4 shrink-0 ${activeTab === 'slides' ? 'text-orange-500' : 'text-slate-500'}`} />
             <span>Slides</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('marquee_settings')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'marquee_settings'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
+              }`}
+          >
+            <Megaphone className={`w-4 h-4 shrink-0 ${activeTab === 'marquee_settings' ? 'text-orange-500' : 'text-slate-500'}`} />
+            <span>Moving Text / Marquee</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('support_settings')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${activeTab === 'support_settings'
+              ? 'bg-white text-black font-black shadow-xs border border-slate-200/90'
+              : 'text-slate-800 hover:text-black hover:bg-slate-200/60 font-bold'
+              }`}
+          >
+            <Headphones className={`w-4 h-4 shrink-0 ${activeTab === 'support_settings' ? 'text-orange-500' : 'text-slate-500'}`} />
+            <span>Support & Social Links</span>
           </button>
 
           <button
@@ -2443,6 +2667,678 @@ export default function AdminDashboard() {
                     >
                       Badge Preview
                     </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'marquee_settings' && (
+            <div className="space-y-6 animate-fade-in text-left">
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 shadow-xs">
+                      <Megaphone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-slate-850">Moving Text & Top Bar Announcements</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Customize the scrolling promotional text, offers, badges, colors, and speed across the top bar.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleResetMarqueeDefaults}
+                      className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-600 flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Reset to store default announcements"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Reset Defaults</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveMarquee}
+                      disabled={marqueeSaving}
+                      className="px-5 py-2 rounded-xl bg-[#005F53] hover:bg-[#00473e] text-xs font-extrabold text-white flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-60"
+                    >
+                      {marqueeSaving ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Live Top Bar Preview Card */}
+                <div className="mt-6 mb-8 p-4 sm:p-5 rounded-2xl bg-slate-900 text-white shadow-md border border-slate-800">
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                      <span className="font-extrabold text-slate-200 uppercase tracking-wider text-[11px]">Live Storefront Top Bar Preview</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      Duration: {marqueeSpeed}s {marqueeEnabled ? '(Active)' : '(Disabled)'}
+                    </span>
+                  </div>
+
+                  {marqueeEnabled ? (
+                    <div className="bg-slate-50 text-slate-800 rounded-xl p-2.5 border border-slate-200 shadow-inner overflow-hidden flex items-center h-10 select-none">
+                      <div className="hidden sm:flex items-center gap-2 shrink-0 mr-3 pr-3 border-r border-slate-200">
+                        <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full font-bold text-[10px] flex items-center gap-1">
+                          WhatsApp
+                        </span>
+                      </div>
+
+                      <div className="flex-1 overflow-hidden relative flex items-center">
+                        <div
+                          className="animate-topbar-marquee flex items-center gap-10 text-xs font-bold"
+                          style={{ animationDuration: `${marqueeSpeed}s` }}
+                        >
+                          {[...marqueeItems, ...marqueeItems].map((item, idx) => {
+                            const badgeStyle = item.badgeColor === 'emerald'
+                              ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                              : item.badgeColor === 'amber'
+                              ? 'bg-amber-100 text-amber-700 border-amber-200'
+                              : item.badgeColor === 'blue'
+                              ? 'bg-blue-100 text-blue-700 border-blue-200'
+                              : item.badgeColor === 'rose'
+                              ? 'bg-rose-100 text-rose-700 border-rose-200'
+                              : 'bg-purple-100 text-purple-700 border-purple-200';
+
+                            const textClass = item.textColor === 'emerald'
+                              ? 'text-emerald-600'
+                              : item.textColor === 'amber'
+                              ? 'text-amber-700'
+                              : item.textColor === 'blue'
+                              ? 'text-blue-600'
+                              : item.textColor === 'rose'
+                              ? 'text-rose-600'
+                              : item.textColor === 'slate'
+                              ? 'text-slate-700'
+                              : 'text-violet-700';
+
+                            return (
+                              <div key={`preview-${idx}`} className="flex items-center gap-2 shrink-0">
+                                {item.badge && (
+                                  <span className={`font-extrabold text-[10px] px-2 py-0.5 rounded-full border ${badgeStyle}`}>
+                                    {item.badge}
+                                  </span>
+                                )}
+                                <span className={`font-extrabold ${textClass}`}>
+                                  {item.text}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="hidden sm:flex items-center gap-2 shrink-0 ml-3 pl-3 border-l border-slate-200">
+                        <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                          ⭐ 4.9
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-800/80 rounded-xl p-4 text-center text-slate-400 text-xs font-semibold">
+                      Announcement marquee is currently disabled and will not be displayed on the storefront.
+                    </div>
+                  )}
+                </div>
+
+                {/* Settings Configuration Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                  {/* Enabled Toggle */}
+                  <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-800">Display Moving Text Bar</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Toggle announcement bar visibility on the site</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setMarqueeEnabled(!marqueeEnabled)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        marqueeEnabled ? 'bg-[#005F53]' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          marqueeEnabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Speed Selector */}
+                  <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl flex flex-col justify-between">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-xs font-extrabold text-slate-800">Scrolling Speed</h4>
+                      <span className="text-[11px] font-mono text-slate-600 font-bold">{marqueeSpeed} seconds</span>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { label: 'Fast', speed: 20 },
+                        { label: 'Normal', speed: 35 },
+                        { label: 'Moderate', speed: 50 },
+                        { label: 'Slow', speed: 70 }
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setMarqueeSpeed(preset.speed)}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-bold text-center transition-all cursor-pointer ${
+                            marqueeSpeed === preset.speed
+                              ? 'bg-[#005F53] text-white shadow-xs'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {preset.label} ({preset.speed}s)
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Announcement Items List */}
+                <div className="border-t border-slate-100 pt-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h4 className="text-sm font-extrabold text-slate-800">Announcement Messages ({marqueeItems.length})</h4>
+                      <p className="text-xs text-slate-500">Edit, reorder, or add messages displayed in the moving bar.</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddMarqueeItem}
+                      className="px-3.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Message</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3.5">
+                    {marqueeItems.map((item, index) => (
+                      <div
+                        key={item.id || index}
+                        className="p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-all shadow-2xs space-y-3"
+                      >
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-mono font-bold text-xs flex items-center justify-center">
+                              #{index + 1}
+                            </span>
+                            <span className="text-xs font-bold text-slate-600">Announcement Item</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveMarqueeItem(index, -1)}
+                              disabled={index === 0}
+                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20 cursor-pointer"
+                              title="Move Up"
+                            >
+                              <ArrowUp className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveMarqueeItem(index, 1)}
+                              disabled={index === marqueeItems.length - 1}
+                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20 cursor-pointer"
+                              title="Move Down"
+                            >
+                              <ArrowDown className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMarqueeItem(index)}
+                              className="p-1 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors ml-1 cursor-pointer"
+                              title="Delete Message"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                          {/* Badge Text */}
+                          <div className="md:col-span-3">
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">Badge / Tag (Optional)</label>
+                            <input
+                              type="text"
+                              value={item.badge || ''}
+                              onChange={(e) => handleUpdateMarqueeItem(index, 'badge', e.target.value)}
+                              placeholder="e.g. বিশেষ অফার, Hot, New"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+
+                          {/* Badge Color */}
+                          <div className="md:col-span-2">
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">Badge Color</label>
+                            <select
+                              value={item.badgeColor || 'purple'}
+                              onChange={(e) => handleUpdateMarqueeItem(index, 'badgeColor', e.target.value)}
+                              className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-400 bg-white"
+                            >
+                              <option value="purple">🟣 Purple</option>
+                              <option value="emerald">🟢 Emerald</option>
+                              <option value="amber">🟡 Amber</option>
+                              <option value="blue">🔵 Blue</option>
+                              <option value="rose">🔴 Rose</option>
+                            </select>
+                          </div>
+
+                          {/* Message Text */}
+                          <div className="md:col-span-5">
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">Announcement Message Text</label>
+                            <input
+                              type="text"
+                              value={item.text || ''}
+                              onChange={(e) => handleUpdateMarqueeItem(index, 'text', e.target.value)}
+                              placeholder="Type announcement message..."
+                              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+
+                          {/* Text Color */}
+                          <div className="md:col-span-2">
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">Text Accent</label>
+                            <select
+                              value={item.textColor || 'violet'}
+                              onChange={(e) => handleUpdateMarqueeItem(index, 'textColor', e.target.value)}
+                              className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-400 bg-white"
+                            >
+                              <option value="violet">Violet</option>
+                              <option value="emerald">Emerald</option>
+                              <option value="amber">Amber</option>
+                              <option value="blue">Blue</option>
+                              <option value="rose">Rose</option>
+                              <option value="slate">Slate Gray</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {marqueeItems.length === 0 && (
+                      <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+                        <Megaphone className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <p className="text-xs font-bold text-slate-600">No announcement messages configured.</p>
+                        <button
+                          type="button"
+                          onClick={handleAddMarqueeItem}
+                          className="mt-3 px-4 py-1.5 bg-[#005F53] text-white text-xs font-bold rounded-xl"
+                        >
+                          + Add First Message
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'support_settings' && (
+            <div className="space-y-6 animate-fade-in text-left">
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
+                {/* Top Header & Actions */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div className="flex items-center space-x-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-teal-50 border border-teal-200/60 flex items-center justify-center text-teal-600 shadow-xs">
+                      <Headphones className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-slate-850">Customer Support & Social Media Links</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Manage your WhatsApp number, support email, and social profiles across the top bar, footer, and support pages.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleResetSupportDefaults}
+                      className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-600 flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Reset to store default contact links"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Reset Defaults</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveSupportSettings}
+                      disabled={supportSaving}
+                      className="px-5 py-2 rounded-xl bg-[#005F53] hover:bg-[#00473e] text-xs font-extrabold text-white flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-60"
+                    >
+                      {supportSaving ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Live Preview Card */}
+                <div className="mt-6 mb-8 p-5 rounded-2xl bg-slate-900 text-white shadow-md border border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+                      <span className="font-extrabold text-slate-200 uppercase tracking-wider text-[11px]">
+                        Live Storefront Preview
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-400">Topbar & Footer Representation</span>
+                  </div>
+
+                  {/* Topbar simulation */}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 tracking-wider">
+                      1. Top Bar Elements
+                    </span>
+                    <div className="bg-slate-50 text-slate-800 rounded-xl p-3 border border-slate-200 shadow-inner flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-white border border-emerald-200 px-2.5 py-1 rounded-full text-emerald-600 font-bold text-xs flex items-center gap-1.5 shadow-2xs">
+                          <Phone className="w-3 h-3 text-emerald-600" />
+                          <span>WhatsApp ({supportForm.support_whatsapp || 'Not set'})</span>
+                        </span>
+
+                        <span className="bg-white border border-slate-200 px-2.5 py-1 rounded-full text-slate-700 font-bold text-xs flex items-center gap-1.5 shadow-2xs">
+                          <Mail className="w-3 h-3 text-violet-600" />
+                          <span>{supportForm.support_email || 'Not set'}</span>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-black text-[10px] flex items-center justify-center" title="Facebook">
+                          f
+                        </span>
+                        <span className="w-6 h-6 rounded-full bg-emerald-500 text-white font-black text-[10px] flex items-center justify-center" title="WhatsApp">
+                          <Phone className="w-3 h-3 text-white" />
+                        </span>
+                        <span className="w-6 h-6 rounded-full bg-pink-600 text-white font-black text-[10px] flex items-center justify-center" title="Instagram">
+                          ig
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer simulation */}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 tracking-wider">
+                      2. Footer Contact & Social Links
+                    </span>
+                    <div className="bg-slate-800 rounded-xl p-3.5 border border-slate-700 flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-slate-300">
+                          <Mail className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{supportForm.support_email}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                          <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>WhatsApp: {supportForm.support_whatsapp}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-700 text-slate-200 font-semibold text-[11px]">
+                          Facebook
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-700 text-slate-200 font-semibold text-[11px]">
+                          LinkedIn
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-700 text-slate-200 font-semibold text-[11px]">
+                          YouTube
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 1: Direct Support & Messaging Channels */}
+                <div className="mb-8">
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                    <Phone className="w-4 h-4 text-emerald-600" />
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                      Direct Support & Messaging Channels
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* WhatsApp */}
+                    <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-xs font-bold text-slate-700">
+                          WhatsApp Support Number
+                        </label>
+                        {supportForm.support_whatsapp && (
+                          <a
+                            href={`https://wa.me/${supportForm.support_whatsapp.replace(/[^0-9]/g, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Test Chat</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={supportForm.support_whatsapp}
+                        onChange={(e) => setSupportForm({ ...supportForm, support_whatsapp: e.target.value })}
+                        placeholder="e.g. 8801925112444"
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[11px] text-slate-500">
+                        Used for Topbar WhatsApp pill, social icons, floating chat widget, and WhatsApp order buttons. Include country code (e.g. 88019...).
+                      </p>
+                    </div>
+
+                    {/* Support Email */}
+                    <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-xs font-bold text-slate-700">
+                          Support / Business Email
+                        </label>
+                        {supportForm.support_email && (
+                          <a
+                            href={`mailto:${supportForm.support_email}`}
+                            className="text-[11px] text-violet-600 hover:text-violet-700 font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Test Email</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <input
+                        type="email"
+                        value={supportForm.support_email}
+                        onChange={(e) => setSupportForm({ ...supportForm, support_email: e.target.value })}
+                        placeholder="e.g. info@elitepassbd.com"
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-violet-500"
+                      />
+                      <p className="text-[11px] text-slate-500">
+                        Displayed in the Topbar email pill, Footer support area, and Contact Support page.
+                      </p>
+                    </div>
+
+                    {/* Messenger Link */}
+                    <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2 md:col-span-2">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-xs font-bold text-slate-700">
+                          Facebook Messenger Direct Link
+                        </label>
+                        {supportForm.social_messenger && (
+                          <a
+                            href={supportForm.social_messenger}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Open Messenger</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={supportForm.social_messenger}
+                        onChange={(e) => setSupportForm({ ...supportForm, social_messenger: e.target.value })}
+                        placeholder="e.g. https://m.me/elitepassbd"
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+                      />
+                      <p className="text-[11px] text-slate-500">
+                        Used in the floating customer chat pill widget in the footer.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Social Media Profiles */}
+                <div>
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                    <Globe className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                      Social Media Profiles
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* Facebook */}
+                    <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-2 hover:border-slate-300 transition-colors">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-blue-600 text-white font-bold text-[9px] flex items-center justify-center">f</span>
+                          <span>Facebook Page URL</span>
+                        </span>
+                        {supportForm.social_facebook && (
+                          <a
+                            href={supportForm.social_facebook}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Open</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={supportForm.social_facebook}
+                        onChange={(e) => setSupportForm({ ...supportForm, social_facebook: e.target.value })}
+                        placeholder="https://facebook.com/ElitePassBD"
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    {/* Instagram */}
+                    <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-2 hover:border-slate-300 transition-colors">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-pink-600 text-white font-bold text-[9px] flex items-center justify-center">ig</span>
+                          <span>Instagram Profile URL</span>
+                        </span>
+                        {supportForm.social_instagram && (
+                          <a
+                            href={supportForm.social_instagram}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-pink-600 hover:text-pink-700 font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Open</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={supportForm.social_instagram}
+                        onChange={(e) => setSupportForm({ ...supportForm, social_instagram: e.target.value })}
+                        placeholder="https://instagram.com/elitepassbd"
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-pink-500"
+                      />
+                    </div>
+
+                    {/* YouTube */}
+                    <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-2 hover:border-slate-300 transition-colors">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-red-600 text-white font-bold text-[9px] flex items-center justify-center">yt</span>
+                          <span>YouTube Channel URL</span>
+                        </span>
+                        {supportForm.social_youtube && (
+                          <a
+                            href={supportForm.social_youtube}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-red-600 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Open</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={supportForm.social_youtube}
+                        onChange={(e) => setSupportForm({ ...supportForm, social_youtube: e.target.value })}
+                        placeholder="https://youtube.com/elitepassbd"
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-red-500"
+                      />
+                    </div>
+
+                    {/* LinkedIn */}
+                    <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-2 hover:border-slate-300 transition-colors">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-blue-700 text-white font-bold text-[9px] flex items-center justify-center">in</span>
+                          <span>LinkedIn Profile URL</span>
+                        </span>
+                        {supportForm.social_linkedin && (
+                          <a
+                            href={supportForm.social_linkedin}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-blue-700 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Open</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={supportForm.social_linkedin}
+                        onChange={(e) => setSupportForm({ ...supportForm, social_linkedin: e.target.value })}
+                        placeholder="https://linkedin.com/elitepassbd"
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-700"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

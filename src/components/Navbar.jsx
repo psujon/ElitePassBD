@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { ShoppingCart, User, LogOut, ShieldAlert, ChevronDown, Menu, X, Search, Loader2, Phone, Mail, Star, ShieldCheck, MessageSquare } from 'lucide-react';
+import { ShoppingCart, User, LogOut, ShieldAlert, ChevronDown, Menu, X, Search, Loader2, Mail, Star, ShieldCheck } from 'lucide-react';
 import { api } from '../utils/api';
 const logo = '/logo.png';
 import logoBanner from '../assets/logo_banner.png';
@@ -26,8 +26,128 @@ export default function Navbar({ onCartClick }) {
   const mobileSearchRef = useRef(null);
   const desktopSearchRef = useRef(null);
 
-  const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState('BDT');
+  const [marqueeEnabled, setMarqueeEnabled] = useState(true);
+  const [marqueeSpeed, setMarqueeSpeed] = useState(35);
+  const [marqueeItems, setMarqueeItems] = useState([
+    {
+      id: '1',
+      badge: 'বিশেষ অফার',
+      text: 'সব অর্ডারে ফ্রি ইনস্ট্যান্ট ডেলিভারি — ১০% পর্যন্ত ছাড় পান',
+      badgeColor: 'purple',
+      textColor: 'violet'
+    },
+    {
+      id: '2',
+      badge: '🛡️ 100% Genuine',
+      text: 'Genuine Digital License & Instant Email Delivery',
+      badgeColor: 'emerald',
+      textColor: 'emerald'
+    },
+    {
+      id: '3',
+      badge: '⭐ 50,000+',
+      text: 'Trusted by Happy Customers in Bangladesh',
+      badgeColor: 'amber',
+      textColor: 'amber'
+    }
+  ]);
+
+  const [supportLinks, setSupportLinks] = useState({
+    support_whatsapp: '8801925112444',
+    support_email: 'info@elitepassbd.com',
+    social_facebook: 'https://facebook.com/ElitePassBD',
+    social_instagram: 'https://instagram.com/elitepassbd'
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadSiteSettings = async () => {
+      try {
+        const data = await api.get('/settings/public');
+        if (data && isMounted) {
+          if (data.marquee_enabled !== undefined) setMarqueeEnabled(data.marquee_enabled);
+          if (data.marquee_speed) setMarqueeSpeed(data.marquee_speed);
+          if (Array.isArray(data.marquee_items) && data.marquee_items.length > 0) {
+            setMarqueeItems(data.marquee_items);
+          }
+          setSupportLinks({
+            support_whatsapp: data.support_whatsapp || '8801925112444',
+            support_email: data.support_email || 'info@elitepassbd.com',
+            social_facebook: data.social_facebook || 'https://facebook.com/ElitePassBD',
+            social_instagram: data.social_instagram || 'https://instagram.com/elitepassbd'
+          });
+        }
+      } catch (e) {
+        // Fallback to default
+      }
+    };
+
+    loadSiteSettings();
+
+    const handleMarqueeUpdate = (e) => {
+      if (e?.detail) {
+        if (e.detail.marquee_enabled !== undefined) setMarqueeEnabled(e.detail.marquee_enabled);
+        if (e.detail.marquee_speed) setMarqueeSpeed(e.detail.marquee_speed);
+        if (Array.isArray(e.detail.marquee_items)) setMarqueeItems(e.detail.marquee_items);
+      } else {
+        loadSiteSettings();
+      }
+    };
+
+    const handleSupportUpdate = (e) => {
+      if (e?.detail) {
+        setSupportLinks(prev => ({ ...prev, ...e.detail }));
+      } else {
+        loadSiteSettings();
+      }
+    };
+
+    window.addEventListener('marquee-updated', handleMarqueeUpdate);
+    window.addEventListener('support-settings-updated', handleSupportUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('marquee-updated', handleMarqueeUpdate);
+      window.removeEventListener('support-settings-updated', handleSupportUpdate);
+    };
+  }, []);
+
+  const getBadgeStyle = (color) => {
+    switch (color) {
+      case 'emerald':
+        return 'bg-emerald-100/90 text-emerald-700 border-emerald-200/60';
+      case 'amber':
+        return 'bg-amber-100/90 text-amber-700 border-amber-200/60';
+      case 'blue':
+        return 'bg-blue-100/90 text-blue-700 border-blue-200/60';
+      case 'rose':
+      case 'red':
+        return 'bg-rose-100/90 text-rose-700 border-rose-200/60';
+      case 'purple':
+      case 'violet':
+      default:
+        return 'bg-purple-100/90 text-purple-700 border-purple-200/60';
+    }
+  };
+
+  const getTextColorStyle = (color) => {
+    switch (color) {
+      case 'emerald':
+        return 'text-emerald-600';
+      case 'amber':
+        return 'text-amber-700';
+      case 'blue':
+        return 'text-blue-600';
+      case 'rose':
+      case 'red':
+        return 'text-rose-600';
+      case 'slate':
+        return 'text-slate-700';
+      case 'violet':
+      case 'purple':
+      default:
+        return 'text-violet-700';
+    }
+  };
 
   const handleMouseEnter = () => {
     if (dropdownTimeoutRef.current) {
@@ -118,49 +238,49 @@ export default function Navbar({ onCartClick }) {
 
           <div className="flex items-center gap-2 shrink-0">
             <a
-              href="https://m.me/elitepassbd"
+              href={`https://wa.me/${(supportLinks.support_whatsapp || '8801925112444').replace(/[^0-9]/g, '')}`}
               target="_blank"
               rel="noreferrer"
-              className="bg-white border border-blue-200/80 hover:bg-blue-50 px-2.5 py-0.5 rounded-full text-blue-600 font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
+              className="bg-white border border-emerald-200/80 hover:bg-emerald-50 px-2.5 py-0.5 rounded-full text-emerald-600 font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
             >
-              <MessageSquare className="w-3 h-3 text-blue-600" />
-              <span>Messenger</span>
+              <svg viewBox="0 0 24 24" className="w-3 h-3 fill-emerald-600 shrink-0">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.008c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+              </svg>
+              <span>WhatsApp</span>
             </a>
 
             <a
-              href="mailto:info@elitepassbd.com"
+              href={`mailto:${supportLinks.support_email || 'info@elitepassbd.com'}`}
               className="hidden sm:flex bg-white border border-slate-200/80 hover:bg-slate-100/80 px-2.5 py-0.5 rounded-full text-slate-700 font-bold items-center gap-1.5 shadow-2xs transition-colors"
             >
               <Mail className="w-3 h-3 text-violet-600" />
-              <span>info@elitepassbd.com</span>
+              <span>{supportLinks.support_email || 'info@elitepassbd.com'}</span>
             </a>
           </div>
 
-          <div className="flex-1 overflow-hidden mx-2 sm:mx-4 relative flex items-center h-6">
-            <div className="animate-topbar-marquee flex items-center gap-10 text-xs font-bold text-slate-700">
-              <div className="flex items-center gap-2">
-                <span className="bg-purple-100/90 text-purple-700 font-extrabold text-[10px] px-2 py-0.5 rounded-full">বিশেষ অফার</span>
-                <span className="text-violet-700 font-extrabold">সব অর্ডারে ফ্রি ইনস্ট্যান্ট ডেলিভারি — ১০% পর্যন্ত ছাড় পান</span>
-              </div>
-              <div className="flex items-center gap-2 text-emerald-600 font-bold">
-                <span>🛡️ 100% Genuine Digital License & Instant Email Delivery</span>
-              </div>
-              <div className="flex items-center gap-2 text-amber-700 font-bold">
-                <span>⭐ Trusted by 5,000+ Happy Customers in Bangladesh</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="bg-purple-100/90 text-purple-700 font-extrabold text-[10px] px-2 py-0.5 rounded-full">বিশেষ অফার</span>
-                <span className="text-violet-700 font-extrabold">সব অর্ডারে ফ্রি ইনস্ট্যান্ট ডেলিভারি — সর্বোচ্চ ৭০% পর্যন্ত ছাড় পান</span>
-              </div>
-              <div className="flex items-center gap-2 text-emerald-600 font-bold">
-                <span>🛡️ 100% Genuine Digital License & Instant Email Delivery</span>
-              </div>
-              <div className="flex items-center gap-2 text-amber-700 font-bold">
-                <span>⭐ Trusted by 50,000+ Happy Customers in Bangladesh</span>
+          {marqueeEnabled && marqueeItems.length > 0 ? (
+            <div className="flex-1 overflow-hidden mx-2 sm:mx-4 relative flex items-center h-6">
+              <div
+                className="animate-topbar-marquee flex items-center gap-10 text-xs font-bold text-slate-700"
+                style={{ animationDuration: `${marqueeSpeed}s` }}
+              >
+                {[...marqueeItems, ...marqueeItems].map((item, idx) => (
+                  <div key={`${item.id || idx}-${idx}`} className="flex items-center gap-2 shrink-0">
+                    {item.badge && (
+                      <span className={`font-extrabold text-[10px] px-2 py-0.5 rounded-full border shadow-2xs ${getBadgeStyle(item.badgeColor)}`}>
+                        {item.badge}
+                      </span>
+                    )}
+                    <span className={`font-extrabold ${getTextColorStyle(item.textColor)}`}>
+                      {item.text}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex-1" />
+          )}
 
           <div className="flex items-center gap-2.5 shrink-0">
 
@@ -176,7 +296,7 @@ export default function Navbar({ onCartClick }) {
 
             <div className="flex items-center gap-1 ml-1">
               <a
-                href="https://facebook.com"
+                href={supportLinks.social_facebook || "https://facebook.com/ElitePassBD"}
                 target="_blank"
                 rel="noreferrer"
                 className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center hover:opacity-90 transition-opacity"
@@ -185,16 +305,18 @@ export default function Navbar({ onCartClick }) {
                 <span className="font-black text-[9px]">f</span>
               </a>
               <a
-                href="https://wa.me/8801925112444"
+                href={`https://wa.me/${(supportLinks.support_whatsapp || '8801925112444').replace(/[^0-9]/g, '')}`}
                 target="_blank"
                 rel="noreferrer"
                 className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center hover:opacity-90 transition-opacity"
                 title="WhatsApp"
               >
-                <Phone className="w-2.5 h-2.5" />
+                <svg viewBox="0 0 24 24" className="w-2.5 h-2.5 fill-white">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.008c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                </svg>
               </a>
               <a
-                href="https://instagram.com"
+                href={supportLinks.social_instagram || "https://instagram.com/elitepassbd"}
                 target="_blank"
                 rel="noreferrer"
                 className="w-5 h-5 rounded-full bg-pink-600 text-white flex items-center justify-center hover:opacity-90 transition-opacity"
@@ -250,9 +372,6 @@ export default function Navbar({ onCartClick }) {
                 className="w-full bg-slate-50/80 border border-violet-100/80 focus:border-violet-400 focus:bg-white focus:outline-none rounded-full pl-9 pr-14 py-2 text-xs text-slate-800 placeholder-slate-400 shadow-2xs transition-all"
               />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-mono text-slate-400 bg-white border border-slate-200/80 px-1.5 py-0.5 rounded shadow-2xs select-none">
-                Ctrl K
-              </kbd>
             </div>
 
             {showSearchResults && searchQuery && (
@@ -411,19 +530,6 @@ export default function Navbar({ onCartClick }) {
               </Link>
             )}
 
-            <div className="relative hidden sm:block">
-              <button
-                onClick={() => setIsCurrencyOpen(!isCurrencyOpen)}
-                className="bg-white border border-slate-200/80 px-2.5 py-1 rounded-full flex items-center space-x-1.5 text-xs font-extrabold text-slate-700 shadow-2xs hover:bg-slate-50 transition-all cursor-pointer"
-              >
-                <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-amber-400 to-amber-300 text-amber-950 font-black text-[10px] flex items-center justify-center shadow-2xs">
-                  ৳
-                </div>
-                <span className="text-[11px] text-slate-700 font-bold">BD {selectedCurrency}</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
-            </div>
-
             <button
               onClick={onCartClick}
               className="hidden sm:flex bg-gradient-to-r from-[#005F4B]/90 via-[#005F4B] to-[#FF6D00] hover:from-[#005F4B] hover:to-[#FF6D00] text-white font-extrabold px-3.5 py-1.5 sm:px-4 sm:py-1.5 rounded-full text-xs items-center space-x-1.5 shadow-md shadow-[#005F4B]/20 backdrop-blur-md border border-white/20 transition-all active:scale-95 cursor-pointer shrink-0"
@@ -547,11 +653,10 @@ export default function Navbar({ onCartClick }) {
               {/* Mobile All Products Dropdown List */}
               <div>
                 <div
-                  className={`flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-bold cursor-pointer transition-colors ${
-                    isActive('/products') || isMobileCategoriesOpen
-                      ? 'bg-violet-100/80 text-violet-700 font-extrabold'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
+                  className={`flex items-center justify-between px-4 py-2.5 rounded-2xl text-xs font-bold cursor-pointer transition-colors ${isActive('/products') || isMobileCategoriesOpen
+                    ? 'bg-violet-100/80 text-violet-700 font-extrabold'
+                    : 'text-slate-700 hover:bg-slate-50'
+                    }`}
                 >
                   <Link
                     to="/products"

@@ -15,6 +15,11 @@ export default function ContactSupport() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  const [supportInfo, setSupportInfo] = useState({
+    support_whatsapp: '8801925112444',
+    support_email: 'support@elitepassbd.com'
+  });
+
   useEffect(() => {
     if (user) {
       setFormData(prev => ({
@@ -24,6 +29,21 @@ export default function ContactSupport() {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.get('/settings/public')
+      .then(data => {
+        if (data && isMounted) {
+          setSupportInfo({
+            support_whatsapp: data.support_whatsapp || '8801925112444',
+            support_email: data.support_email || 'support@elitepassbd.com'
+          });
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -78,7 +98,9 @@ export default function ContactSupport() {
                     <Mail className="w-4 h-4 text-violet-600 mt-0.5 shrink-0" />
                     <div>
                       <span className="font-bold text-slate-800 block">Email Support</span>
-                      <a href="mailto:support@elitepassbd.com" className="hover:text-violet-600 transition-colors">support@elitepassbd.com</a>
+                      <a href={`mailto:${supportInfo.support_email}`} className="hover:text-violet-600 transition-colors">
+                        {supportInfo.support_email}
+                      </a>
                     </div>
                   </div>
 
@@ -99,7 +121,7 @@ export default function ContactSupport() {
                 </p>
 
                 <a
-                  href="https://wa.me/8801925112444"
+                  href={`https://wa.me/${(supportInfo.support_whatsapp || '8801925112444').replace(/[^0-9]/g, '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center space-x-2 active:scale-95 duration-150 cursor-pointer"

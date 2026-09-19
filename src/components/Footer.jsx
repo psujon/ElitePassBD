@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { api } from '../utils/api';
 import {
   Facebook,
   Linkedin,
@@ -20,11 +21,57 @@ export default function Footer() {
   const location = useLocation();
   const isProductDetailsPage = location.pathname.startsWith('/product/');
 
+  const [supportLinks, setSupportLinks] = useState({
+    support_whatsapp: '8801925112444',
+    support_email: 'support@elitepassbd.com',
+    social_facebook: 'https://facebook.com/elitepassbd',
+    social_linkedin: 'https://linkedin.com/elitepassbd',
+    social_youtube: 'https://youtube.com/elitepassbd',
+    social_messenger: 'https://m.me/elitepassbd'
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadSupportSettings = async () => {
+      try {
+        const data = await api.get('/settings/public');
+        if (data && isMounted) {
+          setSupportLinks({
+            support_whatsapp: data.support_whatsapp || '8801925112444',
+            support_email: data.support_email || 'support@elitepassbd.com',
+            social_facebook: data.social_facebook || 'https://facebook.com/elitepassbd',
+            social_linkedin: data.social_linkedin || 'https://linkedin.com/elitepassbd',
+            social_youtube: data.social_youtube || 'https://youtube.com/elitepassbd',
+            social_messenger: data.social_messenger || 'https://m.me/elitepassbd'
+          });
+        }
+      } catch (e) {
+        // Fallback to default
+      }
+    };
+
+    loadSupportSettings();
+
+    const handleSupportUpdate = (e) => {
+      if (e?.detail) {
+        setSupportLinks(prev => ({ ...prev, ...e.detail }));
+      } else {
+        loadSupportSettings();
+      }
+    };
+
+    window.addEventListener('support-settings-updated', handleSupportUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('support-settings-updated', handleSupportUpdate);
+    };
+  }, []);
+
   const handleStartChat = (e) => {
     e.preventDefault();
     if (!message.trim()) return;
 
-    const phoneNumber = '8801925112444';
+    const phoneNumber = (supportLinks.support_whatsapp || '8801925112444').replace(/[^0-9]/g, '');
     const encodedText = encodeURIComponent(message.trim());
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedText}`;
 
@@ -58,23 +105,30 @@ export default function Footer() {
             <div className="space-y-2 text-xs text-slate-600 font-bold">
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-slate-400" />
-                <span>support@elitepassbd.com</span>
+                <a href={`mailto:${supportLinks.support_email || 'support@elitepassbd.com'}`} className="hover:underline hover:text-blue-600">
+                  {supportLinks.support_email || 'support@elitepassbd.com'}
+                </a>
               </div>
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-slate-400" />
-                <Link to="https://wa.me/8801925112444" target="_blank" rel="noreferrer" className="hover:underline hover:text-blue-600 cursor-pointer text-left bg-transparent border-none p-0 font-bold">
+                <a
+                  href={`https://wa.me/${(supportLinks.support_whatsapp || '8801925112444').replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:underline hover:text-blue-600 cursor-pointer text-left bg-transparent border-none p-0 font-bold"
+                >
                   WhatsApp Support
-                </Link>
+                </a>
               </div>
             </div>
             <div className="flex space-x-3.5 pt-2">
-              <a href="https://facebook.com/elitepassbd" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs">
+              <a href={supportLinks.social_facebook || "https://facebook.com/elitepassbd"} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs" title="Facebook">
                 <Facebook className="w-4 h-4" />
               </a>
-              <a href="https://linkedin.com/elitepassbd" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-blue-700 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs">
+              <a href={supportLinks.social_linkedin || "https://linkedin.com/elitepassbd"} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-blue-700 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs" title="LinkedIn">
                 <Linkedin className="w-4 h-4" />
               </a>
-              <a href="https://youtube.com/elitepassbd" target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-red-655 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs">
+              <a href={supportLinks.social_youtube || "https://youtube.com/elitepassbd"} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-red-655 hover:text-white flex items-center justify-center text-slate-500 transition-colors shadow-xxs" title="YouTube">
                 <Youtube className="w-4 h-4" />
               </a>
             </div>
@@ -166,7 +220,7 @@ export default function Footer() {
 
             {/* Messenger Option Pill */}
             <a
-              href="https://m.me/elitepassbd"
+              href={supportLinks.social_messenger || "https://m.me/elitepassbd"}
               target="_blank"
               rel="noopener noreferrer"
               className="w-72 sm:w-80 bg-white/95 backdrop-blur-xl border border-purple-200/90 hover:border-blue-500 p-3 rounded-full shadow-2xl hover:shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-between group text-left"
@@ -187,7 +241,7 @@ export default function Footer() {
 
             {/* WhatsApp Chat Option Pill */}
             <a
-              href="https://wa.me/8801925112444?text=Hello%20ElitePassBD%20Support,%20I%20need%20assistance."
+              href={`https://wa.me/${(supportLinks.support_whatsapp || '8801925112444').replace(/[^0-9]/g, '')}?text=Hello%20ElitePassBD%20Support,%20I%20need%20assistance.`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-72 sm:w-80 bg-white/95 backdrop-blur-xl border border-purple-200/90 hover:border-emerald-500 p-3 rounded-full shadow-2xl hover:shadow-emerald-500/20 transition-all cursor-pointer flex items-center justify-between group text-left"

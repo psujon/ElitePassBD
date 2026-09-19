@@ -17,6 +17,52 @@ exports.getAllLicenses = async (req, res) => {
   }
 };
 
+exports.getAvailableLicenses = async (req, res) => {
+  const { product_id, product_name, package_name } = req.query;
+  try {
+    let targetProductId = product_id ? parseInt(product_id) : null;
+    if (!targetProductId && product_name) {
+      const [prods] = await db.query('SELECT id FROM products WHERE name LIKE ? LIMIT 1', [`%${product_name.trim()}%`]);
+      if (prods.length > 0) {
+        targetProductId = prods[0].id;
+      }
+    }
+
+    if (!targetProductId) {
+      return res.json({ count: 0, licenses: [] });
+    }
+
+    let query = `
+      SELECT pl.id, pl.product_id, pl.activation_option, pl.package_option, pl.rules, pl.license_key, pl.created_at, p.name as product_name
+      FROM product_licenses pl
+      JOIN products p ON pl.product_id = p.id
+      WHERE pl.product_id = ? AND pl.is_used = 0
+    `;
+    const params = [targetProductId];
+
+    if (package_name && package_name.trim()) {
+      query += `
+        ORDER BY 
+          (pl.package_option <=> ?) DESC,
+          (pl.package_option IS NULL) DESC,
+          pl.id ASC
+      `;
+      params.push(package_name.trim());
+    } else {
+      query += ` ORDER BY pl.id ASC`;
+    }
+
+    const [rows] = await db.query(query, params);
+    res.json({
+      count: rows.length,
+      licenses: rows
+    });
+  } catch (error) {
+    console.error('Fetch available licenses error:', error);
+    res.status(500).json({ message: 'Database error occurred while fetching available licenses.' });
+  }
+};
+
 exports.createLicense = async (req, res) => {
   const { product_id, activation_option, package_option, rules, license_key } = req.body;
 

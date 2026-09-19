@@ -30,10 +30,11 @@ const sendEmail = async ({ to, subject, text, html }) => {
       });
       return true;
     } else {
-      console.log(`Failed to send email to ${to}`);
+      console.warn(`[Mailer] SMTP credentials not configured in .env. Skipping email to ${to}`);
       return false;
     }
   } catch (err) {
+    console.error(`[Mailer Error] Failed to send email to ${to}:`, err.message);
     return false;
   }
 };

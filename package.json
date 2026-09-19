@@ -4,7 +4,7 @@
   "description": "Fast & Minimal E-Commerce Site",
   "main": "server.js",
   "scripts": {
-    "dev": "npx concurrently --kill-others \"node server.js\" \"vite\"",
+    "dev": "npx concurrently --kill-others \"node --watch server.js\" \"vite\"",
     "build": "vite build",
     "start": "node server.js"
   },

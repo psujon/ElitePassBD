@@ -132,6 +132,126 @@ exports.getSubscriptionById = async (req, res) => {
   }
 };
 
+const { sendEmail } = require('../utils/mailer');
+
+/**
+ * Send dedicated License & Subscription Details Email to the customer
+ */
+const sendSubscriptionLicenseEmail = async ({
+  email,
+  customerName,
+  productName,
+  packagePlan,
+  licenseKey,
+  rules,
+  purchaseDate,
+  validityDays,
+  expiryDate,
+  orderId
+}) => {
+  if (!email || !email.trim()) return false;
+
+  const appName = process.env.APP_NAME || 'ElitePassBD';
+  const subject = `Your License Key & Access Details - ${productName} - ${appName}`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Your License & Subscription Details</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #e2e8f0;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); border: 1px solid #334155;">
+        
+        <!-- Header -->
+        <div style="background-color: #059669; color: #ffffff; padding: 28px 24px; text-align: center;">
+          <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">
+            Subscription & License Activated!
+          </h1>
+          <p style="margin: 6px 0 0 0; font-size: 14px; color: #d1fae5; font-weight: 500;">
+            ${productName} • ${packagePlan}
+          </p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 26px 24px;">
+          <p style="font-size: 15px; color: #ffffff; margin-top: 0; font-weight: 600;">
+            Hello ${customerName || 'Valued Customer'},
+          </p>
+          <p style="font-size: 13px; color: #cbd5e1; line-height: 1.6; margin-bottom: 20px;">
+            Your subscription has been successfully created. Your official digital license key / account credentials and plan details are below:
+          </p>
+
+          <!-- License Key Box -->
+          <div style="margin: 20px 0; background-color: #0f172a; border: 2px dashed #10b981; border-radius: 12px; padding: 18px; text-align: center;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #34d399; font-weight: 700; letter-spacing: 0.8px; margin-bottom: 8px;">
+              Digital License Key / Account Credentials
+            </div>
+            <div style="font-family: Consolas, 'Courier New', monospace; font-size: 15px; font-weight: 700; color: #ffffff; word-break: break-all; background-color: #1e293b; padding: 10px 16px; border-radius: 8px; display: inline-block; border: 1px solid #334155;">
+              ${licenseKey || 'N/A'}
+            </div>
+          </div>
+
+          <!-- Details Table -->
+          <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+            <table style="width: 100%; font-size: 13px; color: #cbd5e1; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8; width: 40%;">Product:</td>
+                <td style="padding: 6px 0; font-weight: 600; color: #ffffff;">${productName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Package / Plan:</td>
+                <td style="padding: 6px 0; font-weight: 600; color: #ffffff;">${packagePlan}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Purchase Date:</td>
+                <td style="padding: 6px 0; color: #ffffff;">${purchaseDate}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Validity:</td>
+                <td style="padding: 6px 0; color: #ffffff;">${validityDays} Days</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Expiry Date:</td>
+                <td style="padding: 6px 0; font-weight: 700; color: #34d399;">${expiryDate}</td>
+              </tr>
+              ${orderId ? `
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Order Ref:</td>
+                <td style="padding: 6px 0; color: #ffffff;">#${orderId}</td>
+              </tr>` : ''}
+            </table>
+          </div>
+
+          ${rules ? `
+          <div style="background-color: #1e1b4b; border: 1px solid #4338ca; border-radius: 10px; padding: 14px; margin-bottom: 20px; font-size: 12px; color: #c7d2fe;">
+            <div style="font-weight: 700; color: #a5b4fc; margin-bottom: 4px;">Activation Rules & Guidelines:</div>
+            <div style="line-height: 1.5;">${rules}</div>
+          </div>` : ''}
+
+          <div style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 24px; line-height: 1.5;">
+            Thank you for choosing <strong style="color: #ffffff;">${appName}</strong>. If you require any assistance, please contact our support team.
+          </div>
+
+        </div>
+
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `Hello ${customerName},\n\nYour subscription for ${productName} (${packagePlan}) has been activated.\n\nLicense Key / Credentials: ${licenseKey}\nExpiry Date: ${expiryDate}\n${rules ? `\nRules: ${rules}\n` : ''}\nThank you,\n${appName}`;
+
+  return await sendEmail({
+    to: email.trim(),
+    subject,
+    text,
+    html
+  });
+};
+
 exports.createSubscription = async (req, res) => {
   const {
     customer_name,
@@ -144,6 +264,8 @@ exports.createSubscription = async (req, res) => {
     validity_days,
     expiry_date,
     account_given,
+    license_id,
+    license_rules,
     selling_price,
     payment_status,
     notes,
@@ -159,6 +281,23 @@ exports.createSubscription = async (req, res) => {
 
   try {
     await connection.beginTransaction();
+
+    let finalAccountGiven = account_given || '';
+    let finalRules = license_rules || '';
+
+    // If a pre-loaded license was selected, fetch it and verify it's available
+    if (license_id) {
+      const [licRows] = await connection.query(
+        'SELECT id, license_key, rules FROM product_licenses WHERE id = ? AND is_used = 0 FOR UPDATE',
+        [license_id]
+      );
+      if (licRows.length > 0) {
+        finalAccountGiven = licRows[0].license_key;
+        if (licRows[0].rules) {
+          finalRules = licRows[0].rules;
+        }
+      }
+    }
 
     const pDate = purchase_date ? new Date(purchase_date) : new Date();
     const vDays = parseInt(validity_days) || 30;
@@ -187,6 +326,7 @@ exports.createSubscription = async (req, res) => {
     }
 
     let finalOrderId = order_id || null;
+    let orderItemId = null;
 
     // If no existing order_id is provided (Manual / WhatsApp / Facebook entry), create an order in orders & order_items tables
     if (!finalOrderId) {
@@ -244,7 +384,7 @@ exports.createSubscription = async (req, res) => {
         finalOrderId = ordRes.insertId;
 
         // 4. Create Order Item
-        await connection.query(`
+        const [ordItemRes] = await connection.query(`
           INSERT INTO order_items (order_id, product_id, quantity, price, package_name, selected_activation)
           VALUES (?, ?, 1, ?, ?, ?)
         `, [
@@ -252,11 +392,20 @@ exports.createSubscription = async (req, res) => {
           productId,
           parseFloat(selling_price) || 0,
           package_plan,
-          account_given || null
+          finalAccountGiven || null
         ]);
+        orderItemId = ordItemRes.insertId;
       } catch (ordErr) {
         console.error('Manual order sync error during subscription creation:', ordErr.message);
       }
+    }
+
+    // Mark the selected pre-loaded license as used
+    if (license_id) {
+      await connection.query(
+        'UPDATE product_licenses SET is_used = 1, order_item_id = ?, used_at = NOW() WHERE id = ?',
+        [orderItemId, license_id]
+      );
     }
 
     const [subResult] = await connection.query(`
@@ -275,7 +424,7 @@ exports.createSubscription = async (req, res) => {
       formattedPDate,
       vDays,
       formattedEDate,
-      account_given || null,
+      finalAccountGiven || null,
       parseFloat(selling_price) || 0,
       payment_status || 'Paid',
       initialStatus,
@@ -304,6 +453,24 @@ exports.createSubscription = async (req, res) => {
       const { sendPurchaseConfirmationEmail } = require('../services/purchaseEmailService');
       sendPurchaseConfirmationEmail(finalOrderId).catch(emailErr => {
         console.error('Failed to send purchase email for manual subscription order:', emailErr.message);
+      });
+    }
+
+    // Trigger License Details Email if customer email provided and license key / account credentials present
+    if (email && email.trim() && finalAccountGiven) {
+      sendSubscriptionLicenseEmail({
+        email: email.trim(),
+        customerName: customer_name,
+        productName: product_name,
+        packagePlan: package_plan,
+        licenseKey: finalAccountGiven,
+        rules: finalRules,
+        purchaseDate: formattedPDate,
+        validityDays: vDays,
+        expiryDate: formattedEDate,
+        orderId: finalOrderId
+      }).catch(mailErr => {
+        console.error('Failed to send subscription license email:', mailErr.message);
       });
     }
 

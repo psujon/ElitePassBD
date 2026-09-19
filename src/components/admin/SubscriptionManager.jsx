@@ -19,6 +19,9 @@ import {
   ExternalLink,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
+  UserPlus,
+  Key,
   X,
   Edit2,
   Trash2,
@@ -85,11 +88,17 @@ export default function SubscriptionManager() {
   const [expiryFilter, setExpiryFilter] = useState('All Dates');
   const [sourceFilter, setSourceFilter] = useState('All Sources');
 
-  // Modals state
-  const [showAddModal, setShowAddModal] = useState(false);
+  // Modals & Forms state
+  const [showAddForm, setShowAddForm] = useState(false);
+  const customerFormRef = useRef(null);
   const [editingSub, setEditingSub] = useState(null); // null = Add, object = Edit
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedSubDetail, setSelectedSubDetail] = useState(null);
+
+  // Available licenses state
+  const [availableLicenses, setAvailableLicenses] = useState([]);
+  const [loadingLicenses, setLoadingLicenses] = useState(false);
+  const [licenseInputMode, setLicenseInputMode] = useState('dropdown'); // 'dropdown' | 'manual'
 
   // Forms state
   const [subForm, setSubForm] = useState({
@@ -104,6 +113,8 @@ export default function SubscriptionManager() {
     validity_days: 30,
     expiry_date: '',
     account_given: '',
+    selected_license_id: null,
+    license_rules: '',
     selling_price: '0',
     payment_status: 'Paid',
     notes: ''
@@ -226,6 +237,67 @@ export default function SubscriptionManager() {
     }
   }, [subForm.purchase_date, subForm.validity_days]);
 
+  // Fetch available licenses whenever product or package changes in Add/Edit form
+  const fetchAvailableLicenses = async (productName, packagePlan) => {
+    if (!productName || !productName.trim()) {
+      setAvailableLicenses([]);
+      setLicenseInputMode('manual');
+      return;
+    }
+
+    try {
+      setLoadingLicenses(true);
+      const res = await api.get('/licenses/available', {
+        params: {
+          product_name: productName.trim(),
+          package_name: packagePlan ? packagePlan.trim() : ''
+        }
+      });
+      const licList = res?.licenses || [];
+      setAvailableLicenses(licList);
+
+      if (licList.length > 0) {
+        setLicenseInputMode('dropdown');
+        setSubForm(prev => {
+          const currentId = prev.selected_license_id;
+          const match = licList.find(l => l.id === currentId);
+          if (match) {
+            return {
+              ...prev,
+              account_given: match.license_key,
+              license_rules: match.rules || ''
+            };
+          } else {
+            return {
+              ...prev,
+              selected_license_id: licList[0].id,
+              account_given: licList[0].license_key,
+              license_rules: licList[0].rules || ''
+            };
+          }
+        });
+      } else {
+        setLicenseInputMode('manual');
+        setSubForm(prev => ({
+          ...prev,
+          selected_license_id: null
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch available licenses:', err);
+      setAvailableLicenses([]);
+      setLicenseInputMode('manual');
+    } finally {
+      setLoadingLicenses(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showAddForm && subForm.product_name) {
+      fetchAvailableLicenses(subForm.product_name, subForm.package_plan);
+    }
+  }, [showAddForm, subForm.product_name, subForm.package_plan]);
+
   // Calculate Renewal Expiry Date automatically
   useEffect(() => {
     if (renewForm.renewal_date && renewForm.validity_days) {
@@ -295,7 +367,12 @@ export default function SubscriptionManager() {
     fetchSubscriptions();
   }, [searchQuery, productFilter, statusFilter, sourceFilter, expiryFilter]);
 
-  const handleOpenAddModal = () => {
+  const handleToggleAddForm = () => {
+    if (showAddForm && !editingSub) {
+      setShowAddForm(false);
+      return;
+    }
+
     setEditingSub(null);
     const defaultProduct = catalogProducts.length > 0 ? (catalogProducts[0].name || '') : '';
     let defaultPrice = '0';
@@ -337,14 +414,20 @@ export default function SubscriptionManager() {
       validity_days: defaultValidity,
       expiry_date: '',
       account_given: '',
+      selected_license_id: null,
+      license_rules: '',
       selling_price: defaultPrice,
       payment_status: 'Paid',
       notes: ''
     });
     setProductSearchQuery('');
     setShowProductDropdown(false);
-    setShowAddModal(true);
+    setShowAddForm(true);
+    setTimeout(() => {
+      customerFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
+  const handleOpenAddModal = handleToggleAddForm;
 
   const handleOpenEditModal = (sub) => {
     setEditingSub(sub);
@@ -361,14 +444,20 @@ export default function SubscriptionManager() {
       validity_days: sub.validity_days || 30,
       expiry_date: sub.expiry_date ? new Date(sub.expiry_date).toISOString().slice(0, 10) : '',
       account_given: sub.account_given || '',
+      selected_license_id: null,
+      license_rules: '',
       selling_price: sub.selling_price || '',
       payment_status: sub.payment_status || 'Paid',
       notes: sub.notes || ''
     });
+    setLicenseInputMode('manual');
     setProductSearchQuery('');
     setShowProductDropdown(false);
-    setShowAddModal(true);
+    setShowAddForm(true);
     setActiveMenuId(null);
+    setTimeout(() => {
+      customerFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const handleSaveCustomerSub = async (e) => {
@@ -388,7 +477,8 @@ export default function SubscriptionManager() {
       setSubFormSubmitting(true);
       const payload = {
         ...subForm,
-        product_name: targetProductName
+        product_name: targetProductName,
+        license_id: (licenseInputMode === 'dropdown' && subForm.selected_license_id) ? subForm.selected_license_id : null
       };
 
       if (editingSub) {
@@ -399,7 +489,8 @@ export default function SubscriptionManager() {
         toast.success('Customer subscription added successfully!');
       }
 
-      setShowAddModal(false);
+      setShowAddForm(false);
+      setEditingSub(null);
       fetchSubscriptions();
     } catch (err) {
       console.error('Error saving subscription:', err);
@@ -577,14 +668,501 @@ export default function SubscriptionManager() {
           </button>
 
           <button
-            onClick={handleOpenAddModal}
-            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm rounded-xl shadow-md shadow-emerald-700/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            onClick={handleToggleAddForm}
+            className={`flex items-center gap-2 px-5 py-2.5 font-semibold text-sm rounded-xl shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] ${
+              showAddForm
+                ? 'bg-slate-800 hover:bg-slate-700 text-white shadow-slate-800/20'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-700/20'
+            }`}
           >
-            <Plus size={18} />
-            Add Customer
+            {showAddForm ? (
+              <>
+                <ChevronUp size={18} />
+                {editingSub ? 'Close Edit Form' : 'Close Form'}
+              </>
+            ) : (
+              <>
+                <Plus size={18} />
+                Add Customer
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      {/* INLINE DROPDOWN / ACCORDION FORM: ADD / EDIT CUSTOMER SUBSCRIPTION */}
+      {showAddForm && (
+        <div
+          ref={customerFormRef}
+          className="bg-white border-2 border-emerald-500/30 rounded-2xl p-5 sm:p-6 shadow-xl shadow-emerald-500/5 transition-all duration-300 animate-in fade-in slide-in-from-top-4"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0">
+                {editingSub ? <Edit2 size={20} /> : <UserPlus size={20} />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                    {editingSub ? 'Edit Customer Subscription' : 'Add Customer / Subscription'}
+                  </h3>
+                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    editingSub
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}>
+                    {editingSub ? 'Edit Mode' : 'New Entry'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {editingSub
+                    ? `Updating customer subscription record for: ${editingSub.customer_name}`
+                    : 'Fill in the customer information and subscription plan details below.'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddForm(false);
+                setEditingSub(null);
+              }}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              title="Close form"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <form onSubmit={handleSaveCustomerSub} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+
+              {/* Customer Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Customer Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Rahim Ahmed"
+                  value={subForm.customer_name}
+                  onChange={(e) => setSubForm({ ...subForm, customer_name: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* WhatsApp / Mobile */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">WhatsApp / Mobile *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 019XX XXX101"
+                  value={subForm.whatsapp_number}
+                  onChange={(e) => setSubForm({ ...subForm, whatsapp_number: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Email Address */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  placeholder="e.g. customer@example.com"
+                  value={subForm.email}
+                  onChange={(e) => setSubForm({ ...subForm, email: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Customer Source */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Customer Source *</label>
+                <select
+                  value={subForm.customer_source}
+                  onChange={(e) => setSubForm({ ...subForm, customer_source: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="Website">Website</option>
+                  <option value="WhatsApp">WhatsApp</option>
+                  <option value="Facebook">Facebook</option>
+                  <option value="Manual">Manual</option>
+                </select>
+              </div>
+
+              {/* Product / Service (Search a Product matching image) */}
+              <div className="relative">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  PRODUCT *
+                </label>
+
+                <div
+                  className="w-full text-xs bg-white border border-violet-500 rounded-lg px-3 py-2 text-slate-900 cursor-text flex items-center justify-between shadow-xs"
+                  onClick={() => setShowProductDropdown(true)}
+                >
+                  <input
+                    type="text"
+                    className="bg-transparent border-none outline-none w-full text-slate-900 placeholder-slate-400 text-xs font-medium"
+                    placeholder="Search a Product..."
+                    value={showProductDropdown ? productSearchQuery : (subForm.product_name || '')}
+                    onChange={(e) => {
+                      setProductSearchQuery(e.target.value);
+                      setShowProductDropdown(true);
+                    }}
+                    onFocus={() => setShowProductDropdown(true)}
+                  />
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                </div>
+
+                {showProductDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowProductDropdown(false)}></div>
+                    <div className="absolute z-40 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                      {catalogProducts
+                        .filter(prod => (prod.name || '').toLowerCase().includes(productSearchQuery.toLowerCase()))
+                        .map((prod) => (
+                          <div
+                            key={prod.id}
+                            className={`px-3 py-2 text-xs cursor-pointer hover:bg-violet-50 transition-colors ${subForm.product_name === prod.name ? 'bg-violet-100 text-violet-700 font-bold' : 'text-slate-700'
+                              }`}
+                            onClick={() => {
+                              const currentProd = prod;
+                              let pkgs = [];
+                              try {
+                                pkgs = Array.isArray(currentProd.packages)
+                                  ? currentProd.packages
+                                  : (typeof currentProd.packages === 'string' ? JSON.parse(currentProd.packages || '[]') : []);
+                              } catch (e) {
+                                pkgs = [];
+                              }
+
+                              let newPackagePlan = 'Monthly';
+                              let newPrice = currentProd.price ? String(currentProd.price) : subForm.selling_price;
+                              let newValidity = subForm.validity_days;
+
+                              if (pkgs.length > 0) {
+                                const firstPkg = pkgs[0];
+                                newPackagePlan = firstPkg.duration
+                                  ? `${firstPkg.duration.trim()}${firstPkg.activation ? ` - ${firstPkg.activation.trim()}` : ''}`
+                                  : (firstPkg.name || 'Monthly');
+                                if (firstPkg.price) {
+                                  newPrice = String(firstPkg.price);
+                                }
+                                const days = getDurationDays(firstPkg.duration);
+                                if (days) newValidity = days;
+                              }
+
+                              setSubForm(prev => ({
+                                ...prev,
+                                product_name: currentProd.name,
+                                package_plan: newPackagePlan,
+                                selling_price: newPrice,
+                                validity_days: newValidity
+                              }));
+                              setProductSearchQuery('');
+                              setShowProductDropdown(false);
+                            }}
+                          >
+                            {prod.name}
+                          </div>
+                        ))}
+                      {catalogProducts.filter(prod => (prod.name || '').toLowerCase().includes(productSearchQuery.toLowerCase())).length === 0 && (
+                        <div className="px-3 py-2 text-xs text-slate-500 text-center italic">No products found.</div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Package / Plan */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">Package / Plan *</label>
+                  {selectedProductPackages.length > 0 && (
+                    <span className="text-[10px] text-emerald-700 font-semibold">
+                      {selectedProductPackages.length} package options
+                    </span>
+                  )}
+                </div>
+                <select
+                  value={subForm.package_plan}
+                  onChange={(e) => {
+                    const chosenVal = e.target.value;
+                    const matchedPkg = selectedProductPackages.find(pkg => {
+                      const pkgLabel = pkg.duration
+                        ? `${pkg.duration.trim()}${pkg.activation ? ` - ${pkg.activation.trim()}` : ''}`
+                        : (pkg.name || '');
+                      return pkgLabel === chosenVal || pkg.duration?.trim() === chosenVal;
+                    });
+
+                    let updatedPrice = subForm.selling_price;
+                    let updatedValidity = subForm.validity_days;
+                    if (matchedPkg) {
+                      if (matchedPkg.price) updatedPrice = String(matchedPkg.price);
+                      const days = getDurationDays(matchedPkg.duration);
+                      if (days) updatedValidity = days;
+                    }
+
+                    setSubForm(prev => ({
+                      ...prev,
+                      package_plan: chosenVal,
+                      selling_price: updatedPrice,
+                      validity_days: updatedValidity
+                    }));
+                  }}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  {selectedProductPackages.length > 0 ? (
+                    <>
+                      {selectedProductPackages.map((pkg, idx) => {
+                        const pkgLabel = pkg.duration
+                          ? `${pkg.duration.trim()}${pkg.activation ? ` - ${pkg.activation.trim()}` : ''}`
+                          : (pkg.name || `Package ${idx + 1}`);
+                        const displayPrice = pkg.price ? ` (৳${parseFloat(pkg.price).toFixed(0)})` : '';
+                        return (
+                          <option key={idx} value={pkgLabel} className="bg-white text-slate-900 py-1">
+                            {pkgLabel}{displayPrice}
+                          </option>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      <option value="Monthly" className="bg-white text-slate-900">Monthly</option>
+                      <option value="3 Months" className="bg-white text-slate-900">3 Months</option>
+                      <option value="6 Months" className="bg-white text-slate-900">6 Months</option>
+                      <option value="Yearly" className="bg-white text-slate-900">Yearly</option>
+                      <option value="Lifetime" className="bg-white text-slate-900">Lifetime</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* License Key / Credentials (Placed directly after Package / Plan) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Key size={13} className="text-emerald-600" />
+                    <span>License / Key</span>
+                  </label>
+                  {availableLicenses.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-semibold">
+                        {availableLicenses.length} in stock
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (licenseInputMode === 'dropdown') {
+                            setLicenseInputMode('manual');
+                            setSubForm(prev => ({ ...prev, selected_license_id: null }));
+                          } else {
+                            setLicenseInputMode('dropdown');
+                            if (availableLicenses.length > 0) {
+                              const lic = availableLicenses[0];
+                              setSubForm(prev => ({
+                                ...prev,
+                                selected_license_id: lic.id,
+                                account_given: lic.license_key,
+                                license_rules: lic.rules || ''
+                              }));
+                            }
+                          }
+                        }}
+                        className="text-[10px] text-emerald-700 hover:text-emerald-800 underline font-medium cursor-pointer"
+                      >
+                        {licenseInputMode === 'dropdown' ? 'Type manual' : 'Use stock key'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {loadingLicenses ? (
+                  <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-400 flex items-center gap-2">
+                    <RefreshCw size={12} className="animate-spin text-emerald-600" />
+                    <span>Checking license stock...</span>
+                  </div>
+                ) : licenseInputMode === 'dropdown' && availableLicenses.length > 0 ? (
+                  <select
+                    value={subForm.selected_license_id || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '__manual__') {
+                        setLicenseInputMode('manual');
+                        setSubForm(prev => ({ ...prev, selected_license_id: null, account_given: '' }));
+                        return;
+                      }
+                      const chosenId = parseInt(val, 10);
+                      const matched = availableLicenses.find(l => l.id === chosenId);
+                      if (matched) {
+                        setSubForm(prev => ({
+                          ...prev,
+                          selected_license_id: matched.id,
+                          account_given: matched.license_key,
+                          license_rules: matched.rules || ''
+                        }));
+                      }
+                    }}
+                    className="w-full bg-emerald-50/40 border border-emerald-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-emerald-500 cursor-pointer shadow-xs"
+                  >
+                    {availableLicenses.map((lic, idx) => {
+                      const displayKey = lic.license_key.length > 30 ? lic.license_key.slice(0, 30) + '...' : lic.license_key;
+                      const pkgTag = lic.package_option ? ` [${lic.package_option}]` : '';
+                      return (
+                        <option key={lic.id || idx} value={lic.id}>
+                          {displayKey}{pkgTag}
+                        </option>
+                      );
+                    })}
+                    <option value="__manual__">➕ Type custom / manual key...</option>
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Enter license key / account credentials..."
+                    value={subForm.account_given}
+                    onChange={(e) => setSubForm({ ...subForm, account_given: e.target.value, selected_license_id: null })}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-mono"
+                  />
+                )}
+                <p className="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
+                  <span>
+                    {availableLicenses.length > 0 && licenseInputMode === 'dropdown'
+                      ? 'Pre-stocked key • Auto marks used on confirm'
+                      : 'Manual entry • Will be saved with subscription'}
+                  </span>
+                  {subForm.email && subForm.email.trim() && (
+                    <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                      <Mail size={10} /> Will email to customer
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              {/* Purchase Date */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Purchase Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={subForm.purchase_date}
+                  onChange={(e) => setSubForm({ ...subForm, purchase_date: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Validity */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Validity *</label>
+                <select
+                  value={subForm.validity_days}
+                  onChange={(e) => setSubForm({ ...subForm, validity_days: parseInt(e.target.value, 10) || 30 })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value={30}>1 Month (30 Days)</option>
+                  <option value={60}>2 Months (60 Days)</option>
+                  <option value={90}>3 Months (90 Days)</option>
+                  <option value={180}>6 Months (180 Days)</option>
+                  <option value={365}>1 Year (365 Days)</option>
+                  <option value={540}>18 Months (540 Days)</option>
+                  <option value={730}>2 Years (730 Days)</option>
+                  <option value={1095}>3 Years (1095 Days)</option>
+                  <option value={3650}>Lifetime</option>
+                  {![30, 60, 90, 180, 365, 540, 730, 1095, 3650].includes(parseInt(subForm.validity_days, 10)) && (
+                    <option value={subForm.validity_days}>{subForm.validity_days} Days</option>
+                  )}
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">Select or synced with package duration</p>
+              </div>
+
+              {/* Expiry Date (Auto calculated & editable) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Expiry Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={subForm.expiry_date}
+                  onChange={(e) => setSubForm({ ...subForm, expiry_date: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
+                />
+                <p className="text-[10px] text-emerald-600 font-semibold mt-1">Calculated automatically • Editable</p>
+              </div>
+
+              {/* Selling Price */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Selling Price (BDT) *</label>
+                <input
+                  type="number"
+                  required
+                  value={subForm.selling_price}
+                  onChange={(e) => setSubForm({ ...subForm, selling_price: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Payment Status */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Payment Status *</label>
+                <select
+                  value={subForm.payment_status}
+                  onChange={(e) => setSubForm({ ...subForm, payment_status: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="Paid">Paid</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Failed">Failed</option>
+                </select>
+              </div>
+
+              {/* Notes (Spans all 4 columns) */}
+              <div className="col-span-1 sm:col-span-2 md:col-span-4">
+                <label className="block text-xs font-bold text-slate-700 mb-1">Notes</label>
+                <textarea
+                  rows={2}
+                  placeholder="Add any additional notes..."
+                  value={subForm.notes}
+                  onChange={(e) => setSubForm({ ...subForm, notes: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddForm(false);
+                  setEditingSub(null);
+                }}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={subFormSubmitting}
+                className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-emerald-700/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+              >
+                {subFormSubmitting ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} />
+                    {editingSub ? 'Update Subscription' : 'Save Customer'}
+                  </>
+                )}
+              </button>
+            </div>
+
+          </form>
+        </div>
+      )}
 
       {/* Alert Banners matching UI mockup */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1250,355 +1828,6 @@ export default function SubscriptionManager() {
         </div>
       )}
 
-      {/* MODAL 1: ADD / EDIT CUSTOMER SUBSCRIPTION */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col p-5 sm:p-6 shadow-2xl my-auto text-left overflow-hidden text-slate-900">
-
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 shrink-0">
-              <div>
-                <h3 className="text-lg font-extrabold text-slate-900">
-                  {editingSub ? 'Edit Customer Subscription' : 'Add Customer / Subscription'}
-                </h3>
-                <p className="text-xs text-slate-500">Create a new customer and subscription record.</p>
-              </div>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveCustomerSub} className="space-y-4 overflow-y-auto pr-1 mt-4 max-h-[calc(90vh-110px)] custom-scrollbar">
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-
-                {/* Customer Name */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Customer Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Rahim Ahmed"
-                    value={subForm.customer_name}
-                    onChange={(e) => setSubForm({ ...subForm, customer_name: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-
-                {/* WhatsApp / Mobile */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">WhatsApp / Mobile *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. 019XX XXX101"
-                    value={subForm.whatsapp_number}
-                    onChange={(e) => setSubForm({ ...subForm, whatsapp_number: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-
-                {/* Email Address */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    placeholder="e.g. customer@example.com"
-                    value={subForm.email}
-                    onChange={(e) => setSubForm({ ...subForm, email: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-
-                {/* Customer Source */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Customer Source *</label>
-                  <select
-                    value={subForm.customer_source}
-                    onChange={(e) => setSubForm({ ...subForm, customer_source: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                  >
-                    <option value="Website">Website</option>
-                    <option value="WhatsApp">WhatsApp</option>
-                    <option value="Facebook">Facebook</option>
-                    <option value="Manual">Manual</option>
-                  </select>
-                </div>
-
-                {/* Product / Service (Search a Product matching image) */}
-                <div className="relative">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    PRODUCT *
-                  </label>
-
-                  <div
-                    className="w-full text-xs bg-white border border-violet-500 rounded-lg px-3 py-2 text-slate-900 cursor-text flex items-center justify-between shadow-xs"
-                    onClick={() => setShowProductDropdown(true)}
-                  >
-                    <input
-                      type="text"
-                      className="bg-transparent border-none outline-none w-full text-slate-900 placeholder-slate-400 text-xs font-medium"
-                      placeholder="Search a Product..."
-                      value={showProductDropdown ? productSearchQuery : (subForm.product_name || '')}
-                      onChange={(e) => {
-                        setProductSearchQuery(e.target.value);
-                        setShowProductDropdown(true);
-                      }}
-                      onFocus={() => setShowProductDropdown(true)}
-                    />
-                    <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                  </div>
-
-                  {showProductDropdown && (
-                    <>
-                      <div className="fixed inset-0 z-30" onClick={() => setShowProductDropdown(false)}></div>
-                      <div className="absolute z-40 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                        {catalogProducts
-                          .filter(prod => (prod.name || '').toLowerCase().includes(productSearchQuery.toLowerCase()))
-                          .map((prod) => (
-                            <div
-                              key={prod.id}
-                              className={`px-3 py-2 text-xs cursor-pointer hover:bg-violet-50 transition-colors ${subForm.product_name === prod.name ? 'bg-violet-100 text-violet-700 font-bold' : 'text-slate-700'
-                                }`}
-                              onClick={() => {
-                                const currentProd = prod;
-                                let pkgs = [];
-                                try {
-                                  pkgs = Array.isArray(currentProd.packages)
-                                    ? currentProd.packages
-                                    : (typeof currentProd.packages === 'string' ? JSON.parse(currentProd.packages || '[]') : []);
-                                } catch (e) {
-                                  pkgs = [];
-                                }
-
-                                let newPackagePlan = 'Monthly';
-                                let newPrice = currentProd.price ? String(currentProd.price) : subForm.selling_price;
-                                let newValidity = subForm.validity_days;
-
-                                if (pkgs.length > 0) {
-                                  const firstPkg = pkgs[0];
-                                  newPackagePlan = firstPkg.duration
-                                    ? `${firstPkg.duration.trim()}${firstPkg.activation ? ` - ${firstPkg.activation.trim()}` : ''}`
-                                    : (firstPkg.name || 'Monthly');
-                                  if (firstPkg.price) {
-                                    newPrice = String(firstPkg.price);
-                                  }
-                                  const days = getDurationDays(firstPkg.duration);
-                                  if (days) newValidity = days;
-                                }
-
-                                setSubForm(prev => ({
-                                  ...prev,
-                                  product_name: currentProd.name,
-                                  package_plan: newPackagePlan,
-                                  selling_price: newPrice,
-                                  validity_days: newValidity
-                                }));
-                                setProductSearchQuery('');
-                                setShowProductDropdown(false);
-                              }}
-                            >
-                              {prod.name}
-                            </div>
-                          ))}
-                        {catalogProducts.filter(prod => (prod.name || '').toLowerCase().includes(productSearchQuery.toLowerCase())).length === 0 && (
-                          <div className="px-3 py-2 text-xs text-slate-500 text-center italic">No products found.</div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Package / Plan */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-slate-700">Package / Plan *</label>
-                    {selectedProductPackages.length > 0 && (
-                      <span className="text-[10px] text-emerald-700 font-semibold">
-                        {selectedProductPackages.length} package options
-                      </span>
-                    )}
-                  </div>
-                  <select
-                    value={subForm.package_plan}
-                    onChange={(e) => {
-                      const chosenVal = e.target.value;
-                      const matchedPkg = selectedProductPackages.find(pkg => {
-                        const pkgLabel = pkg.duration
-                          ? `${pkg.duration.trim()}${pkg.activation ? ` - ${pkg.activation.trim()}` : ''}`
-                          : (pkg.name || '');
-                        return pkgLabel === chosenVal || pkg.duration?.trim() === chosenVal;
-                      });
-
-                      let updatedPrice = subForm.selling_price;
-                      let updatedValidity = subForm.validity_days;
-                      if (matchedPkg) {
-                        if (matchedPkg.price) updatedPrice = String(matchedPkg.price);
-                        const days = getDurationDays(matchedPkg.duration);
-                        if (days) updatedValidity = days;
-                      }
-
-                      setSubForm(prev => ({
-                        ...prev,
-                        package_plan: chosenVal,
-                        selling_price: updatedPrice,
-                        validity_days: updatedValidity
-                      }));
-                    }}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                  >
-                    {selectedProductPackages.length > 0 ? (
-                      <>
-                        {selectedProductPackages.map((pkg, idx) => {
-                          const pkgLabel = pkg.duration
-                            ? `${pkg.duration.trim()}${pkg.activation ? ` - ${pkg.activation.trim()}` : ''}`
-                            : (pkg.name || `Package ${idx + 1}`);
-                          const displayPrice = pkg.price ? ` (৳${parseFloat(pkg.price).toFixed(0)})` : '';
-                          return (
-                            <option key={idx} value={pkgLabel} className="bg-white text-slate-900 py-1">
-                              {pkgLabel}{displayPrice}
-                            </option>
-                          );
-                        })}
-                      </>
-                    ) : (
-                      <>
-                        <option value="Monthly" className="bg-white text-slate-900">Monthly</option>
-                        <option value="3 Months" className="bg-white text-slate-900">3 Months</option>
-                        <option value="6 Months" className="bg-white text-slate-900">6 Months</option>
-                        <option value="Yearly" className="bg-white text-slate-900">Yearly</option>
-                        <option value="Lifetime" className="bg-white text-slate-900">Lifetime</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-
-                {/* Purchase Date */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Purchase Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={subForm.purchase_date}
-                    onChange={(e) => setSubForm({ ...subForm, purchase_date: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                {/* Validity */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Validity *</label>
-                  <select
-                    value={subForm.validity_days}
-                    onChange={(e) => setSubForm({ ...subForm, validity_days: parseInt(e.target.value, 10) || 30 })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                  >
-                    <option value={30}>1 Month (30 Days)</option>
-                    <option value={60}>2 Months (60 Days)</option>
-                    <option value={90}>3 Months (90 Days)</option>
-                    <option value={180}>6 Months (180 Days)</option>
-                    <option value={365}>1 Year (365 Days)</option>
-                    <option value={540}>18 Months (540 Days)</option>
-                    <option value={730}>2 Years (730 Days)</option>
-                    <option value={1095}>3 Years (1095 Days)</option>
-                    <option value={3650}>Lifetime</option>
-                    {![30, 60, 90, 180, 365, 540, 730, 1095, 3650].includes(parseInt(subForm.validity_days, 10)) && (
-                      <option value={subForm.validity_days}>{subForm.validity_days} Days</option>
-                    )}
-                  </select>
-                  <p className="text-[10px] text-slate-500 mt-1">Select or synced with package duration</p>
-                </div>
-
-                {/* Expiry Date (Auto calculated & editable) */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Expiry Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={subForm.expiry_date}
-                    onChange={(e) => setSubForm({ ...subForm, expiry_date: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
-                  <p className="text-[10px] text-emerald-600 font-semibold mt-1">Calculated automatically • Editable</p>
-                </div>
-
-                {/* Account Given */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Account Information / Given</label>
-                  <input
-                    type="text"
-                    placeholder="customer.account@example.com"
-                    value={subForm.account_given}
-                    onChange={(e) => setSubForm({ ...subForm, account_given: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                {/* Selling Price */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Selling Price (BDT) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={subForm.selling_price}
-                    onChange={(e) => setSubForm({ ...subForm, selling_price: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                {/* Payment Status */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Payment Status *</label>
-                  <select
-                    value={subForm.payment_status}
-                    onChange={(e) => setSubForm({ ...subForm, payment_status: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                  >
-                    <option value="Paid">Paid</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Failed">Failed</option>
-                  </select>
-                </div>
-
-                {/* Notes (Spans all 4 columns) */}
-                <div className="col-span-1 sm:col-span-2 md:col-span-4">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Notes</label>
-                  <textarea
-                    rows={2}
-                    placeholder="Add any additional notes..."
-                    value={subForm.notes}
-                    onChange={(e) => setSubForm({ ...subForm, notes: e.target.value })}
-                    className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4 sticky bottom-0 bg-white py-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={subFormSubmitting}
-                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-emerald-700/20 transition-all"
-                >
-                  {subFormSubmitting ? 'Saving...' : 'Save Customer'}
-                </button>
-              </div>
-
-            </form>
-
-          </div>
-        </div>
-      )}
 
       {/* MODAL 2: CUSTOMER PROFILE & RENEWAL DRAWER matching UI concept */}
       {showDetailModal && selectedSubDetail && (

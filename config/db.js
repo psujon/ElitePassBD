@@ -200,6 +200,14 @@ async function createTables() {
     );
   `;
 
+  const siteSettingsTable = `
+    CREATE TABLE IF NOT EXISTS site_settings (
+      setting_key VARCHAR(100) PRIMARY KEY,
+      setting_value LONGTEXT DEFAULT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+  `;
+
   await pool.query(usersTable);
   await pool.query(categoriesTable);
   await pool.query(productsTable);
@@ -211,7 +219,46 @@ async function createTables() {
   await pool.query(passwordResetsTable);
   await pool.query(productLicensesTable);
   await pool.query(slidesTable);
+  await pool.query(siteSettingsTable);
 
+  const defaultMarqueeItems = [
+    {
+      id: '1',
+      badge: 'বিশেষ অফার',
+      text: 'সব অর্ডারে ফ্রি ইনস্ট্যান্ট ডেলিভারি — ১০% পর্যন্ত ছাড় পান',
+      badgeColor: 'purple',
+      textColor: 'violet'
+    },
+    {
+      id: '2',
+      badge: '🛡️ 100% Genuine',
+      text: 'Genuine Digital License & Instant Email Delivery',
+      badgeColor: 'emerald',
+      textColor: 'emerald'
+    },
+    {
+      id: '3',
+      badge: '⭐ 50,000+',
+      text: 'Trusted by Happy Customers in Bangladesh',
+      badgeColor: 'amber',
+      textColor: 'amber'
+    }
+  ];
+
+  await pool.query(`
+    INSERT IGNORE INTO site_settings (setting_key, setting_value)
+    VALUES 
+      ('marquee_enabled', 'true'),
+      ('marquee_speed', '35'),
+      ('marquee_items', ?),
+      ('support_whatsapp', '8801925112444'),
+      ('support_email', 'info@elitepassbd.com'),
+      ('social_facebook', 'https://facebook.com/ElitePassBD'),
+      ('social_instagram', 'https://instagram.com/elitepassbd'),
+      ('social_youtube', 'https://youtube.com/elitepassbd'),
+      ('social_linkedin', 'https://linkedin.com/elitepassbd'),
+      ('social_messenger', 'https://m.me/elitepassbd')
+  `, [JSON.stringify(defaultMarqueeItems)]);
 
   console.log('Database tables verified/created successfully.');
 }
@@ -481,6 +528,31 @@ async function updateSchema() {
       await pool.query("ALTER TABLE reviews DROP INDEX unique_user_product");
     } catch (err) {
     }
+
+    // Performance indexes for subscriptions and product_licenses
+    try {
+      const [licIdx] = await pool.query("SHOW INDEX FROM product_licenses WHERE Key_name = 'idx_product_is_used'");
+      if (licIdx.length === 0) {
+        await pool.query("CREATE INDEX idx_product_is_used ON product_licenses (product_id, is_used)");
+        console.log("Created index 'idx_product_is_used' on 'product_licenses' table.");
+      }
+    } catch (e) {}
+
+    try {
+      const [subStatusIdx] = await pool.query("SHOW INDEX FROM subscriptions WHERE Key_name = 'idx_sub_status_expiry'");
+      if (subStatusIdx.length === 0) {
+        await pool.query("CREATE INDEX idx_sub_status_expiry ON subscriptions (status, expiry_date)");
+        console.log("Created index 'idx_sub_status_expiry' on 'subscriptions' table.");
+      }
+    } catch (e) {}
+
+    try {
+      const [subPhoneIdx] = await pool.query("SHOW INDEX FROM subscriptions WHERE Key_name = 'idx_sub_phone'");
+      if (subPhoneIdx.length === 0) {
+        await pool.query("CREATE INDEX idx_sub_phone ON subscriptions (whatsapp_number)");
+        console.log("Created index 'idx_sub_phone' on 'subscriptions' table.");
+      }
+    } catch (e) {}
   } catch (error) {
     console.error("Error updating database schema:", error.message);
   }

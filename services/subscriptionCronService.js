@@ -1,4 +1,9 @@
-const cron = require('node-cron');
+let cron;
+try {
+  cron = require('node-cron');
+} catch (err) {
+  console.warn('[SubscriptionCronService] node-cron module is not installed. Background subscription cron will be disabled until installed.');
+}
 const db = require('../config/db');
 const { sendEmail } = require('../utils/mailer');
 const { replaceTemplateTags, sendWhatsAppCloudApi } = require('./whatsappService');
@@ -186,6 +191,10 @@ const processSubscriptionReminders = async () => {
 };
 
 const initSubscriptionCron = () => {
+  if (!cron) {
+    console.warn('[SubscriptionCronService] Skipping cron initialization: node-cron is not installed.');
+    return;
+  }
   console.log('[SubscriptionCronService] Initializing subscription reminder cron scheduler (runs daily at 09:00 AM & on startup)...');
 
   // Run daily at 09:00 AM
