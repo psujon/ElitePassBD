@@ -198,9 +198,9 @@ export default function UserDashboard() {
   const currentStep = trackingOrder ? getStatusStep(trackingOrder.status) : 1;
 
   return (
-    <div className="w-full min-h-[calc(100vh-64px)] flex flex-col md:flex-row bg-[#f5f7fa] text-slate-800">
+    <div className="w-full max-w-full min-w-0 min-h-[calc(100vh-64px)] flex flex-col md:flex-row bg-[#f5f7fa] text-slate-800 overflow-x-hidden">
       
-      <div className="w-full md:w-64 bg-[#111e35] text-slate-300 p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-850">
+      <div className="w-full md:w-56 lg:w-64 bg-[#111e35] text-slate-300 p-3.5 sm:p-4 md:p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-850 min-w-0 max-w-full">
         <div className="hidden md:flex items-center space-x-2.5 px-2 mb-6 text-left">
           <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
             E
@@ -292,11 +292,11 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      <div className="flex-1 bg-[#f5f7fa] p-6 sm:p-8 overflow-y-auto space-y-6 min-w-0">
+      <div className="flex-1 bg-[#f5f7fa] p-3.5 sm:p-5 md:p-6 lg:p-8 min-w-0 w-full max-w-full overflow-x-hidden overflow-y-visible md:overflow-y-auto space-y-4 sm:space-y-6">
         
-        <div className="flex justify-between items-center border-b border-slate-200/60 pb-5 shrink-0">
+        <div className="flex justify-between items-center border-b border-slate-200/60 pb-4 sm:pb-5 shrink-0">
           <div className="text-left">
-            <h1 className="text-2xl font-extrabold text-slate-850 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-850 tracking-tight">
               {activeTab === 'orders' ? 'My Purchases' : 'Support Tickets'}
             </h1>
             <p className="hidden sm:block text-xs text-slate-500 mt-1">
@@ -317,7 +317,7 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
           <div className="bg-white border border-slate-150/70 p-5 rounded-2xl shadow-xs text-left relative overflow-hidden flex flex-col justify-between h-28 hover:shadow-sm transition-shadow">
             <div className="flex justify-between items-start">
               <div>
@@ -376,7 +376,7 @@ export default function UserDashboard() {
         </div>
 
         {activeTab === 'orders' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in text-left">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 animate-fade-in text-left">
             
             <div className="lg:col-span-1 space-y-4">
               <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700">Order History</h3>

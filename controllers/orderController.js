@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { sendPurchaseConfirmationEmail } = require('../services/purchaseEmailService');
+const { syncWebsiteOrderToSubscriptions } = require('../services/orderSubscriptionSyncService');
 
 exports.createOrder = async (req, res) => {
   const { items, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, coupon_code, discount_amount } = req.body;
@@ -347,83 +348,9 @@ exports.updateOrderStatus = async (req, res) => {
         [status, id]
       );
 
-      // Auto-create subscription entry for website order
+      // Auto-create / sync subscription entry for website order with exact package duration
       try {
-        const [ordDetails] = await connection.query(`
-          SELECT o.id, o.phone, o.delivery_email, u.name as user_name, u.email as user_email
-          FROM orders o
-          JOIN users u ON o.user_id = u.id
-          WHERE o.id = ?
-        `, [id]);
-
-        if (ordDetails.length > 0) {
-          const ord = ordDetails[0];
-          const customerName = ord.user_name || 'Website Customer';
-          const customerPhone = ord.phone || '';
-          const customerEmail = ord.delivery_email || ord.user_email || null;
-
-          const [orderItems] = await connection.query(`
-            SELECT oi.id, oi.product_id, oi.price, oi.package_name, oi.selected_device, oi.selected_activation, p.name as product_name
-            FROM order_items oi
-            JOIN products p ON oi.product_id = p.id
-            WHERE oi.order_id = ?
-          `, [id]);
-
-          for (const item of orderItems) {
-            // Check if subscription already created for this order item
-            const [existingSub] = await connection.query(`
-              SELECT id FROM subscriptions WHERE order_id = ? AND product_name = ?
-            `, [id, item.product_name]);
-
-            if (existingSub.length === 0) {
-              const pkgName = item.package_name || 'Standard Plan';
-              let validityDays = 30;
-              const lowerPkg = pkgName.toLowerCase();
-              if (lowerPkg.includes('year') || lowerPkg.includes('365')) {
-                validityDays = 365;
-              } else if (lowerPkg.includes('3 month') || lowerPkg.includes('90')) {
-                validityDays = 90;
-              } else if (lowerPkg.includes('6 month')) {
-                validityDays = 180;
-              } else if (lowerPkg.includes('7 day')) {
-                validityDays = 7;
-              }
-
-              const pDate = new Date();
-              const eDate = new Date(pDate);
-              eDate.setDate(eDate.getDate() + validityDays);
-
-              const formattedPDate = pDate.toISOString().slice(0, 10);
-              const formattedEDate = eDate.toISOString().slice(0, 10);
-
-              const [subRes] = await connection.query(`
-                INSERT INTO subscriptions (
-                  customer_name, whatsapp_number, email, product_name, package_plan,
-                  customer_source, purchase_date, validity_days, expiry_date, account_given,
-                  selling_price, payment_status, status, order_id
-                ) VALUES (?, ?, ?, ?, ?, 'Website', ?, ?, ?, ?, ?, 'Paid', 'Active', ?)
-              `, [
-                customerName,
-                customerPhone,
-                customerEmail,
-                item.product_name,
-                pkgName,
-                formattedPDate,
-                validityDays,
-                formattedEDate,
-                item.selected_activation || item.selected_device || null,
-                parseFloat(item.price) || 0,
-                id
-              ]);
-
-              const subId = subRes.insertId;
-              await connection.query(`
-                INSERT INTO subscription_renewals (subscription_id, start_date, end_date, validity_days, amount, status, notes)
-                VALUES (?, ?, ?, ?, ?, 'Current', 'Website order auto-entry')
-              `, [subId, formattedPDate, formattedEDate, validityDays, parseFloat(item.price) || 0]);
-            }
-          }
-        }
+        await syncWebsiteOrderToSubscriptions(id, connection);
       } catch (subErr) {
         console.error('Auto subscription creation hook error:', subErr.message);
       }
@@ -442,6 +369,41 @@ exports.updateOrderStatus = async (req, res) => {
     res.status(400).json({ message: error.message || 'Failed to update order status.' });
   } finally {
     connection.release();
+  }
+};
+
+exports.updateOrderPayment = async (req, res) => {
+  const { id } = req.params;
+  const { payment_method, payment_status, transaction_id } = req.body;
+
+  try {
+    const fields = [];
+    const values = [];
+
+    if (payment_method !== undefined) {
+      fields.push('payment_method = ?');
+      values.push(payment_method);
+    }
+    if (payment_status !== undefined) {
+      fields.push('payment_status = ?');
+      values.push(payment_status);
+    }
+    if (transaction_id !== undefined) {
+      fields.push('transaction_id = ?');
+      values.push(transaction_id || null);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ message: 'No payment fields to update.' });
+    }
+
+    values.push(id);
+    await db.query(`UPDATE orders SET ${fields.join(', ')} WHERE id = ?`, values);
+
+    res.json({ message: `Order #${id} payment details updated successfully!` });
+  } catch (error) {
+    console.error('Update order payment error:', error);
+    res.status(500).json({ message: error.message || 'Failed to update order payment.' });
   }
 };
 

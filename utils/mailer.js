@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 
-const sendEmail = async ({ to, subject, text, html }) => {
+const sendEmailDetailed = async ({ to, subject, text, html, attachments }) => {
   try {
     const smtpHost = process.env.SMTP_HOST;
     const smtpPort = process.env.SMTP_PORT || 587;
@@ -21,24 +21,37 @@ const sendEmail = async ({ to, subject, text, html }) => {
         }
       });
 
-      await transporter.sendMail({
+      const mailOptions = {
         from: `"${process.env.APP_NAME || 'ElitePassBD'}" <${smtpUser}>`,
         to,
         subject,
         text,
         html
-      });
-      return true;
+      };
+
+      if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+        mailOptions.attachments = attachments;
+      }
+
+      const info = await transporter.sendMail(mailOptions);
+      return { success: true, messageId: info.messageId };
     } else {
       console.warn(`[Mailer] SMTP credentials not configured in .env. Skipping email to ${to}`);
-      return false;
+      return { success: false, error: 'SMTP credentials not configured in .env' };
     }
   } catch (err) {
     console.error(`[Mailer Error] Failed to send email to ${to}:`, err.message);
-    return false;
+    return { success: false, error: err.message };
   }
 };
 
+// Standard sendEmail returning boolean (true / false) for 100% backward compatibility
+const sendEmail = async (options) => {
+  const result = await sendEmailDetailed(options);
+  return !!(result && result.success);
+};
+
 module.exports = {
-  sendEmail
+  sendEmail,
+  sendEmailDetailed
 };

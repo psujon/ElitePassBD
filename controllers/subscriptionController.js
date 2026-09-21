@@ -34,43 +34,48 @@ exports.getAllSubscriptions = async (req, res) => {
 
     const { search, product, status, source, expiryFilter } = req.query;
 
-    let query = `SELECT * FROM subscriptions WHERE 1=1`;
+    let query = `
+      SELECT s.*, o.created_at AS order_created_at
+      FROM subscriptions s
+      LEFT JOIN orders o ON s.order_id = o.id
+      WHERE 1=1
+    `;
     const params = [];
 
     if (search && search.trim()) {
       const searchTerm = `%${search.trim()}%`;
-      query += ` AND (customer_name LIKE ? OR whatsapp_number LIKE ? OR email LIKE ? OR product_name LIKE ?)`;
+      query += ` AND (s.customer_name LIKE ? OR s.whatsapp_number LIKE ? OR s.email LIKE ? OR s.product_name LIKE ?)`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     if (product && product.trim() && product !== 'All Products') {
-      query += ` AND product_name = ?`;
+      query += ` AND s.product_name = ?`;
       params.push(product.trim());
     }
 
     if (status && status.trim() && status !== 'All Status') {
-      query += ` AND status = ?`;
+      query += ` AND s.status = ?`;
       params.push(status.trim());
     }
 
     if (source && source.trim() && source !== 'All Sources') {
-      query += ` AND customer_source = ?`;
+      query += ` AND s.customer_source = ?`;
       params.push(source.trim());
     }
 
     if (expiryFilter) {
       if (expiryFilter === 'today') {
-        query += ` AND expiry_date = CURDATE()`;
+        query += ` AND s.expiry_date = CURDATE()`;
       } else if (expiryFilter === '3days') {
-        query += ` AND expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY)`;
+        query += ` AND s.expiry_date >= CURDATE() AND s.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY)`;
       } else if (expiryFilter === '7days') {
-        query += ` AND expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)`;
+        query += ` AND s.expiry_date >= CURDATE() AND s.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)`;
       } else if (expiryFilter === 'expired') {
-        query += ` AND (expiry_date < CURDATE() OR status = 'Expired')`;
+        query += ` AND (s.expiry_date < CURDATE() OR s.status = 'Expired')`;
       }
     }
 
-    query += ` ORDER BY expiry_date ASC, id DESC`;
+    query += ` ORDER BY s.id DESC`;
 
     const [rows] = await pool.query(query, params);
 
@@ -111,15 +116,43 @@ exports.getSubscriptionById = async (req, res) => {
   const { id } = req.params;
   try {
     const pool = db.getPool();
-    const [subs] = await pool.query('SELECT * FROM subscriptions WHERE id = ?', [id]);
-    if (subs.length === 0) {
+
+    let subs = [];
+    try {
+      const [resSubs] = await pool.query(`
+        SELECT s.*, o.created_at AS order_created_at
+        FROM subscriptions s
+        LEFT JOIN orders o ON s.order_id = o.id
+        WHERE s.id = ?
+      `, [id]);
+      subs = resSubs;
+    } catch (joinErr) {
+      console.warn('Subscription join query fallback:', joinErr.message);
+      const [resSubs] = await pool.query('SELECT * FROM subscriptions WHERE id = ?', [id]);
+      subs = resSubs;
+    }
+
+    if (!subs || subs.length === 0) {
       return res.status(404).json({ message: 'Subscription not found.' });
     }
 
     const sub = subs[0];
 
-    const [renewals] = await pool.query('SELECT * FROM subscription_renewals WHERE subscription_id = ? ORDER BY id DESC', [id]);
-    const [reminders] = await pool.query('SELECT * FROM subscription_reminders WHERE subscription_id = ? ORDER BY id DESC', [id]);
+    let renewals = [];
+    try {
+      const [r] = await pool.query('SELECT * FROM subscription_renewals WHERE subscription_id = ? ORDER BY id DESC', [id]);
+      renewals = r || [];
+    } catch (renErr) {
+      console.warn('Renewals table query skipped:', renErr.message);
+    }
+
+    let reminders = [];
+    try {
+      const [rem] = await pool.query('SELECT * FROM subscription_reminders WHERE subscription_id = ? ORDER BY id DESC', [id]);
+      reminders = rem || [];
+    } catch (remErr) {
+      console.warn('Reminders table query skipped:', remErr.message);
+    }
 
     res.json({
       ...sub,
@@ -128,7 +161,7 @@ exports.getSubscriptionById = async (req, res) => {
     });
   } catch (err) {
     console.error('Get subscription detail error:', err);
-    res.status(500).json({ message: 'Error fetching subscription details.' });
+    res.status(500).json({ message: 'Error fetching subscription details: ' + (err.message || '') });
   }
 };
 
@@ -243,6 +276,148 @@ const sendSubscriptionLicenseEmail = async ({
   `;
 
   const text = `Hello ${customerName},\n\nYour subscription for ${productName} (${packagePlan}) has been activated.\n\nLicense Key / Credentials: ${licenseKey}\nExpiry Date: ${expiryDate}\n${rules ? `\nRules: ${rules}\n` : ''}\nThank you,\n${appName}`;
+
+  return await sendEmail({
+    to: email.trim(),
+    subject,
+    text,
+    html
+  });
+};
+
+/**
+ * Send dedicated Subscription Renewal Confirmation Email to the customer
+ */
+const sendSubscriptionRenewalEmail = async ({
+  email,
+  customerName,
+  productName,
+  packagePlan,
+  licenseKey,
+  rules,
+  renewalDate,
+  validityDays,
+  expiryDate,
+  amount,
+  orderId,
+  subscriptionId
+}) => {
+  if (!email || !email.trim()) return false;
+
+  const appName = process.env.APP_NAME || 'ElitePassBD';
+  const subject = `Subscription Renewed Successfully - ${productName} - ${appName}`;
+
+  const formattedDate = renewalDate
+    ? new Date(renewalDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const formattedExpiry = expiryDate
+    ? new Date(expiryDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : expiryDate;
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Subscription Renewed - ${appName}</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #e2e8f0;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); border: 1px solid #334155;">
+        
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; padding: 28px 24px; text-align: center;">
+          <div style="display: inline-block; background-color: rgba(255, 255, 255, 0.2); padding: 6px 14px; border-radius: 9999px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;">
+            Renewal Successful 🎉
+          </div>
+          <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">
+            Subscription Renewed!
+          </h1>
+          <p style="margin: 6px 0 0 0; font-size: 14px; color: #d1fae5; font-weight: 500;">
+            ${productName} • ${packagePlan}
+          </p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 26px 24px;">
+          <p style="font-size: 15px; color: #ffffff; margin-top: 0; font-weight: 600;">
+            Hello ${customerName || 'Valued Customer'},
+          </p>
+          <p style="font-size: 13px; color: #cbd5e1; line-height: 1.6; margin-bottom: 20px;">
+            Your subscription with <strong>${appName}</strong> has been successfully renewed. Your service access and account credentials are confirmed below:
+          </p>
+
+          ${licenseKey ? `
+          <!-- License Key Box -->
+          <div style="margin: 20px 0; background-color: #0f172a; border: 2px dashed #10b981; border-radius: 12px; padding: 18px; text-align: center;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #34d399; font-weight: 700; letter-spacing: 0.8px; margin-bottom: 8px;">
+              Digital License Key / Account Credentials
+            </div>
+            <div style="font-family: Consolas, 'Courier New', monospace; font-size: 15px; font-weight: 700; color: #ffffff; word-break: break-all; background-color: #1e293b; padding: 10px 16px; border-radius: 8px; display: inline-block; border: 1px solid #334155;">
+              ${licenseKey}
+            </div>
+          </div>` : ''}
+
+          <!-- Details Table -->
+          <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+            <table style="width: 100%; font-size: 13px; color: #cbd5e1; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8; width: 42%;">Product:</td>
+                <td style="padding: 6px 0; font-weight: 600; color: #ffffff;">${productName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Package / Plan:</td>
+                <td style="padding: 6px 0; font-weight: 600; color: #ffffff;">${packagePlan}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Renewal Date:</td>
+                <td style="padding: 6px 0; color: #ffffff;">${formattedDate}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Validity:</td>
+                <td style="padding: 6px 0; color: #ffffff;">${validityDays} Days</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">New Expiry Date:</td>
+                <td style="padding: 6px 0; font-weight: 700; color: #34d399;">${formattedExpiry}</td>
+              </tr>
+              ${amount ? `
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Payment Amount:</td>
+                <td style="padding: 6px 0; font-weight: 700; color: #ffffff;">৳${amount} BDT</td>
+              </tr>` : ''}
+              ${orderId ? `
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Order Ref:</td>
+                <td style="padding: 6px 0; color: #ffffff;">#${orderId}</td>
+              </tr>` : ''}
+              ${subscriptionId ? `
+              <tr>
+                <td style="padding: 6px 0; color: #94a3b8;">Subscription Ref:</td>
+                <td style="padding: 6px 0; color: #94a3b8;">#${subscriptionId}</td>
+              </tr>` : ''}
+            </table>
+          </div>
+
+          ${rules ? `
+          <div style="background-color: #1e1b4b; border: 1px solid #4338ca; border-radius: 10px; padding: 14px; margin-bottom: 20px; font-size: 12px; color: #c7d2fe;">
+            <div style="font-weight: 700; color: #a5b4fc; margin-bottom: 4px;">Activation Rules & Guidelines:</div>
+            <div style="line-height: 1.5;">${rules}</div>
+          </div>` : ''}
+
+          <div style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 24px; line-height: 1.5;">
+            Thank you for continuing with <strong style="color: #ffffff;">${appName}</strong>. If you require any assistance, please reach out to our team.
+          </div>
+
+        </div>
+
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `Hello ${customerName || 'Valued Customer'},\n\nYour subscription for ${productName} (${packagePlan}) has been renewed.\n\nRenewal Date: ${formattedDate}\nValidity: ${validityDays} Days\nNew Expiry Date: ${formattedExpiry}\n${licenseKey ? `License Key / Credentials: ${licenseKey}\n` : ''}${rules ? `Rules: ${rules}\n` : ''}\nThank you,\n${appName}`;
 
   return await sendEmail({
     to: email.trim(),
@@ -504,7 +679,8 @@ exports.updateSubscription = async (req, res) => {
     selling_price,
     payment_status,
     status,
-    notes
+    notes,
+    order_id
   } = req.body;
 
   try {
@@ -532,6 +708,7 @@ exports.updateSubscription = async (req, res) => {
         selling_price = COALESCE(?, selling_price),
         payment_status = COALESCE(?, payment_status),
         status = COALESCE(?, status),
+        order_id = COALESCE(?, order_id),
         notes = ?
       WHERE id = ?
     `, [
@@ -548,6 +725,7 @@ exports.updateSubscription = async (req, res) => {
       selling_price !== undefined ? parseFloat(selling_price) : undefined,
       payment_status,
       status,
+      order_id !== undefined ? (order_id ? parseInt(order_id, 10) : null) : undefined,
       notes !== undefined ? notes : null,
       id
     ]);
@@ -561,7 +739,18 @@ exports.updateSubscription = async (req, res) => {
 
 exports.renewSubscription = async (req, res) => {
   const { id } = req.params;
-  const { renewal_date, validity_days, new_expiry_date, payment_amount, notes, package_plan } = req.body;
+  const {
+    renewal_date,
+    validity_days,
+    new_expiry_date,
+    payment_amount,
+    notes,
+    package_plan,
+    license_id,
+    account_given,
+    license_rules,
+    customer_email
+  } = req.body;
 
   const pool = db.getPool();
   const connection = await pool.getConnection();
@@ -576,12 +765,17 @@ exports.renewSubscription = async (req, res) => {
     }
 
     const sub = subCheck[0];
-    const rDate = renewal_date ? new Date(renewal_date) : new Date();
-    const vDays = parseInt(validity_days) || 30;
+    let rDate = renewal_date ? new Date(renewal_date) : new Date();
+    if (isNaN(rDate.getTime())) rDate = new Date();
+    const vDays = parseInt(validity_days, 10) || 30;
 
     let eDate;
     if (new_expiry_date) {
       eDate = new Date(new_expiry_date);
+      if (isNaN(eDate.getTime())) {
+        eDate = new Date(rDate);
+        eDate.setDate(eDate.getDate() + vDays);
+      }
     } else {
       eDate = new Date(rDate);
       eDate.setDate(eDate.getDate() + vDays);
@@ -589,23 +783,54 @@ exports.renewSubscription = async (req, res) => {
 
     const formattedRDate = rDate.toISOString().slice(0, 10);
     const formattedEDate = eDate.toISOString().slice(0, 10);
-    const amount = payment_amount !== undefined ? parseFloat(payment_amount) : parseFloat(sub.selling_price);
+    const amount = payment_amount !== undefined && payment_amount !== ''
+      ? parseFloat(payment_amount)
+      : parseFloat(sub.selling_price || 0);
 
-    // Mark previous renewals as 'Previous'
-    await connection.query('UPDATE subscription_renewals SET status = "Previous" WHERE subscription_id = ?', [id]);
+    let finalAccountGiven = (account_given !== undefined && account_given !== null && account_given.trim() !== '')
+      ? account_given.trim()
+      : (sub.account_given || '');
+    let finalRules = license_rules || '';
 
-    // Insert new renewal history entry
-    await connection.query(`
-      INSERT INTO subscription_renewals (subscription_id, start_date, end_date, validity_days, amount, status, notes)
-      VALUES (?, ?, ?, ?, ?, 'Current', ?)
-    `, [
-      id,
-      formattedRDate,
-      formattedEDate,
-      vDays,
-      amount,
-      notes || 'Subscription renewed'
-    ]);
+    // If a pre-loaded license from stock was chosen, mark it as used and get its details
+    if (license_id) {
+      const [licRows] = await connection.query(
+        'SELECT id, license_key, rules FROM product_licenses WHERE id = ? AND is_used = 0 FOR UPDATE',
+        [license_id]
+      );
+      if (licRows.length > 0) {
+        finalAccountGiven = licRows[0].license_key;
+        if (licRows[0].rules) {
+          finalRules = licRows[0].rules;
+        }
+        await connection.query(
+          'UPDATE product_licenses SET is_used = 1, used_at = NOW() WHERE id = ?',
+          [license_id]
+        );
+      }
+    }
+
+    const targetEmail = (customer_email !== undefined && customer_email !== null && customer_email.trim() !== '')
+      ? customer_email.trim()
+      : (sub.email || '').trim();
+
+    // Try logging into subscription_renewals if table exists
+    try {
+      await connection.query('UPDATE subscription_renewals SET status = "Previous" WHERE subscription_id = ?', [id]);
+      await connection.query(`
+        INSERT INTO subscription_renewals (subscription_id, start_date, end_date, validity_days, amount, status, notes)
+        VALUES (?, ?, ?, ?, ?, 'Current', ?)
+      `, [
+        id,
+        formattedRDate,
+        formattedEDate,
+        vDays,
+        amount,
+        notes || 'Subscription renewed'
+      ]);
+    } catch (renErr) {
+      console.warn('Skipping subscription_renewals log:', renErr.message);
+    }
 
     // Update main subscription record
     await connection.query(`
@@ -615,6 +840,8 @@ exports.renewSubscription = async (req, res) => {
         expiry_date = ?,
         selling_price = ?,
         package_plan = COALESCE(?, package_plan),
+        account_given = ?,
+        email = COALESCE(?, email),
         payment_status = 'Paid',
         status = 'Renewed',
         updated_at = NOW()
@@ -625,12 +852,48 @@ exports.renewSubscription = async (req, res) => {
       formattedEDate,
       amount,
       package_plan || null,
+      finalAccountGiven || null,
+      targetEmail || null,
       id
     ]);
 
     await connection.commit();
 
-    res.json({ message: `Subscription for ${sub.customer_name} renewed successfully until ${formattedEDate}!` });
+    // Send renewal confirmation email if customer email exists
+    let emailDispatched = false;
+    if (targetEmail) {
+      sendSubscriptionRenewalEmail({
+        email: targetEmail,
+        customerName: sub.customer_name,
+        productName: sub.product_name,
+        packagePlan: package_plan || sub.package_plan,
+        licenseKey: finalAccountGiven,
+        rules: finalRules,
+        renewalDate: formattedRDate,
+        validityDays: vDays,
+        expiryDate: formattedEDate,
+        amount: amount,
+        orderId: sub.order_id,
+        subscriptionId: id
+      }).then(sent => {
+        console.log(`[Subscription Renewal] Confirmation email sent to ${targetEmail}:`, sent);
+      }).catch(mailErr => {
+        console.error('[Subscription Renewal] Failed to send renewal confirmation email:', mailErr.message);
+      });
+      emailDispatched = true;
+    }
+
+    let responseMessage = `Subscription for ${sub.customer_name} renewed successfully until ${formattedEDate}!`;
+    if (emailDispatched) {
+      responseMessage += ` Renewal confirmation email sent to ${targetEmail}.`;
+    }
+
+    res.json({
+      message: responseMessage,
+      emailSent: emailDispatched,
+      email: targetEmail,
+      newExpiryDate: formattedEDate
+    });
   } catch (err) {
     await connection.rollback();
     console.error('Renew subscription error:', err);

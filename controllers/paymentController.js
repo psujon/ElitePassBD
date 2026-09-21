@@ -2,6 +2,7 @@ const { EPS } = require('eps-gateway-nodejs');
 const db = require('../config/db');
 const { sendEmail } = require('../utils/mailer');
 const { sendPurchaseConfirmationEmail } = require('../services/purchaseEmailService');
+const { syncWebsiteOrderToSubscriptions } = require('../services/orderSubscriptionSyncService');
 
 const getEpsInstance = () => {
   const config = {
@@ -308,6 +309,13 @@ const fulfillOrder = async (merchantTransactionId) => {
     if (allAutomaticFulfilled && items.length > 0) {
       await connection.query('UPDATE orders SET status = "Delivered", completed_at = IFNULL(completed_at, NOW()) WHERE id = ?', [order.id]);
       activationType = 'automatic';
+
+      // Auto-create subscription entry with exact package duration for automatic delivered order
+      try {
+        await syncWebsiteOrderToSubscriptions(order.id, connection);
+      } catch (syncErr) {
+        console.error('[PaymentController] Subscription auto-sync error:', syncErr.message);
+      }
     } else {
       activationType = 'manual';
     }

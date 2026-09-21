@@ -80,6 +80,11 @@ export default function Footer() {
     setIsChatOpen(false);
   };
 
+  const isDashboard = location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/admin');
+  if (isDashboard) {
+    return null;
+  }
+
   return (
     <footer className="bg-white border-t border-slate-200 px-4 sm:px-6 mt-auto text-slate-800 text-left relative z-30">
       <div className="w-full max-w-[95%] mx-auto">

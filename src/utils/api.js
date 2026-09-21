@@ -1,5 +1,21 @@
-//export const API_BASE_URL = 'http://localhost:5000/api';
-export const API_BASE_URL = 'https://api.elitepassbd.com/api';
+const getApiBaseUrl = () => {
+  if (typeof window === 'undefined') return 'http://localhost:5000/api';
+  const { hostname, port } = window.location;
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    hostname.endsWith('.local') ||
+    port === '5173' ||
+    port === '5174'
+  ) {
+    return `http://${hostname || 'localhost'}:5000/api`;
+  }
+  return 'https://api.elitepassbd.com/api';
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 const apiRequest = async (endpoint, options = {}) => {
   const token = localStorage.getItem('token');

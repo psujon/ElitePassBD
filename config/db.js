@@ -208,6 +208,83 @@ async function createTables() {
     );
   `;
 
+  const couponsTable = `
+    CREATE TABLE IF NOT EXISTS coupons (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      code VARCHAR(50) NOT NULL UNIQUE,
+      discount_type ENUM('percentage', 'fixed') NOT NULL DEFAULT 'percentage',
+      discount_value DECIMAL(10, 2) NOT NULL,
+      min_order_amount DECIMAL(10, 2) DEFAULT 0,
+      max_discount_amount DECIMAL(10, 2) DEFAULT NULL,
+      usage_limit INT DEFAULT NULL,
+      used_count INT DEFAULT 0,
+      is_active TINYINT DEFAULT 1,
+      expires_at DATETIME DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
+  const subscriptionsTable = `
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      customer_name VARCHAR(255) NOT NULL,
+      whatsapp_number VARCHAR(30) NOT NULL,
+      email VARCHAR(255) DEFAULT NULL,
+      product_name VARCHAR(255) NOT NULL,
+      package_plan VARCHAR(255) NOT NULL,
+      customer_source ENUM('Website', 'WhatsApp', 'Facebook', 'Manual') DEFAULT 'Manual',
+      purchase_date DATE NOT NULL,
+      validity_days INT NOT NULL,
+      expiry_date DATE NOT NULL,
+      account_given TEXT DEFAULT NULL,
+      selling_price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+      payment_status ENUM('Paid', 'Pending', 'Failed') DEFAULT 'Paid',
+      status ENUM('Active', 'Expiring Soon', 'Expired', 'Renewed', 'Cancelled') DEFAULT 'Active',
+      notes TEXT DEFAULT NULL,
+      order_id INT DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
+    );
+  `;
+
+  const subscriptionRenewalsTable = `
+    CREATE TABLE IF NOT EXISTS subscription_renewals (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      subscription_id INT NOT NULL,
+      start_date DATE NOT NULL,
+      end_date DATE NOT NULL,
+      validity_days INT NOT NULL,
+      amount DECIMAL(10, 2) NOT NULL,
+      status ENUM('Current', 'Previous') DEFAULT 'Current',
+      notes TEXT DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+    );
+  `;
+
+  const subscriptionRemindersTable = `
+    CREATE TABLE IF NOT EXISTS subscription_reminders (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      subscription_id INT NOT NULL,
+      reminder_type ENUM('3_DAYS_BEFORE', '1_DAY_BEFORE', 'EXPIRY_DAY') NOT NULL,
+      channel ENUM('WhatsApp', 'Email', 'AdminAlert') NOT NULL,
+      recipient VARCHAR(255) NOT NULL,
+      status ENUM('Sent', 'Failed') DEFAULT 'Sent',
+      failure_reason TEXT DEFAULT NULL,
+      scheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      sent_at TIMESTAMP NULL DEFAULT NULL,
+      FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+    );
+  `;
+
+  const subscriptionSettingsTable = `
+    CREATE TABLE IF NOT EXISTS subscription_settings (
+      setting_key VARCHAR(100) PRIMARY KEY,
+      setting_value LONGTEXT DEFAULT NULL
+    );
+  `;
+
   await pool.query(usersTable);
   await pool.query(categoriesTable);
   await pool.query(productsTable);
@@ -220,6 +297,11 @@ async function createTables() {
   await pool.query(productLicensesTable);
   await pool.query(slidesTable);
   await pool.query(siteSettingsTable);
+  await pool.query(couponsTable);
+  await pool.query(subscriptionsTable);
+  await pool.query(subscriptionRenewalsTable);
+  await pool.query(subscriptionRemindersTable);
+  await pool.query(subscriptionSettingsTable);
 
   const defaultMarqueeItems = [
     {
@@ -259,6 +341,26 @@ async function createTables() {
       ('social_linkedin', 'https://linkedin.com/elitepassbd'),
       ('social_messenger', 'https://m.me/elitepassbd')
   `, [JSON.stringify(defaultMarqueeItems)]);
+
+  await pool.query(`
+    INSERT IGNORE INTO subscription_settings (setting_key, setting_value)
+    VALUES 
+      ('reminder_3_days_before', 'true'),
+      ('reminder_1_day_before', 'true'),
+      ('reminder_expiry_day', 'true'),
+      ('channel_whatsapp_enabled', 'true'),
+      ('channel_email_enabled', 'true'),
+      ('whatsapp_cloud_api_token', ''),
+      ('whatsapp_phone_number_id', ''),
+      ('whatsapp_template', 'Hello {customer_name}, your {product_name} subscription expires on {expiry_date}. Please complete renewal payment to continue. Thank you, ElitePassBD.'),
+      ('email_subject_template', 'Your {product_name} Subscription is Expiring'),
+      ('email_body_template', 'Hello {customer_name},\\n\\nYour {product_name} subscription ({package_plan}) is set to expire on {expiry_date}.\\n\\nTo keep your access uninterrupted, please complete your renewal payment.\\n\\nThank you,\\nElitePassBD'),
+      ('admin_alert_dashboard', 'true'),
+      ('admin_alert_email', 'true'),
+      ('admin_alert_whatsapp', 'true'),
+      ('admin_email', 'admin@elitepassbd.com'),
+      ('admin_whatsapp', '')
+  `);
 
   console.log('Database tables verified/created successfully.');
 }

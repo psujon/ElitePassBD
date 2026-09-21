@@ -4,19 +4,19 @@ require('dotenv').config();
 
 const app = express();
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "https://elitepassbd.com",
-  "https://www.elitepassbd.com",
-];
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  // Allow all localhost and 127.0.0.1 ports (5173, 5174, 5000, 3000, etc.)
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  // Allow local LAN IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+  if (/^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin)) return true;
+  // Allow elitepassbd.com and all subdomains
+  if (/^https?:\/\/([a-z0-9-]+\.)*elitepassbd\.com(:\d+)?$/.test(origin)) return true;
+  return true; // Graceful fallback for web clients
+};
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      return callback(new Error('CORS Policy Blocked'), false);
-    }
     return callback(null, true);
   },
   credentials: true,
@@ -32,8 +32,10 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
+  if (origin && isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (!res.getHeader('Access-Control-Allow-Origin')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -66,6 +68,7 @@ const pixelRoutes = require('./routes/pixelRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const backupRoutes = require('./routes/backupRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -78,64 +81,7 @@ app.use('/api/pixel', pixelRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/settings', settingsRoutes);
-
-const { authenticateToken, authorizeAdmin } = require('./middleware/auth');
-const db = require('./config/db');
-
-app.get('/api/admin/backup', authenticateToken, authorizeAdmin, async (req, res, next) => {
-  try {
-    const pool = db.getPool();
-    const [tables] = await pool.query('SHOW TABLES');
-    const dbName = process.env.DB_NAME;
-    const keyName = `Tables_in_${dbName}`;
-
-    let sqlDump = `-- ElitePassBD Database Backup\n`;
-    sqlDump += `-- Date: ${new Date().toISOString()}\n\n`;
-    sqlDump += `SET FOREIGN_KEY_CHECKS=0;\n\n`;
-
-    for (const tableRow of tables) {
-      const tableName = tableRow[keyName] || Object.values(tableRow)[0];
-
-      const [createTableResult] = await pool.query(`SHOW CREATE TABLE \`${tableName}\``);
-      const createTableSql = createTableResult[0]['Create Table'];
-
-      sqlDump += `-- Table structure for table \`${tableName}\`\n`;
-      sqlDump += `DROP TABLE IF EXISTS \`${tableName}\`;\n`;
-      sqlDump += `${createTableSql};\n\n`;
-
-      const [rows] = await pool.query(`SELECT * FROM \`${tableName}\``);
-      if (rows.length > 0) {
-        sqlDump += `-- Dumping data for table \`${tableName}\`\n`;
-        for (const row of rows) {
-          const columns = Object.keys(row).map(c => `\`${c}\``).join(', ');
-          const values = Object.values(row).map(val => {
-            if (val === null) return 'NULL';
-            if (typeof val === 'number') return val;
-            if (val instanceof Date) {
-              const formattedDate = val.toISOString().slice(0, 19).replace('T', ' ');
-              return `'${formattedDate}'`;
-            }
-            if (typeof val === 'object') return `'${JSON.stringify(val).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-
-            const escaped = val.toString().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            return `'${escaped}'`;
-          }).join(', ');
-
-          sqlDump += `INSERT INTO \`${tableName}\` (${columns}) VALUES (${values});\n`;
-        }
-        sqlDump += `\n`;
-      }
-    }
-
-    sqlDump += `SET FOREIGN_KEY_CHECKS=1;\n`;
-
-    res.setHeader('Content-Type', 'application/sql');
-    res.setHeader('Content-Disposition', `attachment; filename=backup-${dbName}-${new Date().toISOString().slice(0, 10)}.sql`);
-    res.send(sqlDump);
-  } catch (error) {
-    next(error);
-  }
-});
+app.use('/api/admin/backup', backupRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'E-commerce API is running.' });
@@ -161,10 +107,12 @@ app.use((err, req, res, next) => {
 
 const { initReviewEmailCron } = require('./services/reviewEmailService');
 const { initSubscriptionCron } = require('./services/subscriptionCronService');
+const { initDatabaseBackupCron } = require('./services/databaseBackupService');
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   initReviewEmailCron();
   initSubscriptionCron();
+  initDatabaseBackupCron();
 });

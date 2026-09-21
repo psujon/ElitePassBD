@@ -25,6 +25,14 @@ const formatDateStr = (dateVal) => {
 
 const processSubscriptionStatuses = async (pool) => {
   try {
+    // 0. Auto-repair any website subscriptions saved with 1-month fallback
+    try {
+      const { repairAllWebsiteSubscriptions } = require('./orderSubscriptionSyncService');
+      await repairAllWebsiteSubscriptions(pool);
+    } catch (repairErr) {
+      console.warn('[SubscriptionCronService] Repair warning:', repairErr.message);
+    }
+
     // 1. Mark past expiries as 'Expired' (unless already Cancelled or Renewed)
     await pool.query(`
       UPDATE subscriptions

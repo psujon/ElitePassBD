@@ -63,11 +63,13 @@ function AppContent() {
     }
   }, [pathname, hash]);
 
+  const isDashboard = pathname.startsWith('/dashboard') || pathname.startsWith('/admin');
+
   return (
-    <div className="flex flex-col min-h-screen w-full pb-16 md:pb-0">
+    <div className={`flex flex-col min-h-screen w-full max-w-full overflow-x-hidden ${isDashboard ? 'pb-0' : 'pb-16 md:pb-0'}`}>
       <Navbar onCartClick={() => setIsCartOpen(true)} />
 
-      <main className="flex-grow w-full max-w-full sm:max-w-[95%] mx-auto px-1 sm:px-4">
+      <main className={`flex-grow w-full min-w-0 overflow-x-hidden ${isDashboard ? 'max-w-full px-0' : 'max-w-full sm:max-w-[95%] mx-auto px-1 sm:px-4'}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -100,9 +102,9 @@ function AppContent() {
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
 
-      <Footer />
+      {!isDashboard && <Footer />}
 
-      <MobileBottomNav onCartClick={() => setIsCartOpen(true)} />
+      {!isDashboard && <MobileBottomNav onCartClick={() => setIsCartOpen(true)} />}
     </div>
   );
 }

@@ -230,10 +230,12 @@ export default function Navbar({ onCartClick }) {
   };
 
   const isActive = (path) => location.pathname === path;
+  const isDashboard = location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/admin');
 
   return (
     <header className="w-full sticky top-0 z-50 text-left">
-      <div className="hidden sm:block bg-slate-50/95 border-b border-slate-200/60 py-1.5 text-[11px] font-semibold text-slate-600 select-none">
+      {!isDashboard && (
+        <div className="hidden sm:block bg-slate-50/95 border-b border-slate-200/60 py-1.5 text-[11px] font-semibold text-slate-600 select-none">
         <div className="w-full max-w-[95%] mx-auto px-4 sm:px-6 flex items-center justify-between gap-4 overflow-x-auto whitespace-nowrap scrollbar-none">
 
           <div className="flex items-center gap-2 shrink-0">
@@ -330,6 +332,7 @@ export default function Navbar({ onCartClick }) {
 
         </div>
       </div>
+      )}
 
       <nav className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-xl border-b border-slate-200/90 shadow-sm transition-all duration-300">
         <div className="w-full sm:max-w-[95%] mx-auto px-2.5 sm:px-6 py-2.5 flex items-center justify-between gap-2 md:gap-4 relative">

@@ -18,11 +18,15 @@ exports.getAllLicenses = async (req, res) => {
 };
 
 exports.getAvailableLicenses = async (req, res) => {
-  const { product_id, product_name, package_name } = req.query;
+  const { product_id, product_name, package_name, filter_by_package } = req.query;
   try {
     let targetProductId = product_id ? parseInt(product_id) : null;
     if (!targetProductId && product_name) {
-      const [prods] = await db.query('SELECT id FROM products WHERE name LIKE ? LIMIT 1', [`%${product_name.trim()}%`]);
+      const trimmedProd = product_name.trim();
+      const [prods] = await db.query(
+        'SELECT id FROM products WHERE name = ? OR name LIKE ? ORDER BY (name = ?) DESC LIMIT 1',
+        [trimmedProd, `%${trimmedProd}%`, trimmedProd]
+      );
       if (prods.length > 0) {
         targetProductId = prods[0].id;
       }
@@ -40,7 +44,28 @@ exports.getAvailableLicenses = async (req, res) => {
     `;
     const params = [targetProductId];
 
-    if (package_name && package_name.trim()) {
+    if (filter_by_package === 'true' && package_name && package_name.trim()) {
+      const fullPkg = package_name.trim();
+      let durationPart = fullPkg;
+      let activationPart = null;
+      if (fullPkg.includes(' - ')) {
+        const parts = fullPkg.split(' - ');
+        durationPart = parts[0].trim();
+        activationPart = parts.slice(1).join(' - ').trim();
+      }
+
+      query += `
+        AND (
+          TRIM(pl.package_option) = ?
+          OR (
+            (TRIM(pl.package_option) = ? OR pl.package_option IS NULL)
+            AND (? IS NULL OR TRIM(pl.activation_option) = ? OR pl.activation_option IS NULL)
+          )
+        )
+        ORDER BY pl.id ASC
+      `;
+      params.push(fullPkg, durationPart, activationPart, activationPart);
+    } else if (package_name && package_name.trim()) {
       query += `
         ORDER BY 
           (pl.package_option <=> ?) DESC,
