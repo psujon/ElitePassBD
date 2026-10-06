@@ -409,31 +409,41 @@ export default function SubscriptionManager() {
     if (accName === target) return true;
     if (target.includes(accName) || accName.includes(target)) return true;
 
+    // Check catalog products for product_id matching
+    const matchedCatalogProd = catalogProducts.find(p => p.name && p.name.toLowerCase().trim() === target);
+    if (matchedCatalogProd && acc.product_id && String(acc.product_id) === String(matchedCatalogProd.id)) {
+      return true;
+    }
+
     const targetWords = target.split(/[\s–—\-_,./\\|()]+/).filter(w => w.length > 2);
     const accWords = accName.split(/[\s–—\-_,./\\|()]+/).filter(w => w.length > 2);
     const common = accWords.filter(w => targetWords.includes(w));
     if (common.length >= 2) return true;
-    if (common.length === 1 && (accWords.length === 1 || ['adobe', 'creative', 'canva', 'chatgpt', 'netflix', 'spotify', 'zoom', 'antivirus', 'office', '365'].includes(common[0]))) {
+    if (common.length === 1 && (accWords.length === 1 || ['adobe', 'creative', 'canva', 'chatgpt', 'netflix', 'spotify', 'zoom', 'antivirus', 'office', '365', 'prime', 'youtube', 'vpn', 'crunchyroll', 'nordvpn', 'surfshark', 'coursera', 'duolingo', 'grammarly', 'quillbot', 'freepik', 'envato'].includes(common[0]))) {
       return true;
     }
     return false;
   };
 
-  const { matchingDigitalAccounts, otherDigitalAccounts } = React.useMemo(() => {
-    if (!subForm.product_name) {
-      return { matchingDigitalAccounts: [], otherDigitalAccounts: digitalAccounts };
+  const matchingDigitalAccounts = React.useMemo(() => {
+    if (!subForm.product_name || !subForm.product_name.trim()) {
+      return [];
     }
-    const matching = [];
-    const others = [];
-    digitalAccounts.forEach(acc => {
-      if (isAccountMatchingProduct(acc, subForm.product_name)) {
-        matching.push(acc);
-      } else {
-        others.push(acc);
+    return digitalAccounts.filter(acc => 
+      isAccountMatchingProduct(acc, subForm.product_name) ||
+      (editingSub && subForm.digital_account_id && String(acc.id) === String(subForm.digital_account_id))
+    );
+  }, [digitalAccounts, subForm.product_name, subForm.digital_account_id, editingSub, catalogProducts]);
+
+  // Auto-clear digital_account_id if selected account is no longer in matching accounts
+  React.useEffect(() => {
+    if (subForm.digital_account_id) {
+      const isStillMatching = matchingDigitalAccounts.some(acc => String(acc.id) === String(subForm.digital_account_id));
+      if (!isStillMatching) {
+        setSubForm(prev => ({ ...prev, digital_account_id: '' }));
       }
-    });
-    return { matchingDigitalAccounts: matching, otherDigitalAccounts: others };
-  }, [digitalAccounts, subForm.product_name]);
+    }
+  }, [matchingDigitalAccounts, subForm.digital_account_id]);
 
   const selectedDigitalAccount = React.useMemo(() => {
     if (!subForm.digital_account_id) return null;
@@ -1527,32 +1537,36 @@ export default function SubscriptionManager() {
                 <select
                   value={subForm.digital_account_id || ''}
                   onChange={(e) => handleDigitalAccountChange(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer shadow-xs"
+                  disabled={matchingDigitalAccounts.length === 0}
+                  className={`w-full border rounded-xl px-3.5 py-2 text-xs transition-colors shadow-xs ${
+                    matchingDigitalAccounts.length > 0
+                      ? 'bg-white border-slate-300 text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer'
+                      : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
+                  }`}
                 >
-                  <option value="">-- No Account Selected --</option>
-                  {matchingDigitalAccounts.length > 0 && (
-                    <optgroup label={`Matching Product Accounts (${matchingDigitalAccounts.length})`}>
+                  {matchingDigitalAccounts.length > 0 ? (
+                    <>
+                      <option value="">-- No Account Selected --</option>
                       {matchingDigitalAccounts.map(acc => (
                         <option key={acc.id} value={acc.id}>
                           {acc.account_email} • {acc.available_slots} / {acc.total_slots} Slots Free ({acc.product_name})
                         </option>
                       ))}
-                    </optgroup>
-                  )}
-                  {otherDigitalAccounts.length > 0 && (
-                    <optgroup label={matchingDigitalAccounts.length > 0 ? "Other Available Accounts" : "All License Accounts"}>
-                      {otherDigitalAccounts.map(acc => (
-                        <option key={acc.id} value={acc.id}>
-                          {acc.account_email} • {acc.available_slots} / {acc.total_slots} Slots Free ({acc.product_name})
-                        </option>
-                      ))}
-                    </optgroup>
+                    </>
+                  ) : (
+                    <option value="">
+                      {subForm.product_name
+                        ? '-- No Account Available for this Product --'
+                        : '-- Select a Product First --'}
+                    </option>
                   )}
                 </select>
                 <p className="text-[10px] text-slate-500 mt-1">
                   {matchingDigitalAccounts.length > 0
-                    ? `Showing ${matchingDigitalAccounts.length} accounts matching product`
-                    : (subForm.product_name ? 'No accounts specifically matching this product title' : 'Select a product above to filter accounts')}
+                    ? `Showing ${matchingDigitalAccounts.length} account(s) matching "${subForm.product_name}"`
+                    : (subForm.product_name
+                        ? `No license accounts found for "${subForm.product_name}"`
+                        : 'Select a product above to filter accounts')}
                 </p>
               </div>
 

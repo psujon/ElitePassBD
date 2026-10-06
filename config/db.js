@@ -243,6 +243,10 @@ async function createTables() {
       status ENUM('Active', 'Expiring Soon', 'Expired', 'Renewed', 'Cancelled') DEFAULT 'Active',
       notes TEXT DEFAULT NULL,
       order_id INT DEFAULT NULL,
+      vendor_id INT DEFAULT NULL,
+      vendor_price DECIMAL(10, 2) DEFAULT 0.00,
+      digital_account_id INT DEFAULT NULL,
+      digital_slot_id INT DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
@@ -762,8 +766,85 @@ async function updateSchema() {
         await pool.query("ALTER TABLE subscriptions ADD COLUMN vendor_price DECIMAL(10, 2) DEFAULT 0.00 AFTER vendor_id");
         console.log("Added column 'vendor_price' to 'subscriptions' table.");
       }
+
+      const [digAccCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'digital_account_id'");
+      if (digAccCols.length === 0) {
+        await pool.query("ALTER TABLE subscriptions ADD COLUMN digital_account_id INT DEFAULT NULL AFTER vendor_price");
+        console.log("Added column 'digital_account_id' to 'subscriptions' table.");
+      }
+
+      const [digSlotCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'digital_slot_id'");
+      if (digSlotCols.length === 0) {
+        await pool.query("ALTER TABLE subscriptions ADD COLUMN digital_slot_id INT DEFAULT NULL AFTER digital_account_id");
+        console.log("Added column 'digital_slot_id' to 'subscriptions' table.");
+      }
+
+      const [digAccIdx] = await pool.query("SHOW INDEX FROM subscriptions WHERE Key_name = 'idx_sub_digital_acc'");
+      if (digAccIdx.length === 0) {
+        await pool.query("CREATE INDEX idx_sub_digital_acc ON subscriptions (digital_account_id)");
+        console.log("Created index 'idx_sub_digital_acc' on 'subscriptions' table.");
+      }
     } catch (subColErr) {
-      console.error("Error ensuring vendor columns on subscriptions:", subColErr.message);
+      console.error("Error ensuring extra columns on subscriptions:", subColErr.message);
+    }
+
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS digital_license_accounts (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          product_id INT DEFAULT NULL,
+          product_name VARCHAR(255) NOT NULL,
+          account_email VARCHAR(255) NOT NULL,
+          account_password VARCHAR(255) NOT NULL,
+          recovery_email VARCHAR(255) DEFAULT NULL,
+          two_factor_status ENUM('Enabled', 'Disabled') DEFAULT 'Enabled',
+          two_factor_key TEXT DEFAULT NULL,
+          total_slots INT NOT NULL DEFAULT 5,
+          status ENUM('Active', 'Expiring', 'Expired', 'Inactive') DEFAULT 'Active',
+          expiry_date DATE DEFAULT NULL,
+          vendor_id INT DEFAULT NULL,
+          vendor_name VARCHAR(255) DEFAULT NULL,
+          purchased_date DATE DEFAULT NULL,
+          renewal_date DATE DEFAULT NULL,
+          purchase_price DECIMAL(10, 2) DEFAULT 0.00,
+          renewal_cost DECIMAL(10, 2) DEFAULT 0.00,
+          payment_method VARCHAR(50) DEFAULT 'bKash',
+          invoice_no VARCHAR(100) DEFAULT NULL,
+          notes TEXT DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_dla_product (product_id, status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS digital_license_slots (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          account_id INT NOT NULL,
+          slot_number INT NOT NULL,
+          order_id INT DEFAULT NULL,
+          assigned_to VARCHAR(255) DEFAULT NULL,
+          customer_name VARCHAR(255) DEFAULT NULL,
+          customer_phone VARCHAR(50) DEFAULT NULL,
+          start_date DATE DEFAULT NULL,
+          end_date DATE DEFAULT NULL,
+          status ENUM('Active', 'Available', 'Expired', 'Suspended') DEFAULT 'Available',
+          notes TEXT DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          FOREIGN KEY (account_id) REFERENCES digital_license_accounts(id) ON DELETE CASCADE,
+          INDEX idx_dls_account_slot (account_id, slot_number),
+          INDEX idx_dls_order (order_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+
+      const [orderIdCols] = await pool.query("SHOW COLUMNS FROM digital_license_slots LIKE 'order_id'");
+      if (orderIdCols.length === 0) {
+        await pool.query("ALTER TABLE digital_license_slots ADD COLUMN order_id INT DEFAULT NULL AFTER slot_number");
+        console.log("Added column 'order_id' to 'digital_license_slots' table.");
+      }
+    } catch (digLicenseErr) {
+      console.error("Error ensuring digital license tables in schema:", digLicenseErr.message);
     }
 
     try {

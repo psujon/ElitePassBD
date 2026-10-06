@@ -306,6 +306,7 @@ CREATE TABLE IF NOT EXISTS digital_license_slots (
     id INT AUTO_INCREMENT PRIMARY KEY,
     account_id INT NOT NULL,
     slot_number INT NOT NULL,
+    order_id INT DEFAULT NULL,
     assigned_to VARCHAR(255) DEFAULT NULL,
     customer_name VARCHAR(255) DEFAULT NULL,
     customer_phone VARCHAR(50) DEFAULT NULL,
@@ -316,7 +317,8 @@ CREATE TABLE IF NOT EXISTS digital_license_slots (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (account_id) REFERENCES digital_license_accounts(id) ON DELETE CASCADE,
-    INDEX idx_dls_account_slot (account_id, slot_number)
+    INDEX idx_dls_account_slot (account_id, slot_number),
+    INDEX idx_dls_order (order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 21. Product Usage Rules Table
