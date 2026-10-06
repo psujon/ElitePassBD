@@ -45,6 +45,7 @@ exports.getAllProducts = async (req, res) => {
              COALESCE((SELECT SUM(quantity) FROM order_items WHERE product_id = p.id), 0) as total_sold
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
+      WHERE (p.is_deleted = 0 OR p.is_deleted IS NULL)
       ORDER BY p.id DESC
     `);
     res.json(products.map(formatProduct));
@@ -64,7 +65,7 @@ exports.getProductById = async (req, res) => {
              COALESCE((SELECT SUM(quantity) FROM order_items WHERE product_id = p.id), 0) as total_sold
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
-      WHERE p.id = ?
+      WHERE p.id = ? AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
     `, [id]);
     if (products.length === 0) {
       return res.status(404).json({ message: 'Product not found.' });
@@ -246,20 +247,60 @@ exports.updateProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
   const { id } = req.params;
   try {
-    const [result] = await db.query('DELETE FROM products WHERE id = ?', [id]);
-
-    if (result.affectedRows === 0) {
+    const [products] = await db.query('SELECT id, name FROM products WHERE id = ?', [id]);
+    if (products.length === 0) {
       return res.status(404).json({ message: 'Product not found to delete.' });
     }
 
+    // Check if the product has associated orders in order_items
+    const [orderRefs] = await db.query('SELECT COUNT(*) as count FROM order_items WHERE product_id = ?', [id]);
+    const hasOrders = (orderRefs[0]?.count || 0) > 0;
+
+    if (hasOrders) {
+      // Soft-delete product to preserve past customer orders, invoices, and accounting history
+      await db.query(
+        `UPDATE products 
+         SET is_deleted = 1, 
+             stock = 0, 
+             is_hot = 0, 
+             is_highlighted = 0, 
+             is_top_selling = 0, 
+             is_hot_discount = 0 
+         WHERE id = ?`,
+        [id]
+      );
+
+      // Clean up unused/unassigned licenses for this deleted product
+      await db.query('DELETE FROM product_licenses WHERE product_id = ? AND (is_used = 0 OR is_used IS NULL)', [id]);
+
+      return res.json({ message: 'Product deleted successfully!' });
+    }
+
+    // If no customer orders are linked, safely hard-delete the product
+    await db.query('DELETE FROM products WHERE id = ?', [id]);
+
     res.json({ message: 'Product deleted successfully!' });
   } catch (error) {
-    console.error('Delete product error:', error);
     if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-      return res.status(400).json({
-        message: 'Cannot delete product because it has associated customer orders. Set its stock to 0 instead.'
-      });
+      try {
+        await db.query(
+          `UPDATE products 
+           SET is_deleted = 1, 
+               stock = 0, 
+               is_hot = 0, 
+               is_highlighted = 0, 
+               is_top_selling = 0, 
+               is_hot_discount = 0 
+           WHERE id = ?`,
+          [id]
+        );
+        await db.query('DELETE FROM product_licenses WHERE product_id = ? AND (is_used = 0 OR is_used IS NULL)', [id]);
+        return res.json({ message: 'Product deleted successfully!' });
+      } catch (softErr) {
+        console.error('Fallback soft delete error:', softErr);
+      }
     }
+    console.error('Delete product error:', error);
     res.status(500).json({ message: 'Database error occurred while deleting product.' });
   }
 };

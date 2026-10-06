@@ -1,6 +1,6 @@
 const getApiBaseUrl = () => {
-  if (typeof window === 'undefined') return 'http://localhost:5000/api';
-  const { hostname, port } = window.location;
+  if (typeof window === 'undefined') return 'http://127.0.0.1:5000/api';
+  const { hostname, port, protocol } = window.location;
   if (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
@@ -8,16 +8,17 @@ const getApiBaseUrl = () => {
     hostname.startsWith('10.') ||
     hostname.endsWith('.local') ||
     port === '5173' ||
-    port === '5174'
+    port === '5174' ||
+    port === '5175'
   ) {
-    return `http://${hostname || 'localhost'}:5000/api`;
+    return `${protocol}//${hostname}:5000/api`;
   }
   return 'https://api.elitepassbd.com/api';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
 
-const apiRequest = async (endpoint, options = {}) => {
+const apiRequest = async (endpoint, options = {}, retries = 1) => {
   const token = localStorage.getItem('token');
 
   const headers = {
@@ -29,18 +30,45 @@ const apiRequest = async (endpoint, options = {}) => {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
 
-  const data = await response.json();
+    const contentType = response.headers.get('content-type') || '';
+    let data;
 
-  if (!response.ok) {
-    throw new Error(data.message || 'Something went wrong.');
+    if (contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      try {
+        data = JSON.parse(text);
+      } catch (_) {
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error(`API endpoint '${endpoint}' was not found (404). Please ensure the latest backend files are uploaded to the server and PM2 is restarted.`);
+          }
+          throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Error'}). Please check backend server status.`);
+        }
+        data = { message: text };
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(data?.message || `Request failed with status ${response.status}`);
+    }
+
+    return data;
+  } catch (error) {
+    // Automatic retry once for GET requests during dev server restart/startup
+    if (retries > 0 && (!options.method || options.method === 'GET')) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return apiRequest(endpoint, options, retries - 1);
+    }
+    throw error;
   }
-
-  return data;
 };
 
 export const api = {

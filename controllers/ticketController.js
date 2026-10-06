@@ -115,3 +115,17 @@ exports.getMyTickets = async (req, res) => {
   }
 };
 
+exports.deleteTicket = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [result] = await db.query('DELETE FROM support_tickets WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Support ticket not found.' });
+    }
+    res.json({ message: `Support ticket #T${id} deleted successfully!` });
+  } catch (error) {
+    console.error('Delete ticket error:', error);
+    res.status(500).json({ message: 'Database error occurred while deleting support ticket.' });
+  }
+};
+

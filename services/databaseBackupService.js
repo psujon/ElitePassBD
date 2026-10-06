@@ -275,20 +275,32 @@ const buildBackupEmailHtml = ({ dbName, tableCount, totalRows, formattedSize, ge
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Database Backup</title>
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    @media only screen and (max-width: 600px) {
+      .email-container { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; }
+      .body-wrapper { padding: 0 !important; }
+      .banner-header { padding: 24px 16px !important; }
+      .banner-header h1 { font-size: 20px !important; }
+      .main-content { padding: 20px 14px !important; }
+      .summary-cell { padding: 8px 10px !important; font-size: 12px !important; }
+      .footer-cell { padding: 14px 16px !important; }
+    }
+  </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0f172a; padding: 32px 16px;">
+<body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155; width: 100%;">
+  <table class="body-wrapper" role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0f172a; padding: 24px 8px; width: 100%;">
     <tr>
-      <td align="center">
-        <table role="presentation" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
+      <td align="center" style="padding: 6px 2px;">
+        <table class="email-container" role="presentation" width="100%" style="width: 100%; max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
           
           <!-- Header Banner -->
           <tr>
-            <td style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #2563eb 100%); padding: 32px 28px; text-align: center;">
+            <td class="banner-header" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #2563eb 100%); padding: 32px 28px; text-align: center;">
               <div style="display: inline-block; background-color: rgba(255,255,255,0.18); border-radius: 50%; padding: 12px; margin-bottom: 12px;">
                 <span style="font-size: 32px; line-height: 1;">💾</span>
               </div>
-              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+              <h1 class="banner-title" style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
                 ElitePassBD Database Backup
               </h1>
               <p style="margin: 6px 0 0 0; color: #e0e7ff; font-size: 13px; font-weight: 500;">
@@ -299,7 +311,7 @@ const buildBackupEmailHtml = ({ dbName, tableCount, totalRows, formattedSize, ge
 
           <!-- Content Body -->
           <tr>
-            <td style="padding: 28px;">
+            <td class="main-content" style="padding: 28px 24px;">
               <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 14px 18px; margin-bottom: 22px;">
                 <p style="margin: 0; color: #166534; font-size: 13px; font-weight: 700; line-height: 1.5;">
                   ✅ ডেটাবেজ সফলভাবে ব্যাকআপ করা হয়েছে এবং সম্পূর্ণ SQL ফাইলটি এই ইমেইলের সাথে সংযুক্ত (Attached) করা হয়েছে।
@@ -310,30 +322,30 @@ const buildBackupEmailHtml = ({ dbName, tableCount, totalRows, formattedSize, ge
                 📊 ব্যাকআপ বিবরণী (Backup Summary)
               </h2>
 
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin-bottom: 24px; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin-bottom: 24px; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; width: 100%;">
                 <tr style="background-color: #f8fafc;">
-                  <td style="padding: 11px 16px; font-size: 13px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; width: 40%;">টাইমস্ট্যাম্প (BST)</td>
-                  <td style="padding: 11px 16px; font-size: 13px; color: #0f172a; font-weight: 700; border-bottom: 1px solid #e2e8f0;">${generatedAt}</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; width: 40%;">টাইমস্ট্যাম্প (BST)</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #0f172a; font-weight: 700; border-bottom: 1px solid #e2e8f0;">${generatedAt}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 11px 16px; font-size: 13px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">ডেটাবেজ নাম</td>
-                  <td style="padding: 11px 16px; font-size: 13px; color: #4f46e5; font-weight: 700; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${dbName}</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">ডেটাবেজ নাম</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #4f46e5; font-weight: 700; font-family: monospace; border-bottom: 1px solid #e2e8f0;">${dbName}</td>
                 </tr>
                 <tr style="background-color: #f8fafc;">
-                  <td style="padding: 11px 16px; font-size: 13px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">মোট টেবিল সংখ্যা</td>
-                  <td style="padding: 11px 16px; font-size: 13px; color: #0f172a; font-weight: 700; border-bottom: 1px solid #e2e8f0;">${tableCount} টি টেবিল</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">মোট টেবিল সংখ্যা</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #0f172a; font-weight: 700; border-bottom: 1px solid #e2e8f0;">${tableCount} টি টেবিল</td>
                 </tr>
                 <tr>
-                  <td style="padding: 11px 16px; font-size: 13px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">মোট ডাটা রেকর্ড</td>
-                  <td style="padding: 11px 16px; font-size: 13px; color: #0f172a; font-weight: 700; border-bottom: 1px solid #e2e8f0;">${totalRows.toLocaleString()} টি রো</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">মোট ডাটা রেকর্ড</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #0f172a; font-weight: 700; border-bottom: 1px solid #e2e8f0;">${totalRows.toLocaleString()} টি রো</td>
                 </tr>
                 <tr style="background-color: #f8fafc;">
-                  <td style="padding: 11px 16px; font-size: 13px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">ফাইল সাইজ</td>
-                  <td style="padding: 11px 16px; font-size: 13px; color: #059669; font-weight: 800; border-bottom: 1px solid #e2e8f0;">${formattedSize}</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">ফাইল সাইজ</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #059669; font-weight: 800; border-bottom: 1px solid #e2e8f0;">${formattedSize}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 11px 16px; font-size: 13px; color: #64748b; font-weight: 600;">সংযুক্ত ফাইল নাম</td>
-                  <td style="padding: 11px 16px; font-size: 12px; color: #334155; font-weight: 600; font-family: monospace;">${filename}</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 13px; color: #64748b; font-weight: 600;">সংযুক্ত ফাইল নাম</td>
+                  <td class="summary-cell" style="padding: 11px 14px; font-size: 12px; color: #334155; font-weight: 600; font-family: monospace; word-break: break-all;">${filename}</td>
                 </tr>
               </table>
 
@@ -348,7 +360,7 @@ const buildBackupEmailHtml = ({ dbName, tableCount, totalRows, formattedSize, ge
 
           <!-- Footer -->
           <tr>
-            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 18px 28px; text-align: center;">
+            <td class="footer-cell" style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 18px 24px; text-align: center;">
               <p style="margin: 0; color: #64748b; font-size: 12px;">
                 ElitePassBD Automated Backup System • Delivered to <strong>${recipient || 'Configured Admin Email'}</strong>
               </p>

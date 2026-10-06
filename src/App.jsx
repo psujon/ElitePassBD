@@ -56,6 +56,7 @@ const DashboardRouter = () => {
 function AppContent() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { pathname, hash } = useLocation();
+  const { isAdmin } = useAuth();
 
   useEffect(() => {
     if (!hash) {
@@ -64,10 +65,11 @@ function AppContent() {
   }, [pathname, hash]);
 
   const isDashboard = pathname.startsWith('/dashboard') || pathname.startsWith('/admin');
+  const isAdminDashboard = isAdmin && isDashboard;
 
   return (
     <div className={`flex flex-col min-h-screen w-full max-w-full overflow-x-hidden ${isDashboard ? 'pb-0' : 'pb-16 md:pb-0'}`}>
-      <Navbar onCartClick={() => setIsCartOpen(true)} />
+      {!isAdminDashboard && <Navbar onCartClick={() => setIsCartOpen(true)} />}
 
       <main className={`flex-grow w-full min-w-0 overflow-x-hidden ${isDashboard ? 'max-w-full px-0' : 'max-w-full sm:max-w-[95%] mx-auto px-1 sm:px-4'}`}>
         <Routes>
@@ -95,6 +97,7 @@ function AppContent() {
           {/* Dashboard Routes for Admin & Customer */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
           <Route path="/dashboard/:tab" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Navigate to="/dashboard/profile" replace /></ProtectedRoute>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

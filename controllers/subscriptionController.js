@@ -5,15 +5,48 @@ const { getDirectWhatsAppUrl, replaceTemplateTags } = require('../services/whats
 /**
  * Calculate dashboard stat counts
  */
-const getDashboardStats = async (pool) => {
-  const [[activeRes]] = await pool.query(`SELECT COUNT(*) as count FROM subscriptions WHERE status IN ('Active', 'Expiring Soon') AND expiry_date >= CURDATE()`);
-  const [[expiringTodayRes]] = await pool.query(`SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date = CURDATE() AND status NOT IN ('Cancelled')`);
-  const [[within3DaysRes]] = await pool.query(`SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY) AND status NOT IN ('Cancelled')`);
-  const [[within7DaysRes]] = await pool.query(`SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status NOT IN ('Cancelled')`);
-  const [[expiredRes]] = await pool.query(`SELECT COUNT(*) as count FROM subscriptions WHERE status = 'Expired' OR (expiry_date < CURDATE() AND status != 'Cancelled')`);
-  const [[renewedRes]] = await pool.query(`SELECT COUNT(*) as count FROM subscriptions WHERE status = 'Renewed' OR id IN (SELECT DISTINCT subscription_id FROM subscription_renewals WHERE status = 'Previous')`);
-  const [[totalCustomersRes]] = await pool.query(`SELECT COUNT(DISTINCT whatsapp_number) as count FROM subscriptions`);
-  const [[totalSubscriptionsRes]] = await pool.query(`SELECT COUNT(*) as count FROM subscriptions`);
+const getDashboardStats = async (pool, product = null) => {
+  const hasProduct = Boolean(product && product.trim() && product.trim() !== 'All Products');
+  const prodPattern = hasProduct ? `%${product.trim()}%` : null;
+  const prodClause = hasProduct ? ' AND product_name LIKE ?' : '';
+  const prodParams = hasProduct ? [prodPattern] : [];
+
+  const [[activeRes]] = await pool.query(
+    `SELECT COUNT(*) as count FROM subscriptions WHERE status IN ('Active', 'Expiring Soon') AND expiry_date >= CURDATE()${prodClause}`,
+    prodParams
+  );
+  const [[expiringTodayRes]] = await pool.query(
+    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date = CURDATE() AND status NOT IN ('Cancelled')${prodClause}`,
+    prodParams
+  );
+  const [[within3DaysRes]] = await pool.query(
+    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY) AND status NOT IN ('Cancelled')${prodClause}`,
+    prodParams
+  );
+  const [[within7DaysRes]] = await pool.query(
+    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status NOT IN ('Cancelled')${prodClause}`,
+    prodParams
+  );
+  const [[expiredRes]] = await pool.query(
+    `SELECT COUNT(*) as count FROM subscriptions WHERE (status = 'Expired' OR (expiry_date < CURDATE() AND status != 'Cancelled'))${prodClause}`,
+    prodParams
+  );
+  const [[renewedRes]] = await pool.query(
+    `SELECT COUNT(*) as count FROM subscriptions WHERE (status = 'Renewed' OR id IN (SELECT DISTINCT subscription_id FROM subscription_renewals WHERE status = 'Previous'))${prodClause}`,
+    prodParams
+  );
+  const [[totalCustomersRes]] = await pool.query(
+    `SELECT COUNT(DISTINCT CASE 
+      WHEN email IS NOT NULL AND TRIM(email) != '' THEN LOWER(TRIM(email))
+      WHEN whatsapp_number IS NOT NULL AND TRIM(whatsapp_number) != '' THEN CONCAT('phone_', TRIM(whatsapp_number))
+      ELSE NULL 
+    END) as count FROM subscriptions ${hasProduct ? 'WHERE product_name LIKE ?' : ''}`,
+    prodParams
+  );
+  const [[totalSubscriptionsRes]] = await pool.query(
+    `SELECT COUNT(*) as count FROM subscriptions ${hasProduct ? 'WHERE product_name LIKE ?' : ''}`,
+    prodParams
+  );
 
   return {
     active: activeRes ? activeRes.count : 0,
@@ -35,22 +68,79 @@ exports.getAllSubscriptions = async (req, res) => {
     const { search, product, status, source, expiryFilter } = req.query;
 
     let query = `
-      SELECT s.*, o.created_at AS order_created_at
+      SELECT s.*, o.created_at AS order_created_at,
+             v.name AS vendor_name, v.company_name AS vendor_company, v.phone AS vendor_phone
       FROM subscriptions s
       LEFT JOIN orders o ON s.order_id = o.id
+      LEFT JOIN vendors v ON s.vendor_id = v.id
       WHERE 1=1
     `;
     const params = [];
 
     if (search && search.trim()) {
-      const searchTerm = `%${search.trim()}%`;
-      query += ` AND (s.customer_name LIKE ? OR s.whatsapp_number LIKE ? OR s.email LIKE ? OR s.product_name LIKE ?)`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+      const trimmed = search.trim();
+      const searchTerm = `%${trimmed}%`;
+
+      // 1. Explicit Order ID query (e.g. "#125", "Order #125", "order 125", "Order-125")
+      const explicitOrderMatch = trimmed.match(/^(?:order[\s:#-]*#?|#)\s*(\d+)$/i);
+
+      // 2. Pure number query (e.g. "125" or "01712345678")
+      const pureNumberMatch = trimmed.match(/^(\d+)$/);
+
+      if (explicitOrderMatch) {
+        // User explicitly searched for an Order ID -> exact match on order_id (or fallback to manual sub id if order_id is null)
+        const orderId = parseInt(explicitOrderMatch[1], 10);
+        query += ` AND (s.order_id = ? OR (s.order_id IS NULL AND s.id = ?))`;
+        params.push(orderId, orderId);
+      } else if (pureNumberMatch) {
+        // User typed a pure number -> exact match on order_id OR search phone, name, email, product, vendor
+        const num = parseInt(pureNumberMatch[1], 10);
+        query += ` AND (
+          s.order_id = ? OR
+          (s.order_id IS NULL AND s.id = ?) OR
+          s.customer_name LIKE ? OR
+          s.whatsapp_number LIKE ? OR
+          s.email LIKE ? OR
+          s.product_name LIKE ? OR
+          v.name LIKE ? OR
+          v.company_name LIKE ?
+        )`;
+        params.push(
+          num,
+          num,
+          searchTerm,
+          searchTerm,
+          searchTerm,
+          searchTerm,
+          searchTerm,
+          searchTerm
+        );
+      } else {
+        // General text query (name, phone, email, product, account details, vendor, etc.)
+        query += ` AND (
+          s.customer_name LIKE ? OR
+          s.whatsapp_number LIKE ? OR
+          s.email LIKE ? OR
+          s.product_name LIKE ? OR
+          s.account_given LIKE ? OR
+          v.name LIKE ? OR
+          v.company_name LIKE ?
+        )`;
+        params.push(
+          searchTerm,
+          searchTerm,
+          searchTerm,
+          searchTerm,
+          searchTerm,
+          searchTerm,
+          searchTerm
+        );
+      }
     }
 
     if (product && product.trim() && product !== 'All Products') {
-      query += ` AND s.product_name = ?`;
-      params.push(product.trim());
+      query += ` AND s.product_name LIKE ?`;
+      params.push(`%${product.trim()}%`);
     }
 
     if (status && status.trim() && status !== 'All Status') {
@@ -100,7 +190,7 @@ exports.getAllSubscriptions = async (req, res) => {
       };
     });
 
-    const stats = await getDashboardStats(pool);
+    const stats = await getDashboardStats(pool, product);
 
     res.json({
       stats,
@@ -120,9 +210,11 @@ exports.getSubscriptionById = async (req, res) => {
     let subs = [];
     try {
       const [resSubs] = await pool.query(`
-        SELECT s.*, o.created_at AS order_created_at
+        SELECT s.*, o.created_at AS order_created_at,
+               v.name AS vendor_name, v.company_name AS vendor_company, v.phone AS vendor_phone
         FROM subscriptions s
         LEFT JOIN orders o ON s.order_id = o.id
+        LEFT JOIN vendors v ON s.vendor_id = v.id
         WHERE s.id = ?
       `, [id]);
       subs = resSubs;
@@ -165,7 +257,7 @@ exports.getSubscriptionById = async (req, res) => {
   }
 };
 
-const { sendEmail } = require('../utils/mailer');
+const { sendEmail, getWhatsAppContactBlock, getEmailFooter, getWhatsAppContactText, formatRulesHtml, formatLicenseKeyHtml } = require('../utils/mailer');
 
 /**
  * Send dedicated License & Subscription Details Email to the customer
@@ -180,7 +272,8 @@ const sendSubscriptionLicenseEmail = async ({
   purchaseDate,
   validityDays,
   expiryDate,
-  orderId
+  orderId,
+  notes
 }) => {
   if (!email || !email.trim()) return false;
 
@@ -194,88 +287,121 @@ const sendSubscriptionLicenseEmail = async ({
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Your License & Subscription Details</title>
+      <style type="text/css">
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        body { margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #0b1120; }
+        .body-wrapper { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+        .body-td { padding: 0 !important; margin: 0 !important; }
+        * {
+          word-break: normal !important;
+          overflow-wrap: break-word !important;
+          word-wrap: break-word !important;
+          hyphens: none !important;
+          -webkit-hyphens: none !important;
+        }
+        @media only screen and (max-width: 600px) {
+          .body-wrapper { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+          .body-td { padding: 0 !important; margin: 0 !important; width: 100% !important; }
+          .email-container { width: 100% !important; max-width: 100% !important; min-width: 100% !important; border-radius: 0 !important; border: none !important; margin: 0 !important; }
+          .banner-header { padding: 14px 6px !important; }
+          .banner-header h1 { font-size: 16px !important; }
+          .main-content { padding: 8px 2px !important; width: 100% !important; }
+          .key-box { padding: 6px 4px !important; margin: 6px 0 !important; border-radius: 4px !important; }
+          .rules-box { padding: 6px 4px !important; margin: 6px 0 !important; border-radius: 4px !important; }
+          .footer-cell { padding: 12px 6px !important; }
+        }
+      </style>
     </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #e2e8f0;">
-      <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); border: 1px solid #334155;">
-        
-        <!-- Header -->
-        <div style="background-color: #059669; color: #ffffff; padding: 28px 24px; text-align: center;">
-          <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">
-            Subscription & License Activated!
-          </h1>
-          <p style="margin: 6px 0 0 0; font-size: 14px; color: #d1fae5; font-weight: 500;">
-            ${productName} • ${packagePlan}
-          </p>
-        </div>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; margin: 0; padding: 0; color: #e2e8f0; width: 100%;">
+      <table class="body-wrapper" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; background-color: #0b1120; margin: 0; padding: 0; border-collapse: collapse;">
+        <tr>
+          <td align="center" class="body-td" style="padding: 0; margin: 0;">
+            <div class="email-container" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 0; overflow: hidden; border: 1px solid #334155;">
+              
+              <!-- Header -->
+              <div class="banner-header" style="background-color: #059669; color: #ffffff; padding: 20px 14px; text-align: center;">
+                <h1 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.2px;">
+                  Subscription & License Activated!
+                </h1>
+                <p style="margin: 4px 0 0 0; font-size: 12px; color: #d1fae5; font-weight: 500; word-break: normal; overflow-wrap: break-word;">
+                  ${productName} • ${packagePlan}
+                </p>
+              </div>
 
-        <!-- Body -->
-        <div style="padding: 26px 24px;">
-          <p style="font-size: 15px; color: #ffffff; margin-top: 0; font-weight: 600;">
-            Hello ${customerName || 'Valued Customer'},
-          </p>
-          <p style="font-size: 13px; color: #cbd5e1; line-height: 1.6; margin-bottom: 20px;">
-            Your subscription has been successfully created. Your official digital license key / account credentials and plan details are below:
-          </p>
+              <!-- Body -->
+              <div class="main-content" style="padding: 16px 12px; box-sizing: border-box; width: 100%;">
+                <p style="font-size: 13.5px; color: #ffffff; margin-top: 0; margin-bottom: 8px; font-weight: 600;">
+                  Hello ${customerName || 'Valued Customer'},
+                </p>
+                <p style="font-size: 12px; color: #cbd5e1; line-height: 1.55; margin-bottom: 14px; word-break: normal; overflow-wrap: break-word;">
+                  Your subscription has been successfully created. Your official digital license key / account credentials and plan details are below:
+                </p>
 
-          <!-- License Key Box -->
-          <div style="margin: 20px 0; background-color: #0f172a; border: 2px dashed #10b981; border-radius: 12px; padding: 18px; text-align: center;">
-            <div style="font-size: 11px; text-transform: uppercase; color: #34d399; font-weight: 700; letter-spacing: 0.8px; margin-bottom: 8px;">
-              Digital License Key / Account Credentials
+                <!-- License Key Box -->
+                <div class="key-box" style="margin: 10px 0; background-color: #0f172a; border: 1.5px dashed #10b981; border-radius: 6px; padding: 8px 10px; text-align: left; box-sizing: border-box; width: 100%;">
+                  <div style="font-size: 9.5px; text-transform: uppercase; color: #34d399; font-weight: 700; letter-spacing: 0.6px; margin-bottom: 4px;">
+                    Digital License Key / Account Credentials
+                  </div>
+                  <div style="background-color: #1e293b; padding: 8px 10px; border-radius: 4px; display: block; width: 100%; box-sizing: border-box; border: 1px solid #334155; text-align: left;">
+                    ${formatLicenseKeyHtml(licenseKey, true)}
+                  </div>
+                </div>
+
+                <!-- Details Table -->
+                <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 14px; box-sizing: border-box; width: 100%;">
+                  <table style="width: 100%; font-size: 12px; color: #cbd5e1; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; width: 38%; font-size: 11.5px;">Product:</td>
+                      <td style="padding: 5px 0; font-weight: 600; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word;">${productName}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Package / Plan:</td>
+                      <td style="padding: 5px 0; font-weight: 600; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word;">${packagePlan}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Purchase Date:</td>
+                      <td style="padding: 5px 0; color: #ffffff; font-size: 12px;">${purchaseDate}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Validity:</td>
+                      <td style="padding: 5px 0; color: #ffffff; font-size: 12px;">${validityDays} Days</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Expiry Date:</td>
+                      <td style="padding: 5px 0; font-weight: 700; color: #34d399; font-size: 12px;">${expiryDate}</td>
+                    </tr>
+                    ${orderId ? `
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Order Ref:</td>
+                      <td style="padding: 5px 0; color: #ffffff; font-size: 12px;">#${orderId}</td>
+                    </tr>` : ''}
+                  </table>
+                </div>
+
+                ${notes ? `
+                <!-- Notes Box -->
+                <div style="background-color: #0f172a; border: 1px solid #334155; border-left: 3px solid #10b981; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 11.5px; color: #cbd5e1; word-break: normal; overflow-wrap: break-word; box-sizing: border-box; width: 100%;">
+                  <div style="font-weight: 700; color: #34d399; margin-bottom: 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">Subscription Notes:</div>
+                  <div style="line-height: 1.5; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word;">${notes}</div>
+                </div>` : ''}
+
+                ${rules ? formatRulesHtml(rules, true) : ''}
+
+                <!-- WhatsApp Support Contact Box -->
+                ${getWhatsAppContactBlock(true)}
+
+              </div>
             </div>
-            <div style="font-family: Consolas, 'Courier New', monospace; font-size: 15px; font-weight: 700; color: #ffffff; word-break: break-all; background-color: #1e293b; padding: 10px 16px; border-radius: 8px; display: inline-block; border: 1px solid #334155;">
-              ${licenseKey || 'N/A'}
-            </div>
-          </div>
-
-          <!-- Details Table -->
-          <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-            <table style="width: 100%; font-size: 13px; color: #cbd5e1; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8; width: 40%;">Product:</td>
-                <td style="padding: 6px 0; font-weight: 600; color: #ffffff;">${productName}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Package / Plan:</td>
-                <td style="padding: 6px 0; font-weight: 600; color: #ffffff;">${packagePlan}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Purchase Date:</td>
-                <td style="padding: 6px 0; color: #ffffff;">${purchaseDate}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Validity:</td>
-                <td style="padding: 6px 0; color: #ffffff;">${validityDays} Days</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Expiry Date:</td>
-                <td style="padding: 6px 0; font-weight: 700; color: #34d399;">${expiryDate}</td>
-              </tr>
-              ${orderId ? `
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Order Ref:</td>
-                <td style="padding: 6px 0; color: #ffffff;">#${orderId}</td>
-              </tr>` : ''}
-            </table>
-          </div>
-
-          ${rules ? `
-          <div style="background-color: #1e1b4b; border: 1px solid #4338ca; border-radius: 10px; padding: 14px; margin-bottom: 20px; font-size: 12px; color: #c7d2fe;">
-            <div style="font-weight: 700; color: #a5b4fc; margin-bottom: 4px;">Activation Rules & Guidelines:</div>
-            <div style="line-height: 1.5;">${rules}</div>
-          </div>` : ''}
-
-          <div style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 24px; line-height: 1.5;">
-            Thank you for choosing <strong style="color: #ffffff;">${appName}</strong>. If you require any assistance, please contact our support team.
-          </div>
-
-        </div>
-
-      </div>
+          </td>
+        </tr>
+        <!-- Footer -->
+        ${getEmailFooter(appName, true)}
+      </table>
     </body>
     </html>
   `;
 
-  const text = `Hello ${customerName},\n\nYour subscription for ${productName} (${packagePlan}) has been activated.\n\nLicense Key / Credentials: ${licenseKey}\nExpiry Date: ${expiryDate}\n${rules ? `\nRules: ${rules}\n` : ''}\nThank you,\n${appName}`;
+  const text = `Hello ${customerName},\n\nYour subscription for ${productName} (${packagePlan}) has been activated.\n\nLicense Key / Credentials: ${licenseKey}\nExpiry Date: ${expiryDate}\n${notes ? `\nNotes: ${notes}\n` : ''}${rules ? `\nRules: ${rules}\n` : ''}${getWhatsAppContactText()}`;
 
   return await sendEmail({
     to: email.trim(),
@@ -300,7 +426,8 @@ const sendSubscriptionRenewalEmail = async ({
   expiryDate,
   amount,
   orderId,
-  subscriptionId
+  subscriptionId,
+  notes
 }) => {
   if (!email || !email.trim()) return false;
 
@@ -322,102 +449,135 @@ const sendSubscriptionRenewalEmail = async ({
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Subscription Renewed - ${appName}</title>
+      <style type="text/css">
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        body { margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #0b1120; }
+        .body-wrapper { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+        .body-td { padding: 0 !important; margin: 0 !important; }
+        * {
+          word-break: normal !important;
+          overflow-wrap: break-word !important;
+          word-wrap: break-word !important;
+          hyphens: none !important;
+          -webkit-hyphens: none !important;
+        }
+        @media only screen and (max-width: 600px) {
+          .body-wrapper { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+          .body-td { padding: 0 !important; margin: 0 !important; width: 100% !important; }
+          .email-container { width: 100% !important; max-width: 100% !important; min-width: 100% !important; border-radius: 0 !important; border: none !important; margin: 0 !important; }
+          .banner-header { padding: 14px 6px !important; }
+          .banner-header h1 { font-size: 16px !important; }
+          .main-content { padding: 8px 2px !important; width: 100% !important; }
+          .key-box { padding: 6px 4px !important; margin: 6px 0 !important; border-radius: 4px !important; }
+          .rules-box { padding: 6px 4px !important; margin: 6px 0 !important; border-radius: 4px !important; }
+          .footer-cell { padding: 12px 6px !important; }
+        }
+      </style>
     </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #e2e8f0;">
-      <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); border: 1px solid #334155;">
-        
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; padding: 28px 24px; text-align: center;">
-          <div style="display: inline-block; background-color: rgba(255, 255, 255, 0.2); padding: 6px 14px; border-radius: 9999px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;">
-            Renewal Successful 🎉
-          </div>
-          <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">
-            Subscription Renewed!
-          </h1>
-          <p style="margin: 6px 0 0 0; font-size: 14px; color: #d1fae5; font-weight: 500;">
-            ${productName} • ${packagePlan}
-          </p>
-        </div>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; margin: 0; padding: 0; color: #e2e8f0; width: 100%;">
+      <table class="body-wrapper" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; background-color: #0b1120; margin: 0; padding: 0; border-collapse: collapse;">
+        <tr>
+          <td align="center" class="body-td" style="padding: 0; margin: 0;">
+            <div class="email-container" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 0; overflow: hidden; border: 1px solid #334155;">
+              
+              <!-- Header -->
+              <div class="banner-header" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; padding: 20px 14px; text-align: center;">
+                <div style="display: inline-block; background-color: rgba(255, 255, 255, 0.2); padding: 4px 10px; border-radius: 9999px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">
+                  Renewal Successful 🎉
+                </div>
+                <h1 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.2px;">
+                  Subscription Renewed!
+                </h1>
+                <p style="margin: 4px 0 0 0; font-size: 12px; color: #d1fae5; font-weight: 500; word-break: normal; overflow-wrap: break-word;">
+                  ${productName} • ${packagePlan}
+                </p>
+              </div>
 
-        <!-- Body -->
-        <div style="padding: 26px 24px;">
-          <p style="font-size: 15px; color: #ffffff; margin-top: 0; font-weight: 600;">
-            Hello ${customerName || 'Valued Customer'},
-          </p>
-          <p style="font-size: 13px; color: #cbd5e1; line-height: 1.6; margin-bottom: 20px;">
-            Your subscription with <strong>${appName}</strong> has been successfully renewed. Your service access and account credentials are confirmed below:
-          </p>
+              <!-- Body -->
+              <div class="main-content" style="padding: 16px 12px; box-sizing: border-box; width: 100%;">
+                <p style="font-size: 13.5px; color: #ffffff; margin-top: 0; margin-bottom: 8px; font-weight: 600;">
+                  Hello ${customerName || 'Valued Customer'},
+                </p>
+                <p style="font-size: 12px; color: #cbd5e1; line-height: 1.55; margin-bottom: 14px; word-break: normal; overflow-wrap: break-word;">
+                  Your subscription with <strong>${appName}</strong> has been successfully renewed. Your service access and account credentials are confirmed below:
+                </p>
 
-          ${licenseKey ? `
-          <!-- License Key Box -->
-          <div style="margin: 20px 0; background-color: #0f172a; border: 2px dashed #10b981; border-radius: 12px; padding: 18px; text-align: center;">
-            <div style="font-size: 11px; text-transform: uppercase; color: #34d399; font-weight: 700; letter-spacing: 0.8px; margin-bottom: 8px;">
-              Digital License Key / Account Credentials
+                ${licenseKey ? `
+                <!-- License Key Box -->
+                <div class="key-box" style="margin: 10px 0; background-color: #0f172a; border: 1.5px dashed #10b981; border-radius: 6px; padding: 8px 10px; text-align: left; box-sizing: border-box; width: 100%;">
+                  <div style="font-size: 9.5px; text-transform: uppercase; color: #34d399; font-weight: 700; letter-spacing: 0.6px; margin-bottom: 4px;">
+                    Digital License Key / Account Credentials
+                  </div>
+                  <div style="background-color: #1e293b; padding: 8px 10px; border-radius: 4px; display: block; width: 100%; box-sizing: border-box; border: 1px solid #334155; text-align: left;">
+                    ${formatLicenseKeyHtml(licenseKey, true)}
+                  </div>
+                </div>` : ''}
+
+                <!-- Details Table -->
+                <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 14px; box-sizing: border-box; width: 100%;">
+                  <table style="width: 100%; font-size: 12px; color: #cbd5e1; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; width: 38%; font-size: 11.5px;">Product:</td>
+                      <td style="padding: 5px 0; font-weight: 600; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word;">${productName}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Package / Plan:</td>
+                      <td style="padding: 5px 0; font-weight: 600; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word;">${packagePlan}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Renewal Date:</td>
+                      <td style="padding: 5px 0; color: #ffffff; font-size: 12px;">${formattedDate}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Validity:</td>
+                      <td style="padding: 5px 0; color: #ffffff; font-size: 12px;">${validityDays} Days</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">New Expiry Date:</td>
+                      <td style="padding: 5px 0; font-weight: 700; color: #34d399; font-size: 12px;">${formattedExpiry}</td>
+                    </tr>
+                    ${amount ? `
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Payment Amount:</td>
+                      <td style="padding: 5px 0; font-weight: 700; color: #ffffff; font-size: 12px;">৳${amount} BDT</td>
+                    </tr>` : ''}
+                    ${orderId ? `
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Order Ref:</td>
+                      <td style="padding: 5px 0; color: #ffffff; font-size: 12px;">#${orderId}</td>
+                    </tr>` : ''}
+                    ${subscriptionId ? `
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Subscription Ref:</td>
+                      <td style="padding: 5px 0; color: #94a3b8; font-size: 12px;">#${subscriptionId}</td>
+                    </tr>` : ''}
+                  </table>
+                </div>
+
+                ${notes ? `
+                <!-- Notes Box -->
+                <div style="background-color: #0f172a; border: 1px solid #334155; border-left: 3px solid #10b981; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 11.5px; color: #cbd5e1; word-break: normal; overflow-wrap: break-word; box-sizing: border-box; width: 100%;">
+                  <div style="font-weight: 700; color: #34d399; margin-bottom: 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">Renewal Notes:</div>
+                  <div style="line-height: 1.5; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word;">${notes}</div>
+                </div>` : ''}
+
+                ${rules ? formatRulesHtml(rules, true) : ''}
+
+                <!-- WhatsApp Support Contact Box -->
+                ${getWhatsAppContactBlock(true)}
+
+              </div>
             </div>
-            <div style="font-family: Consolas, 'Courier New', monospace; font-size: 15px; font-weight: 700; color: #ffffff; word-break: break-all; background-color: #1e293b; padding: 10px 16px; border-radius: 8px; display: inline-block; border: 1px solid #334155;">
-              ${licenseKey}
-            </div>
-          </div>` : ''}
-
-          <!-- Details Table -->
-          <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-            <table style="width: 100%; font-size: 13px; color: #cbd5e1; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8; width: 42%;">Product:</td>
-                <td style="padding: 6px 0; font-weight: 600; color: #ffffff;">${productName}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Package / Plan:</td>
-                <td style="padding: 6px 0; font-weight: 600; color: #ffffff;">${packagePlan}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Renewal Date:</td>
-                <td style="padding: 6px 0; color: #ffffff;">${formattedDate}</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Validity:</td>
-                <td style="padding: 6px 0; color: #ffffff;">${validityDays} Days</td>
-              </tr>
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">New Expiry Date:</td>
-                <td style="padding: 6px 0; font-weight: 700; color: #34d399;">${formattedExpiry}</td>
-              </tr>
-              ${amount ? `
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Payment Amount:</td>
-                <td style="padding: 6px 0; font-weight: 700; color: #ffffff;">৳${amount} BDT</td>
-              </tr>` : ''}
-              ${orderId ? `
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Order Ref:</td>
-                <td style="padding: 6px 0; color: #ffffff;">#${orderId}</td>
-              </tr>` : ''}
-              ${subscriptionId ? `
-              <tr>
-                <td style="padding: 6px 0; color: #94a3b8;">Subscription Ref:</td>
-                <td style="padding: 6px 0; color: #94a3b8;">#${subscriptionId}</td>
-              </tr>` : ''}
-            </table>
-          </div>
-
-          ${rules ? `
-          <div style="background-color: #1e1b4b; border: 1px solid #4338ca; border-radius: 10px; padding: 14px; margin-bottom: 20px; font-size: 12px; color: #c7d2fe;">
-            <div style="font-weight: 700; color: #a5b4fc; margin-bottom: 4px;">Activation Rules & Guidelines:</div>
-            <div style="line-height: 1.5;">${rules}</div>
-          </div>` : ''}
-
-          <div style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 24px; line-height: 1.5;">
-            Thank you for continuing with <strong style="color: #ffffff;">${appName}</strong>. If you require any assistance, please reach out to our team.
-          </div>
-
-        </div>
-
-      </div>
+          </td>
+        </tr>
+        <!-- Footer -->
+        ${getEmailFooter(appName, true)}
+      </table>
     </body>
     </html>
   `;
 
-  const text = `Hello ${customerName || 'Valued Customer'},\n\nYour subscription for ${productName} (${packagePlan}) has been renewed.\n\nRenewal Date: ${formattedDate}\nValidity: ${validityDays} Days\nNew Expiry Date: ${formattedExpiry}\n${licenseKey ? `License Key / Credentials: ${licenseKey}\n` : ''}${rules ? `Rules: ${rules}\n` : ''}\nThank you,\n${appName}`;
+  const text = `Hello ${customerName || 'Valued Customer'},\n\nYour subscription for ${productName} (${packagePlan}) has been renewed.\n\nRenewal Date: ${formattedDate}\nValidity: ${validityDays} Days\nNew Expiry Date: ${formattedExpiry}\n${notes ? `\nNotes: ${notes}\n` : ''}${licenseKey ? `License Key / Credentials: ${licenseKey}\n` : ''}${rules ? `Rules: ${rules}\n` : ''}${getWhatsAppContactText()}`;
 
   return await sendEmail({
     to: email.trim(),
@@ -444,7 +604,10 @@ exports.createSubscription = async (req, res) => {
     selling_price,
     payment_status,
     notes,
-    order_id
+    order_id,
+    vendor_id,
+    vendor_price,
+    digital_account_id
   } = req.body;
 
   if (!customer_name || !whatsapp_number || !product_name || !package_plan) {
@@ -471,6 +634,20 @@ exports.createSubscription = async (req, res) => {
         if (licRows[0].rules) {
           finalRules = licRows[0].rules;
         }
+      }
+    } else if (digital_account_id && !finalAccountGiven) {
+      // If a digital license manager account was selected and account_given is empty, auto-populate credentials
+      const [dlaRows] = await connection.query(
+        'SELECT account_email, account_password, two_factor_key FROM digital_license_accounts WHERE id = ?',
+        [parseInt(digital_account_id, 10)]
+      );
+      if (dlaRows.length > 0) {
+        const dAcc = dlaRows[0];
+        const parts = [`Email: ${dAcc.account_email}`, `Password: ${dAcc.account_password}`];
+        if (dAcc.two_factor_key && dAcc.two_factor_key.trim()) {
+          parts.push(`2FA: ${dAcc.two_factor_key.trim()}`);
+        }
+        finalAccountGiven = parts.join(' | ');
       }
     }
 
@@ -587,8 +764,9 @@ exports.createSubscription = async (req, res) => {
       INSERT INTO subscriptions (
         customer_name, whatsapp_number, email, product_name, package_plan,
         customer_source, purchase_date, validity_days, expiry_date, account_given,
-        selling_price, payment_status, status, notes, order_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        selling_price, payment_status, status, notes, order_id, vendor_id, vendor_price,
+        digital_account_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       customer_name,
       whatsapp_number,
@@ -604,10 +782,63 @@ exports.createSubscription = async (req, res) => {
       payment_status || 'Paid',
       initialStatus,
       notes || null,
-      finalOrderId
+      finalOrderId,
+      vendor_id ? parseInt(vendor_id, 10) : null,
+      vendor_price !== undefined && vendor_price !== null && vendor_price !== '' ? parseFloat(vendor_price) : 0.00,
+      digital_account_id ? parseInt(digital_account_id, 10) : null
     ]);
 
     const subscriptionId = subResult.insertId;
+
+    // Auto-assign available slot from digital_license_slots if digital_account_id is provided
+    let assignedSlotId = null;
+    let assignedSlotNumber = null;
+    if (digital_account_id) {
+      const parsedAccId = parseInt(digital_account_id, 10);
+      const [freeSlots] = await connection.query(`
+        SELECT id, slot_number FROM digital_license_slots
+        WHERE account_id = ? AND (status = 'Available' OR status IS NULL)
+        ORDER BY slot_number ASC
+        LIMIT 1
+        FOR UPDATE
+      `, [parsedAccId]);
+
+      if (freeSlots.length > 0) {
+        const slot = freeSlots[0];
+        assignedSlotId = slot.id;
+        assignedSlotNumber = slot.slot_number;
+        const slotNotes = `Assigned via Subscription #${subscriptionId}${finalOrderId ? ` (Order #${finalOrderId})` : ''}`;
+        const assignedRecipient = (email && email.trim()) ? email.trim() : (whatsapp_number ? whatsapp_number.trim() : customer_name.trim());
+
+        await connection.query(`
+          UPDATE digital_license_slots SET
+            order_id = ?,
+            assigned_to = ?,
+            customer_name = ?,
+            customer_phone = ?,
+            start_date = ?,
+            end_date = ?,
+            status = 'Active',
+            notes = ?
+          WHERE id = ?
+        `, [
+          finalOrderId ? parseInt(finalOrderId, 10) : null,
+          assignedRecipient,
+          customer_name.trim(),
+          whatsapp_number.trim(),
+          formattedPDate,
+          formattedEDate,
+          slotNotes,
+          assignedSlotId
+        ]);
+
+        await connection.query(`
+          UPDATE subscriptions SET digital_slot_id = ? WHERE id = ?
+        `, [assignedSlotId, subscriptionId]);
+      } else {
+        console.warn(`No available slots left in digital license account #${parsedAccId} for subscription #${subscriptionId}`);
+      }
+    }
 
     // Add initial record in subscription_renewals
     await connection.query(`
@@ -643,7 +874,8 @@ exports.createSubscription = async (req, res) => {
         purchaseDate: formattedPDate,
         validityDays: vDays,
         expiryDate: formattedEDate,
-        orderId: finalOrderId
+        orderId: finalOrderId,
+        notes: notes || null
       }).catch(mailErr => {
         console.error('Failed to send subscription license email:', mailErr.message);
       });
@@ -680,18 +912,79 @@ exports.updateSubscription = async (req, res) => {
     payment_status,
     status,
     notes,
-    order_id
+    order_id,
+    vendor_id,
+    vendor_price,
+    digital_account_id
   } = req.body;
 
   try {
     const pool = db.getPool();
-    const [subCheck] = await pool.query('SELECT id FROM subscriptions WHERE id = ?', [id]);
+    const [subCheck] = await pool.query('SELECT * FROM subscriptions WHERE id = ?', [id]);
     if (subCheck.length === 0) {
       return res.status(404).json({ message: 'Subscription not found.' });
     }
+    const currSub = subCheck[0];
 
     const pDate = purchase_date ? new Date(purchase_date).toISOString().slice(0, 10) : undefined;
     const eDate = expiry_date ? new Date(expiry_date).toISOString().slice(0, 10) : undefined;
+
+    // Handle digital license slot assignment / reallocation if digital_account_id is provided
+    let newSlotId = currSub.digital_slot_id;
+    if (digital_account_id !== undefined) {
+      const parsedAccId = digital_account_id ? parseInt(digital_account_id, 10) : null;
+      if (parsedAccId && (currSub.digital_account_id !== parsedAccId || !currSub.digital_slot_id)) {
+        // Free old slot if any
+        if (currSub.digital_slot_id) {
+          await pool.query(`
+            UPDATE digital_license_slots SET
+              order_id = NULL, assigned_to = NULL, customer_name = NULL, customer_phone = NULL,
+              start_date = NULL, end_date = NULL, status = 'Available', notes = NULL
+            WHERE id = ?
+          `, [currSub.digital_slot_id]);
+        }
+
+        // Find available slot in newly chosen account
+        const [freeSlots] = await pool.query(`
+          SELECT id, slot_number FROM digital_license_slots
+          WHERE account_id = ? AND (status = 'Available' OR status IS NULL)
+          ORDER BY slot_number ASC LIMIT 1
+        `, [parsedAccId]);
+
+        if (freeSlots.length > 0) {
+          const slot = freeSlots[0];
+          newSlotId = slot.id;
+          const ordId = order_id !== undefined ? (order_id ? parseInt(order_id, 10) : null) : currSub.order_id;
+          const assignedUser = (email && email.trim()) ? email.trim() : (whatsapp_number ? whatsapp_number.trim() : (customer_name ? customer_name.trim() : 'Customer'));
+          const slotNotes = `Assigned via Subscription #${id}${ordId ? ` (Order #${ordId})` : ''}`;
+
+          await pool.query(`
+            UPDATE digital_license_slots SET
+              order_id = ?, assigned_to = ?, customer_name = ?, customer_phone = ?,
+              start_date = ?, end_date = ?, status = 'Active', notes = ?
+            WHERE id = ?
+          `, [
+            ordId,
+            assignedUser,
+            customer_name ? customer_name.trim() : currSub.customer_name,
+            whatsapp_number ? whatsapp_number.trim() : currSub.whatsapp_number,
+            pDate || currSub.purchase_date,
+            eDate || currSub.expiry_date,
+            slotNotes,
+            slot.id
+          ]);
+        }
+      } else if (!parsedAccId && currSub.digital_slot_id) {
+        // Disassociated from digital account: free slot
+        await pool.query(`
+          UPDATE digital_license_slots SET
+            order_id = NULL, assigned_to = NULL, customer_name = NULL, customer_phone = NULL,
+            start_date = NULL, end_date = NULL, status = 'Available', notes = NULL
+          WHERE id = ?
+        `, [currSub.digital_slot_id]);
+        newSlotId = null;
+      }
+    }
 
     await pool.query(`
       UPDATE subscriptions SET
@@ -709,7 +1002,11 @@ exports.updateSubscription = async (req, res) => {
         payment_status = COALESCE(?, payment_status),
         status = COALESCE(?, status),
         order_id = COALESCE(?, order_id),
-        notes = ?
+        vendor_id = ?,
+        vendor_price = COALESCE(?, vendor_price),
+        notes = ?,
+        digital_account_id = ?,
+        digital_slot_id = ?
       WHERE id = ?
     `, [
       customer_name,
@@ -726,7 +1023,11 @@ exports.updateSubscription = async (req, res) => {
       payment_status,
       status,
       order_id !== undefined ? (order_id ? parseInt(order_id, 10) : null) : undefined,
+      vendor_id !== undefined ? (vendor_id ? parseInt(vendor_id, 10) : null) : null,
+      vendor_price !== undefined && vendor_price !== '' ? parseFloat(vendor_price) : undefined,
       notes !== undefined ? notes : null,
+      digital_account_id !== undefined ? (digital_account_id ? parseInt(digital_account_id, 10) : null) : currSub.digital_account_id,
+      newSlotId,
       id
     ]);
 
@@ -874,7 +1175,8 @@ exports.renewSubscription = async (req, res) => {
         expiryDate: formattedEDate,
         amount: amount,
         orderId: sub.order_id,
-        subscriptionId: id
+        subscriptionId: id,
+        notes: notes || null
       }).then(sent => {
         console.log(`[Subscription Renewal] Confirmation email sent to ${targetEmail}:`, sent);
       }).catch(mailErr => {
@@ -907,6 +1209,23 @@ exports.deleteSubscription = async (req, res) => {
   const { id } = req.params;
   try {
     const pool = db.getPool();
+    // If a digital slot is assigned, release it back to 'Available'
+    const [subRows] = await pool.query('SELECT digital_slot_id FROM subscriptions WHERE id = ?', [id]);
+    if (subRows.length > 0 && subRows[0].digital_slot_id) {
+      await pool.query(`
+        UPDATE digital_license_slots SET
+          order_id = NULL,
+          assigned_to = NULL,
+          customer_name = NULL,
+          customer_phone = NULL,
+          start_date = NULL,
+          end_date = NULL,
+          status = 'Available',
+          notes = NULL
+        WHERE id = ?
+      `, [subRows[0].digital_slot_id]);
+    }
+
     await pool.query('DELETE FROM subscriptions WHERE id = ?', [id]);
     res.json({ message: 'Subscription deleted successfully.' });
   } catch (err) {

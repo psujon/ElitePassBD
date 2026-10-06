@@ -1,12 +1,57 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
-import { Loader2, Package, Calendar, Phone, MapPin, Truck, ChevronRight, ChevronDown, CheckCircle2, Clock, Star, X, MessageSquare, Send, Inbox, Plus } from 'lucide-react';
+import { 
+  Loader2, Package, Calendar, Phone, MapPin, Truck, ChevronRight, ChevronDown, 
+  CheckCircle2, Clock, Star, X, MessageSquare, Send, Inbox, Plus, Copy, Check, 
+  ExternalLink, Key, Info, Download, User, Lock, Eye, EyeOff, ShieldCheck, 
+  AlertCircle, Save, Shield
+} from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import UserProfileView from '../components/UserProfileView';
 
 export default function UserDashboard() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' or 'tickets'
+  const { user, updateUser } = useAuth();
+  const { tab: urlTab } = useParams();
+  const navigate = useNavigate();
+
+  const [activeTab, setActiveTabState] = useState(() => {
+    if (urlTab === 'profile') return 'profile';
+    if (urlTab === 'tickets') return 'tickets';
+    return 'orders';
+  });
+
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    navigate(`/dashboard/${tab}`, { replace: true });
+  };
+
+  useEffect(() => {
+    if (urlTab && ['orders', 'tickets', 'profile'].includes(urlTab)) {
+      setActiveTabState(urlTab);
+    }
+  }, [urlTab]);
+
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileUpdating, setProfileUpdating] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    whatsapp_number: user?.whatsapp_number || '',
+    address: user?.address || ''
+  });
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordUpdating, setPasswordUpdating] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,10 +80,205 @@ export default function UserDashboard() {
   const [newTicketError, setNewTicketError] = useState('');
   const [newTicketSuccess, setNewTicketSuccess] = useState('');
 
+  const [copiedKeyId, setCopiedKeyId] = useState(null);
+
+  const handleCopy = (text, id, label = 'License key') => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedKeyId(id);
+    toast.success(`${label} copied to clipboard!`);
+    setTimeout(() => {
+      setCopiedKeyId(null);
+    }, 2000);
+  };
+
+  const renderRules = (rules) => {
+    if (!rules || typeof rules !== 'string') return null;
+    const trimmed = rules.trim();
+    if (!trimmed) return null;
+
+    const urlRegex = /(https?:\/\/[^\s]+)/gi;
+    const isOnlyUrl = /^https?:\/\/[^\s]+$/i.test(trimmed);
+
+    if (isOnlyUrl) {
+      const cleanUrl = trimmed.replace(/[.,;!?)]+$/, '');
+      const isDownload = /\.(iso|img|exe|zip|rar|msi|dmg|pkg)(\?.*)?$/i.test(cleanUrl) || /download/i.test(cleanUrl);
+      const copyId = `rule-${cleanUrl}`;
+      const isCopied = copiedKeyId === copyId;
+
+      return (
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <a
+            href={cleanUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300/80 rounded-lg text-xs font-bold transition-all shadow-2xs hover:shadow-xs break-all max-w-full group"
+          >
+            {isDownload ? (
+              <Download className="w-3.5 h-3.5 shrink-0 text-amber-700 group-hover:scale-110 transition-transform" />
+            ) : (
+              <ExternalLink className="w-3.5 h-3.5 shrink-0 text-amber-700 group-hover:scale-110 transition-transform" />
+            )}
+            <span className="break-all">{cleanUrl}</span>
+          </a>
+          <button
+            type="button"
+            onClick={() => handleCopy(cleanUrl, copyId, 'Download link')}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs ${
+              isCopied
+                ? 'bg-emerald-600 text-white'
+                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+            }`}
+            title="Copy Link"
+          >
+            {isCopied ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-white" />
+                <span className="text-[11px]">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-[11px]">Copy Link</span>
+              </>
+            )}
+          </button>
+        </div>
+      );
+    }
+
+    const parts = trimmed.split(urlRegex);
+
+    return (
+      <div className="text-xs text-amber-950/90 leading-relaxed break-words break-all whitespace-pre-line">
+        {parts.map((part, index) => {
+          if (part.match(urlRegex)) {
+            const cleanLink = part.replace(/[.,;!?)]+$/, '');
+            const trailing = part.slice(cleanLink.length);
+            return (
+              <React.Fragment key={index}>
+                <a
+                  href={cleanLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-violet-700 hover:text-violet-900 font-bold underline break-all inline-flex items-center gap-0.5 mx-0.5 transition-colors"
+                >
+                  <span className="break-all">{cleanLink}</span>
+                  <ExternalLink className="w-3 h-3 inline-block shrink-0" />
+                </a>
+                {trailing}
+              </React.Fragment>
+            );
+          }
+          return <span key={index}>{part}</span>;
+        })}
+      </div>
+    );
+  };
+
+  const fetchUserProfile = async () => {
+    try {
+      setProfileLoading(true);
+      const res = await api.get('/auth/profile');
+      if (res?.user) {
+        setProfileForm({
+          name: res.user.name || '',
+          email: res.user.email || '',
+          whatsapp_number: res.user.whatsapp_number || '',
+          address: res.user.address || ''
+        });
+        updateUser(res.user);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user profile:', err);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
     fetchTickets(true);
+    fetchUserProfile();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      setProfileForm((prev) => ({
+        name: prev.name || user.name || '',
+        email: user.email || '',
+        whatsapp_number: prev.whatsapp_number !== undefined && prev.whatsapp_number !== '' ? prev.whatsapp_number : (user.whatsapp_number || ''),
+        address: prev.address !== undefined && prev.address !== '' ? prev.address : (user.address || '')
+      }));
+    }
+  }, [user]);
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    if (!profileForm.name.trim()) {
+      toast.error('Full Name is required.');
+      return;
+    }
+
+    try {
+      setProfileUpdating(true);
+      const res = await api.put('/auth/profile', {
+        name: profileForm.name.trim(),
+        whatsapp_number: profileForm.whatsapp_number ? profileForm.whatsapp_number.trim() : '',
+        address: profileForm.address ? profileForm.address.trim() : ''
+      });
+
+      if (res?.user) {
+        updateUser(res.user, res.token);
+        toast.success(res.message || 'Profile updated successfully!');
+      }
+    } catch (err) {
+      console.error('Update profile error:', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to update profile.');
+    } finally {
+      setProfileUpdating(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (!passwordForm.currentPassword) {
+      toast.error('Please enter your current password.');
+      return;
+    }
+    if (!passwordForm.newPassword) {
+      toast.error('Please enter a new password.');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters long.');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('New password and confirm password do not match.');
+      return;
+    }
+
+    try {
+      setPasswordUpdating(true);
+      const res = await api.put('/auth/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      });
+
+      toast.success(res.message || 'Password changed successfully!');
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (err) {
+      console.error('Change password error:', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to change password.');
+    } finally {
+      setPasswordUpdating(false);
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -240,6 +480,9 @@ export default function UserDashboard() {
               <option value="tickets" className="bg-[#111e35] text-white">
                 💬 Support Tickets ({tickets.length})
               </option>
+              <option value="profile" className="bg-[#111e35] text-white">
+                👤 My Profile & Security
+              </option>
             </select>
             <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -289,6 +532,18 @@ export default function UserDashboard() {
               </span>
             )}
           </button>
+
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 whitespace-nowrap snap-start cursor-pointer ${
+              activeTab === 'profile'
+                ? 'bg-white/10 text-white shadow-xs'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <User className={`w-4 h-4 shrink-0 ${activeTab === 'profile' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <span>My Profile</span>
+          </button>
         </div>
       </div>
 
@@ -297,23 +552,35 @@ export default function UserDashboard() {
         <div className="flex justify-between items-center border-b border-slate-200/60 pb-4 sm:pb-5 shrink-0">
           <div className="text-left">
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-850 tracking-tight">
-              {activeTab === 'orders' ? 'My Purchases' : 'Support Tickets'}
+              {activeTab === 'orders' ? 'My Purchases' : activeTab === 'tickets' ? 'Support Tickets' : 'My Profile & Security'}
             </h1>
             <p className="hidden sm:block text-xs text-slate-500 mt-1">
-              Hello, {user?.name}. {activeTab === 'orders' ? 'Check your purchase history and live tracking details.' : 'Submit and manage your support tickets.'}
+              {activeTab === 'orders'
+                ? `Hello, ${user?.name}. Check your purchase history and live tracking details.`
+                : activeTab === 'tickets'
+                ? `Hello, ${user?.name}. Submit and manage your support tickets.`
+                : `Hello, ${user?.name}. Manage your personal details, WhatsApp contact, and password.`}
             </p>
           </div>
           
           <div className="hidden sm:flex items-center space-x-4">
-            <div className="flex items-center space-x-2.5 bg-white border border-slate-200/60 px-3 py-1.5 rounded-xl shadow-xs">
-              <div className="w-7 h-7 rounded-full bg-violet-650 flex items-center justify-center text-white font-extrabold text-xs uppercase shadow-sm">
+            <button
+              type="button"
+              onClick={() => setActiveTab('profile')}
+              className="flex items-center space-x-2.5 bg-white hover:bg-slate-50 border border-slate-200/60 hover:border-violet-300 px-3 py-1.5 rounded-xl shadow-xs cursor-pointer transition-all text-left group"
+              title="Edit Profile"
+            >
+              <div className="w-7 h-7 rounded-full bg-violet-650 flex items-center justify-center text-white font-extrabold text-xs uppercase shadow-sm group-hover:scale-105 transition-transform">
                 {user?.name ? user.name.substring(0, 2) : 'US'}
               </div>
               <div className="hidden sm:block text-left">
-                <span className="block text-xs font-bold text-slate-700 leading-tight">{user?.name}</span>
+                <span className="block text-xs font-bold text-slate-700 leading-tight flex items-center gap-1.5">
+                  {user?.name}
+                  <span className="text-[10px] text-violet-600 font-semibold underline">Edit</span>
+                </span>
                 <span className="block text-[10px] text-slate-500 font-semibold leading-tight">{user?.email}</span>
               </div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -538,69 +805,174 @@ export default function UserDashboard() {
 
                   <div className="border-t border-slate-150 pt-5">
                     <h5 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Ordered Items</h5>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {trackingOrder.items?.map((item) => (
-                        <div key={item.id} className="flex flex-col sm:flex-row justify-between sm:items-center text-xs p-3 bg-slate-50 rounded-xl border border-slate-150 gap-3">
-                          <div className="min-w-0 flex-1 text-left">
-                            <p className="font-bold text-slate-800 truncate">{item.product_name}</p>
-                            
-                            {(item.package_name || item.selected_device || item.selected_activation) && (
-                              <div className="text-[10px] text-slate-500 mt-1 space-y-1 flex flex-col leading-relaxed">
-                                <div className="space-x-1.5 flex flex-wrap gap-y-1">
-                                  {item.package_name && (
-                                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200/80">Package: {item.package_name}</span>
-                                  )}
-                                  {item.selected_device && (
-                                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200/80">Device: {item.selected_device}</span>
-                                  )}
-                                  {item.selected_activation && (
-                                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200/80">Activation: {item.selected_activation}</span>
-                                  )}
+                        <div key={item.id} className="p-3.5 sm:p-4 bg-slate-50 rounded-2xl border border-slate-200/90 space-y-3 text-left">
+                          {/* Top Row: Product details & price / review */}
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-xs">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-slate-800 text-sm leading-snug">{item.product_name}</p>
+                              
+                              {(item.package_name || item.selected_device || item.selected_activation) && (
+                                <div className="text-[10px] text-slate-500 mt-1.5 space-y-1 flex flex-col leading-relaxed">
+                                  <div className="space-x-1.5 flex flex-wrap gap-y-1">
+                                    {item.package_name && (
+                                      <span className="bg-white px-2 py-0.5 rounded border border-slate-200/80 font-medium">Package: {item.package_name}</span>
+                                    )}
+                                    {item.selected_device && (
+                                      <span className="bg-white px-2 py-0.5 rounded border border-slate-200/80 font-medium">Device: {item.selected_device}</span>
+                                    )}
+                                    {item.selected_activation && (
+                                      <span className="bg-white px-2 py-0.5 rounded border border-slate-200/80 font-medium">Activation: {item.selected_activation}</span>
+                                    )}
+                                  </div>
                                 </div>
+                              )}
+
+                              <p className="text-xxs text-slate-500 mt-1.5 font-medium">
+                                Qty: <span className="font-bold text-slate-700">{item.quantity}</span> × ৳{parseFloat(item.price).toFixed(2)}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between sm:flex-col sm:items-end sm:justify-start gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 shrink-0">
+                              <div className="text-left sm:text-right">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block sm:hidden">Item Total</span>
+                                <span className="font-extrabold text-slate-850 text-sm sm:text-base">৳{(item.quantity * parseFloat(item.price)).toFixed(2)}</span>
                               </div>
-                            )}
+                              {trackingOrder.status === 'Delivered' && (
+                                <button
+                                  onClick={() => handleOpenReviewModal(item.product_id, item.product_name)}
+                                  className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-[10px] rounded-lg transition-colors flex items-center space-x-1 shadow-xs active:scale-95 duration-150 cursor-pointer"
+                                >
+                                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                                  <span>Review</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
 
-                            <p className="text-xxs text-slate-500 mt-1.5">Qty: {item.quantity} × ৳{parseFloat(item.price).toFixed(2)}</p>
+                          {/* License Section */}
+                          {item.licenses && item.licenses.length > 0 ? (
+                            <div className="p-3 sm:p-3.5 bg-emerald-50/70 border border-emerald-200/90 rounded-xl text-emerald-900 space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                                  <Key className="w-3.5 h-3.5 text-emerald-600" />
+                                  License Key(s) / Code(s):
+                                </span>
+                                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                                  {item.licenses.length} {item.licenses.length > 1 ? 'Keys' : 'Key'}
+                                </span>
+                              </div>
 
-                            {item.licenses && item.licenses.length > 0 ? (
-                              <div className="mt-2.5 p-2.5 bg-emerald-50 border border-emerald-150 rounded-xl text-emerald-800 space-y-2">
-                                <span className="block text-[9px] font-black uppercase tracking-wider text-emerald-600">License Key(s) / Code(s):</span>
-                                <div className="space-y-1.5">
-                                  {item.licenses.map((lic, keyIdx) => (
-                                    <div key={keyIdx} className="space-y-1">
-                                      <code className="inline-block text-xxs font-mono bg-white px-2 py-1 border border-emerald-100 rounded select-all font-bold text-slate-800">{lic.license_key}</code>
+                              <div className="space-y-2">
+                                {item.licenses.map((lic, keyIdx) => {
+                                  const keyId = `lic-${item.id}-${keyIdx}`;
+                                  const isCopied = copiedKeyId === keyId;
+
+                                  return (
+                                    <div key={keyIdx} className="bg-white rounded-lg border border-emerald-150 p-2.5 shadow-2xs space-y-2 text-left">
+                                      {item.licenses.length > 1 && (
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                                          Key #{keyIdx + 1}
+                                        </div>
+                                      )}
+
+                                      <div className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200/80 rounded-md p-1.5 sm:p-2">
+                                        <code className="text-xs sm:text-sm font-mono font-bold text-slate-850 select-all break-all px-1">
+                                          {lic.license_key}
+                                        </code>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCopy(lic.license_key, keyId, 'License key')}
+                                          className={`shrink-0 px-2.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                                            isCopied
+                                              ? 'bg-emerald-600 text-white'
+                                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 active:scale-95'
+                                          }`}
+                                          title="Copy License Key"
+                                        >
+                                          {isCopied ? (
+                                            <>
+                                              <Check className="w-3.5 h-3.5 text-white" />
+                                              <span className="text-[11px]">Copied!</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Copy className="w-3.5 h-3.5 text-emerald-600" />
+                                              <span className="text-[11px]">Copy</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      </div>
+
                                       {lic.rules && (
-                                        <p className="text-[10px] text-amber-800 bg-amber-50/90 border border-amber-200/80 px-2 py-1 rounded-lg font-medium text-left leading-relaxed">
-                                          <strong>Rules:</strong> {lic.rules}
-                                        </p>
+                                        <div className="bg-amber-50/90 border border-amber-200/80 rounded-md p-2.5 text-left space-y-1">
+                                          <div className="flex items-center gap-1 text-[10px] font-bold text-amber-800 uppercase tracking-wide">
+                                            <Info className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                            <span>Instructions / Rules:</span>
+                                          </div>
+                                          <div className="text-xs text-amber-950 break-words break-all">
+                                            {renderRules(lic.rules)}
+                                          </div>
+                                        </div>
                                       )}
                                     </div>
-                                  ))}
-                                </div>
+                                  );
+                                })}
                               </div>
-                            ) : item.license_keys && item.license_keys.length > 0 ? (
-                              <div className="mt-2.5 p-2.5 bg-emerald-50 border border-emerald-150 rounded-xl text-emerald-800 space-y-1">
-                                <span className="block text-[9px] font-black uppercase tracking-wider text-emerald-600">License Key(s) / Code(s):</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {item.license_keys.map((key, keyIdx) => (
-                                    <code key={keyIdx} className="block text-xxs font-mono bg-white px-2 py-1 border border-emerald-100 rounded select-all font-bold w-fit">{key}</code>
-                                  ))}
-                                </div>
+                            </div>
+                          ) : item.license_keys && item.license_keys.length > 0 ? (
+                            <div className="p-3 sm:p-3.5 bg-emerald-50/70 border border-emerald-200/90 rounded-xl text-emerald-900 space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                                  <Key className="w-3.5 h-3.5 text-emerald-600" />
+                                  License Key(s) / Code(s):
+                                </span>
+                                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                                  {item.license_keys.length} {item.license_keys.length > 1 ? 'Keys' : 'Key'}
+                                </span>
                               </div>
-                            ) : null}
-                          </div>
-                          <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
-                            <span className="font-extrabold text-slate-800">৳{(item.quantity * parseFloat(item.price)).toFixed(2)}</span>
-                            {trackingOrder.status === 'Delivered' && (
-                              <button
-                                onClick={() => handleOpenReviewModal(item.product_id, item.product_name)}
-                                className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-550 text-white font-bold text-[10px] rounded-lg transition-colors flex items-center space-x-1 shadow-xs active:scale-95 duration-150 cursor-pointer"
-                              >
-                                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                <span>Review</span>
-                              </button>
-                            )}
-                          </div>
+
+                              <div className="space-y-2">
+                                {item.license_keys.map((key, keyIdx) => {
+                                  const keyId = `key-${item.id}-${keyIdx}`;
+                                  const isCopied = copiedKeyId === keyId;
+
+                                  return (
+                                    <div key={keyIdx} className="bg-white rounded-lg border border-emerald-150 p-2.5 shadow-2xs text-left">
+                                      <div className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200/80 rounded-md p-1.5 sm:p-2">
+                                        <code className="text-xs sm:text-sm font-mono font-bold text-slate-850 select-all break-all px-1">
+                                          {key}
+                                        </code>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCopy(key, keyId, 'License key')}
+                                          className={`shrink-0 px-2.5 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                                            isCopied
+                                              ? 'bg-emerald-600 text-white'
+                                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 active:scale-95'
+                                          }`}
+                                          title="Copy License Key"
+                                        >
+                                          {isCopied ? (
+                                            <>
+                                              <Check className="w-3.5 h-3.5 text-white" />
+                                              <span className="text-[11px]">Copied!</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Copy className="w-3.5 h-3.5 text-emerald-600" />
+                                              <span className="text-[11px]">Copy</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -837,6 +1209,10 @@ export default function UserDashboard() {
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === 'profile' && (
+          <UserProfileView />
         )}
       </div>
 

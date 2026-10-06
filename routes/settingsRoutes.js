@@ -143,6 +143,11 @@ router.put('/support', authenticateToken, authorizeAdmin, async (req, res) => {
       }
     }
 
+    if (support_whatsapp) {
+      const { setCachedSupportWhatsApp } = require('../utils/mailer');
+      setCachedSupportWhatsApp(support_whatsapp);
+    }
+
     res.json({
       message: 'Support and social links updated successfully!',
       ...fields

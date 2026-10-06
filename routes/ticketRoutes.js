@@ -10,5 +10,7 @@ router.get('/my-tickets', authenticateToken, ticketController.getMyTickets);
 router.get('/', authenticateToken, authorizeAdmin, ticketController.getAllTickets);
 router.get('/stats', authenticateToken, authorizeAdmin, ticketController.getTicketStats);
 router.put('/:id/status', authenticateToken, authorizeAdmin, ticketController.updateTicketStatus);
+router.delete('/:id', authenticateToken, authorizeAdmin, ticketController.deleteTicket);
 
 module.exports = router;
+

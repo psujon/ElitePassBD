@@ -159,6 +159,182 @@ body {
 }
 
 
+/* Jodit WYSIWYG Editor Styles & Formatting Preservation */
+.jodit-container {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.5rem !important;
+  font-family: inherit !important;
+  background: #ffffff !important;
+  height: auto !important;
+  min-height: 220px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.jodit-toolbar__box {
+  background-color: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  flex-shrink: 0 !important;
+}
+
+.jodit-workplace {
+  min-height: 180px !important;
+  height: auto !important;
+  flex: 1 1 auto !important;
+  display: flex !important;
+}
+
+.jodit-wysiwyg {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 13.5px !important;
+  line-height: 1.6 !important;
+  color: #1e293b;
+  min-height: 180px !important;
+  padding: 12px 14px !important;
+  outline: none !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.jodit-wysiwyg p {
+  margin-top: 0;
+  margin-bottom: 0.65rem;
+  line-height: 1.6;
+}
+
+.jodit-wysiwyg h1,
+.jodit-wysiwyg h2,
+.jodit-wysiwyg h3,
+.jodit-wysiwyg h4,
+.jodit-wysiwyg h5,
+.jodit-wysiwyg h6 {
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 1rem;
+  margin-bottom: 0.45rem;
+  line-height: 1.3;
+}
+
+.jodit-wysiwyg h1 { font-size: 1.65rem; }
+.jodit-wysiwyg h2 { font-size: 1.4rem; }
+.jodit-wysiwyg h3 { font-size: 1.2rem; }
+.jodit-wysiwyg h4 { font-size: 1.05rem; }
+.jodit-wysiwyg h5 { font-size: 0.95rem; }
+.jodit-wysiwyg h6 { font-size: 0.85rem; }
+
+.jodit-wysiwyg strong,
+.jodit-wysiwyg b {
+  font-weight: 700;
+}
+
+.jodit-wysiwyg em,
+.jodit-wysiwyg i {
+  font-style: italic;
+}
+
+.jodit-wysiwyg u {
+  text-decoration: underline;
+}
+
+.jodit-wysiwyg s,
+.jodit-wysiwyg strike,
+.jodit-wysiwyg del {
+  text-decoration: line-through;
+}
+
+.jodit-wysiwyg ul {
+  list-style-type: disc !important;
+  padding-left: 1.75rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.jodit-wysiwyg ol {
+  list-style-type: decimal !important;
+  padding-left: 1.75rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.jodit-wysiwyg li {
+  display: list-item !important;
+  margin-top: 0.2rem;
+  margin-bottom: 0.2rem;
+  line-height: 1.5;
+}
+
+.jodit-wysiwyg ul ul,
+.jodit-wysiwyg ol ul {
+  list-style-type: circle !important;
+  padding-left: 1.25rem !important;
+}
+
+.jodit-wysiwyg ol ol,
+.jodit-wysiwyg ul ol {
+  list-style-type: lower-latin !important;
+  padding-left: 1.25rem !important;
+}
+
+.jodit-wysiwyg blockquote {
+  border-left: 3px solid #cbd5e1;
+  padding-left: 0.85rem;
+  margin: 0.85rem 0;
+  color: #64748b;
+  font-style: italic;
+}
+
+.jodit-wysiwyg table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 0.75rem 0 !important;
+  font-size: 0.85rem;
+}
+
+.jodit-wysiwyg table td,
+.jodit-wysiwyg table th {
+  border: 1px solid #cbd5e1 !important;
+  padding: 6px 10px !important;
+}
+
+.jodit-wysiwyg table th {
+  background-color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+.jodit-wysiwyg a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.jodit-wysiwyg img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+}
+
+@media (max-width: 640px) {
+  .jodit-container {
+    min-height: 240px !important;
+  }
+  .jodit-toolbar-button__button {
+    min-width: 28px !important;
+    height: 32px !important;
+    padding: 2px 4px !important;
+  }
+  .jodit-toolbar__box {
+    padding: 2px 4px !important;
+  }
+  .jodit-workplace {
+    min-height: 180px !important;
+  }
+  .jodit-wysiwyg {
+    min-height: 180px !important;
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+  }
+}
+
 .ql-toolbar.ql-snow {
   border: 1px solid #cbd5e1 !important;
   border-top-left-radius: 0.5rem;
@@ -252,6 +428,7 @@ body {
 }
 
 .prose li {
+  display: list-item !important;
   margin-top: 0.25rem;
   margin-bottom: 0.25rem;
   line-height: 1.5;

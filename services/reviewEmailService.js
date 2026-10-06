@@ -5,7 +5,7 @@ try {
   console.warn('[ReviewEmailService] node-cron module is not installed. Review email cron will be disabled until installed.');
 }
 const db = require('../config/db');
-const { sendEmail } = require('../utils/mailer');
+const { sendEmail, getWhatsAppContactBlock, getEmailFooter, getWhatsAppContactText } = require('../utils/mailer');
 
 const getFrontendUrl = () => {
   const url = process.env.FRONTEND_URL;
@@ -57,65 +57,100 @@ const generateReviewEmailHtml = (userName, items, orderId) => {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>${userName}, আপনার কেনা পণ্যটি কেমন লেগেছে?</title>
+      <style type="text/css">
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        body { margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #121212; }
+        .body-wrapper { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+        .body-td { padding: 0 !important; margin: 0 !important; }
+        * {
+          word-break: normal !important;
+          overflow-wrap: break-word !important;
+          word-wrap: break-word !important;
+          hyphens: none !important;
+          -webkit-hyphens: none !important;
+        }
+        img { max-width: 100%; height: auto; }
+        @media only screen and (max-width: 600px) {
+          .email-container { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; border-left: none !important; border-right: none !important; }
+          .banner-header { padding: 18px 12px !important; }
+          .banner-header h2 { font-size: 17px !important; }
+          .main-content { padding: 14px 10px !important; }
+          .item-card { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+          .item-btn-wrap { width: 100% !important; text-align: right !important; }
+          .review-btn-main { display: block !important; width: 100% !important; box-sizing: border-box !important; text-align: center !important; padding: 12px 14px !important; }
+        }
+      </style>
     </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #121212; margin: 0; padding: 20px; color: #e0e0e0;">
-      <div style="max-width: 560px; margin: 0 auto; background-color: #1e1e1e; border-radius: 14px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); border: 1px solid #2d2d2d;">
-        
-        <!-- Top Green Banner Image/Header -->
-        <div style="background-color: #059669; color: #ffffff; padding: 36px 24px; text-align: center; border-bottom: 3px solid #047857;">
-          <h2 style="margin: 0; font-size: 22px; font-weight: 700; line-height: 1.4; letter-spacing: -0.2px;">
-            আমাদের সেবা সম্পর্কে আপনার মতামত জানান
-          </h2>
-        </div>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #121212; margin: 0; padding: 0; color: #e0e0e0; width: 100%;">
+      <table class="body-wrapper" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; background-color: #121212; margin: 0; padding: 0; border-collapse: collapse;">
+        <tr>
+          <td align="center" class="body-td" style="padding: 0; margin: 0;">
+            <div class="email-container" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #1e1e1e; border-radius: 0; overflow: hidden; border: 1px solid #2d2d2d;">
+              
+              <!-- Top Green Banner Image/Header -->
+              <div class="banner-header" style="background-color: #059669; color: #ffffff; padding: 20px 14px; text-align: center; border-bottom: 2px solid #047857;">
+                <h2 style="margin: 0; font-size: 18px; font-weight: 700; line-height: 1.35; letter-spacing: -0.2px; word-break: normal; overflow-wrap: break-word;">
+                  আমাদের সেবা সম্পর্কে আপনার মতামত জানান
+                </h2>
+              </div>
 
-        <!-- Body Container -->
-        <div style="padding: 28px 24px;">
-          
-          <p style="font-size: 17px; color: #ffffff; margin-top: 0; font-weight: 600;">
-            হাই ${userName},
-          </p>
+              <!-- Body Container -->
+              <div class="main-content" style="padding: 16px 12px; box-sizing: border-box; width: 100%;">
+                
+                <p style="font-size: 16px; color: #ffffff; margin-top: 0; font-weight: 600;">
+                  হাই ${userName},
+                </p>
 
-          <p style="font-size: 15px; line-height: 1.6; color: #cccccc; margin-bottom: 20px;">
-            আপনি সম্প্রতি <strong style="color: #ffffff;">${appName}</strong> থেকে নিচের পণ্যগুলো কিনেছেন:
-          </p>
+                <p style="font-size: 14px; line-height: 1.6; color: #cccccc; margin-bottom: 20px;">
+                  আপনি সম্প্রতি <strong style="color: #ffffff;">${appName}</strong> থেকে নিচের পণ্যগুলো কিনেছেন:
+                </p>
 
-          <!-- Product Items List -->
-          <div style="margin-bottom: 24px;">
-            ${itemsHtml}
-          </div>
+                <!-- Product Items List -->
+                <div style="margin-bottom: 24px;">
+                  ${itemsHtml}
+                </div>
 
-          <p style="font-size: 15px; line-height: 1.6; color: #cccccc; margin-bottom: 16px;">
-            পণ্যগুলো ব্যবহার করে থাকলে আপনার অভিজ্ঞতা সম্পর্কে একটি ছোট্ট রিভিউ দিলে আমরা খুবই খুশি হব। 😊
-          </p>
+                <p style="font-size: 14px; line-height: 1.6; color: #cccccc; margin-bottom: 16px;">
+                  পণ্যগুলো ব্যবহার করে থাকলে আপনার অভিজ্ঞতা সম্পর্কে একটি ছোট্ট রিভিউ দিলে আমরা খুবই খুশি হব। 😊
+                </p>
 
-          <p style="font-size: 15px; line-height: 1.6; color: #cccccc; margin-bottom: 24px;">
-            আপনার মতামত ভবিষ্যতের ক্রেতাদের সঠিক সিদ্ধান্ত নিতে সাহায্য করবে এবং আমাদের সেবা আরও উন্নত করতে উৎসাহ দেবে।
-          </p>
+                <p style="font-size: 14px; line-height: 1.6; color: #cccccc; margin-bottom: 22px;">
+                  আপনার মতামত ভবিষ্যতের ক্রেতাদের সঠিক সিদ্ধান্ত নিতে সাহায্য করবে এবং আমাদের সেবা আরও উন্নত করতে উৎসাহ দেবে।
+                </p>
 
-          <p style="font-size: 15px; line-height: 1.6; color: #ffffff; font-weight: 500; margin-bottom: 20px;">
-            ধন্যবাদ আমাদের উপর আস্থা রাখার জন্য। ❤️
-          </p>
+                <p style="font-size: 14px; line-height: 1.6; color: #ffffff; font-weight: 500; margin-bottom: 18px;">
+                  ধন্যবাদ আমাদের উপর আস্থা রাখার জন্য। ❤️
+                </p>
 
-          <p style="font-size: 15px; line-height: 1.5; color: #cccccc; margin-bottom: 28px;">
-            শুভেচ্ছান্তে,<br />
-            <strong style="color: #ffffff; font-size: 16px;">${appName}</strong>
-          </p>
+                <p style="font-size: 14px; line-height: 1.5; color: #cccccc; margin-bottom: 24px;">
+                  শুভেচ্ছান্তে,<br />
+                  <strong style="color: #ffffff; font-size: 15px;">${appName}</strong>
+                </p>
 
-          <!-- Main Review Button -->
-          <div style="text-align: center; margin: 32px 0 16px 0;">
-            <a href="${firstProductUrl}" target="_blank" style="background-color: #059669; color: #ffffff; padding: 14px 44px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 16px; display: inline-block; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4);">
-              Review
-            </a>
-          </div>
+                <!-- Main Review Button -->
+                <div style="text-align: center; margin: 26px 0 12px 0;">
+                  <a href="${firstProductUrl}" target="_blank" class="review-btn-main" style="background-color: #059669; color: #ffffff; padding: 13px 40px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4); max-width: 100%;">
+                    Review
+                  </a>
+                </div>
 
-        </div>
+                <!-- WhatsApp Support Contact Box -->
+                ${getWhatsAppContactBlock(true)}
 
-        <!-- Footer -->
-        <div style="background-color: #141414; padding: 18px 24px; text-align: center; font-size: 13px; color: #777777; border-top: 1px solid #2a2a2a;">
-          This email was sent by ${appName}.
-        </div>
+              </div>
 
-      </div>
+              <!-- Footer -->
+              <div style="background-color: #0f172a; padding: 22px 20px 20px 20px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #1e293b; line-height: 1.6;">
+                <div style="margin-bottom: 6px; text-align: center;">
+                  <img src="${process.env.EMAIL_LOGO_URL || 'cid:brand_logo'}" alt="${appName}" width="165" style="width: 165px; max-width: 100%; height: auto; display: inline-block; vertical-align: middle; border: 0; outline: none; text-decoration: none;" />
+                </div>
+                <div style="color: #64748b; font-size: 12px; font-weight: 500; letter-spacing: 0.2px;">Dhaka, Bangladesh</div>
+              </div>
+
+            </div>
+          </td>
+        </tr>
+      </table>
     </body>
     </html>
   `;
@@ -167,9 +202,12 @@ const processPendingReviewEmails = async () => {
       const html = generateReviewEmailHtml(order.user_name, items, order.order_id);
       const subject = `${order.user_name}, আপনার কেনা পণ্যটি কেমন লেগেছে?`;
 
+      const text = `Hello ${order.user_name},\n\nThank you for shopping at ${process.env.APP_NAME || 'ElitePassBD'}!\nPlease share your review for your purchase.${getWhatsAppContactText()}`;
+
       const sent = await sendEmail({
         to: recipientEmail,
         subject,
+        text,
         html
       });
 

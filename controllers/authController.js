@@ -185,50 +185,185 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-const nodemailer = require('nodemailer');
+exports.updateProfile = async (req, res) => {
+  const userId = req.user.id;
+  const { name, whatsapp_number, address } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ message: 'Name is required.' });
+  }
+
+  try {
+    // Note: Email address is strictly NOT allowed to be modified by the user
+    await db.query(
+      'UPDATE users SET name = ?, whatsapp_number = ?, address = ? WHERE id = ?',
+      [
+        name.trim(),
+        whatsapp_number !== undefined ? (whatsapp_number ? String(whatsapp_number).trim() : null) : null,
+        address !== undefined ? (address ? String(address).trim() : null) : null,
+        userId
+      ]
+    );
+
+    const [users] = await db.query(
+      'SELECT id, name, email, role, whatsapp_number, address, created_at FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const updatedUser = users[0];
+
+    const token = jwt.sign(
+      { id: updatedUser.id, name: updatedUser.name, email: updatedUser.email, role: updatedUser.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      message: 'Profile updated successfully!',
+      user: updatedUser,
+      token
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Database error occurred while updating profile.' });
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  const userId = req.user.id;
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ message: 'Current password and new password are required.' });
+  }
+
+  if (String(newPassword).length < 6) {
+    return res.status(400).json({ message: 'New password must be at least 6 characters long.' });
+  }
+
+  try {
+    const [users] = await db.query('SELECT password FROM users WHERE id = ?', [userId]);
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, users[0].password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password does not match.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+
+    res.json({ message: 'Password updated successfully!' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ message: 'Database error occurred while changing password.' });
+  }
+};
+
+const { sendEmail, getWhatsAppContactBlock, getEmailFooter, getWhatsAppContactText } = require('../utils/mailer');
 
 const sendOTPEmail = async (email, otp) => {
   try {
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT || 587;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    const appName = process.env.APP_NAME || 'ElitePassBD';
+    const subject = `Password Reset OTP - ${appName}`;
+    const text = `Your OTP for resetting your password is: ${otp}. It will expire in 10 minutes. If you did not request this, please ignore this email.${getWhatsAppContactText()}`;
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Reset OTP - ${appName}</title>
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    @media only screen and (max-width: 600px) {
+      .email-container { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; }
+      .body-wrapper { padding: 0 !important; }
+      .banner-header { padding: 24px 16px !important; }
+      .banner-header h1 { font-size: 20px !important; }
+      .main-content { padding: 20px 14px !important; }
+      .otp-box { font-size: 24px !important; letter-spacing: 4px !important; padding: 14px 16px !important; }
+    }
+  </style>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; margin: 0; padding: 0; color: #e2e8f0; width: 100%;">
+  <table class="body-wrapper" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; background-color: #0b1120; padding: 20px 8px;">
+    <tr>
+      <td align="center" style="padding: 10px 4px;">
+        <table class="email-container" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45); border: 1px solid #334155;">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td class="banner-header" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); background-color: #059669; color: #ffffff; padding: 26px 20px; text-align: center;">
+              <h1 style="margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -0.3px;">
+                Password Reset Request
+              </h1>
+              <p style="margin: 6px 0 0 0; font-size: 13.5px; color: #d1fae5; font-weight: 500;">
+                ${appName} Account Security
+              </p>
+            </td>
+          </tr>
 
-    if (smtpHost && smtpUser && smtpPass) {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: parseInt(smtpPort),
-        secure: smtpPort === '465',
-        auth: {
-          user: smtpUser,
-          pass: smtpPass
-        },
-        tls: {
-          rejectUnauthorized: false
-        }
-      });
+          <!-- Content Body -->
+          <tr>
+            <td class="main-content" style="padding: 24px 20px;">
+              <p style="font-size: 15px; color: #ffffff; margin-top: 0; font-weight: 600;">
+                Hello,
+              </p>
+              <p style="font-size: 13.5px; line-height: 1.6; color: #cbd5e1; margin-bottom: 20px;">
+                We received a request to reset the password for your <strong style="color: #ffffff;">${appName}</strong> account. Use the verification code below to complete your password reset:
+              </p>
 
-      await transporter.sendMail({
-        from: `"${process.env.APP_NAME || 'ElitePassBD'}" <${smtpUser}>`,
-        to: email,
-        subject: 'Password Reset OTP - ElitePassBD',
-        text: `Your OTP for resetting password is ${otp}. It will expire in 10 minutes.`,
-        html: `<h3>Password Reset Requested</h3>
-               <p>Your OTP code to reset your password is: <strong>${otp}</strong></p>
-               <p>This code will expire in 10 minutes.</p>
-               <p>If you did not request this, please ignore this email.</p>`
-      });
+              <!-- OTP Code Display Card -->
+              <div style="text-align: center; margin: 24px 0;">
+                <div class="otp-box" style="display: inline-block; background-color: #0f172a; border: 2px dashed #10b981; border-radius: 12px; padding: 16px 28px; font-family: Consolas, 'Courier New', monospace; font-size: 30px; font-weight: 800; color: #34d399; letter-spacing: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                  ${otp}
+                </div>
+                <div style="font-size: 12px; color: #f59e0b; font-weight: 600; margin-top: 10px;">
+                  ⏱️ This code will expire in 10 minutes
+                </div>
+              </div>
+
+              <!-- Security Notice -->
+              <div style="background-color: #0f172a; border-radius: 10px; padding: 14px 16px; border: 1px solid #334155; margin-top: 20px; font-size: 12px; line-height: 1.5; color: #94a3b8;">
+                <strong style="color: #ffffff;">Security Alert:</strong> If you did not request a password reset, please ignore this email or change your password if you suspect unauthorized access. Never share this code with anyone.
+              </div>
+
+              <div style="font-size: 12px; color: #64748b; text-align: center; margin-top: 24px; line-height: 1.5;">
+                Thank you for using <strong style="color: #ffffff;">${appName}</strong>.
+              </div>
+
+              <!-- WhatsApp Support Contact Box -->
+              ${getWhatsAppContactBlock(true)}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          ${getEmailFooter(appName, true)}
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const sent = await sendEmail({
+      to: email,
+      subject,
+      text,
+      html
+    });
+    if (sent) {
       console.log(`OTP Email sent successfully to ${email}`);
-    } else {
-      console.log('----------------------------');
-      console.log(`MOCK SMTP: OTP for ${email} is ${otp}`);
-      console.log('----------------------------');
     }
   } catch (error) {
     console.error('Failed to send OTP email:', error);
-    console.log('----------------------------');
-    console.log(`FALLBACK: OTP for ${email} is ${otp}`);
-    console.log('----------------------------');
   }
 };
 

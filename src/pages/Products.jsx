@@ -274,7 +274,7 @@ export default function Products() {
                           ) : <div></div>}
 
                           {(prod.is_instant === 1 || prod.activation_process === 'Instant') && (
-                            <span className="bg-emerald-600/95 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5">
+                            <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5 border border-amber-300/80">
                               ⚡ Instant
                             </span>
                           )}

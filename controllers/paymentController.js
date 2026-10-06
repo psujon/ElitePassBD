@@ -1,6 +1,6 @@
 const { EPS } = require('eps-gateway-nodejs');
 const db = require('../config/db');
-const { sendEmail } = require('../utils/mailer');
+const { sendEmail, getWhatsAppContactBlock, getEmailFooter, getWhatsAppContactText, formatRulesHtml, formatLicenseKeyHtml } = require('../utils/mailer');
 const { sendPurchaseConfirmationEmail } = require('../services/purchaseEmailService');
 const { syncWebsiteOrderToSubscriptions } = require('../services/orderSubscriptionSyncService');
 
@@ -100,17 +100,22 @@ exports.initiatePayment = async (req, res) => {
 
 const sendLicenseEmail = async (email, userName, orderId, licenses) => {
   try {
+    const appName = process.env.APP_NAME || 'ElitePassBD';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://elitepassbd.com';
+    const dashboardUrl = `${frontendUrl}/dashboard`;
+
     let keysHtml = '';
     for (const lic of licenses) {
       keysHtml += `
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px; font-family: sans-serif;">
-          <h4 style="margin: 0 0 8px 0; color: #1e293b; font-size: 14px;">${lic.product_name}</h4>
-          ${lic.package_name ? `<p style="margin: 2px 0; color: #64748b; font-size: 12px;"><strong>Package:</strong> ${lic.package_name}</p>` : ''}
-          ${lic.selected_device ? `<p style="margin: 2px 0; color: #64748b; font-size: 12px;"><strong>Device:</strong> ${lic.selected_device}</p>` : ''}
-          ${lic.selected_activation ? `<p style="margin: 2px 0; color: #64748b; font-size: 12px;"><strong>Activation:</strong> ${lic.selected_activation}</p>` : ''}
-          ${lic.rules ? `<p style="margin: 6px 0 2px 0; color: #b45309; background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; padding: 6px 10px; font-size: 11px;"><strong>License Rules:</strong> ${lic.rules}</p>` : ''}
-          <div style="margin-top: 10px; background-color: #ecfdf5; border: 1px dashed #10b981; border-radius: 6px; padding: 10px; color: #065f46; font-family: monospace; font-size: 14px; font-weight: bold; width: fit-content; word-break: break-all;">
-            ${lic.license_key}
+        <div class="key-card" style="background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; box-sizing: border-box; width: 100%;">
+          <div style="font-size: 13.5px; font-weight: 700; color: #ffffff; margin-bottom: 4px; line-height: 1.35; word-break: normal; overflow-wrap: break-word;">${lic.product_name}</div>
+          ${lic.package_name ? `<div style="margin: 2px 0; color: #94a3b8; font-size: 11px; word-break: normal; overflow-wrap: break-word;"><strong>Package:</strong> ${lic.package_name}</div>` : ''}
+          ${lic.selected_device ? `<div style="margin: 2px 0; color: #94a3b8; font-size: 11px; word-break: normal; overflow-wrap: break-word;"><strong>Device:</strong> ${lic.selected_device}</div>` : ''}
+          ${lic.selected_activation ? `<div style="margin: 2px 0; color: #94a3b8; font-size: 11px; word-break: normal; overflow-wrap: break-word;"><strong>Activation:</strong> ${lic.selected_activation}</div>` : ''}
+          ${lic.rules ? formatRulesHtml(lic.rules, true) : ''}
+          
+          <div class="key-box" style="margin-top: 8px; background-color: #1e293b; border: 1.5px dashed #10b981; border-radius: 6px; padding: 8px 10px; color: #ffffff; display: block; width: 100%; box-sizing: border-box; word-break: normal; overflow-wrap: break-word; text-align: left;">
+            ${formatLicenseKeyHtml(lic.license_key, true)}
           </div>
         </div>
       `;
@@ -118,34 +123,117 @@ const sendLicenseEmail = async (email, userName, orderId, licenses) => {
 
     const emailSent = await sendEmail({
       to: email,
-      subject: `Your Digital Keys - Order #${orderId} - ElitePassBD`,
+      subject: `Your Digital Keys - Order #${orderId} - ${appName}`,
       text: `Hello ${userName},\n\nThank you for your purchase! Here are your digital keys for Order #${orderId}:\n\n` +
         licenses.map(lic => `${lic.product_name}: ${lic.license_key}${lic.rules ? `\nLicense Rules: ${lic.rules}` : ''}`).join('\n\n') +
-        `\n\nYou can also find these keys at any time in your customer dashboard.`,
-      html: `
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: sans-serif; color: #334155;">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <h2 style="color: #6d28d9; margin: 0;">ElitePass BD</h2>
-            <p style="color: #64748b; font-size: 14px; margin: 4px 0 0 0;">Your Digital Keys are Ready!</p>
-          </div>
-          <p>Hello <strong>${userName}</strong>,</p>
-          <p>Thank you for your order! The payment was successful, and your keys have been issued successfully.</p>
-          <h3 style="color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-top: 24px;">Purchase Details (Order #${orderId})</h3>
-          ${keysHtml}
-          <div style="margin-top: 24px; padding: 16px; background-color: #f1f5f9; border-radius: 12px; font-size: 12px; color: #475569;">
-            <strong>Need Help?</strong> If you have any trouble activating your products, please open a support ticket from your account dashboard or reply to this email.
-          </div>
-        </div>
-      `
+        `\n\nYou can also find these keys at any time in your customer dashboard: ${dashboardUrl}${getWhatsAppContactText()}`,
+      html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Digital Keys - Order #${orderId}</title>
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    body { margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #0b1120; }
+    .body-wrapper { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    .body-td { padding: 0 !important; margin: 0 !important; }
+    * {
+      word-break: normal !important;
+      overflow-wrap: break-word !important;
+      word-wrap: break-word !important;
+      hyphens: none !important;
+      -webkit-hyphens: none !important;
+    }
+    img { max-width: 100%; height: auto; }
+    @media only screen and (max-width: 600px) {
+      .body-wrapper { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+      .body-td { padding: 0 !important; margin: 0 !important; width: 100% !important; }
+      .email-container { width: 100% !important; max-width: 100% !important; min-width: 100% !important; border-radius: 0 !important; border: none !important; margin: 0 !important; }
+      .banner-header { padding: 14px 6px !important; }
+      .banner-header h1 { font-size: 16px !important; }
+      .main-content { padding: 8px 2px !important; width: 100% !important; }
+      .key-card { padding: 8px 4px !important; margin-bottom: 8px !important; border-radius: 0 !important; border-left: none !important; border-right: none !important; width: 100% !important; }
+      .key-box { padding: 6px 4px !important; margin-top: 6px !important; border-radius: 4px !important; }
+      .rules-box { padding: 6px 4px !important; margin: 6px 0 !important; border-radius: 4px !important; }
+      .dash-btn { display: block !important; width: 100% !important; box-sizing: border-box !important; text-align: center !important; padding: 10px 14px !important; }
+      .footer-cell { padding: 12px 6px !important; }
+    }
+  </style>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; margin: 0; padding: 0; color: #e2e8f0; width: 100%;">
+  <table class="body-wrapper" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; background-color: #0b1120; margin: 0; padding: 0; border-collapse: collapse;">
+    <tr>
+      <td align="center" class="body-td" style="padding: 0; margin: 0;">
+        <table class="email-container" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 0; overflow: hidden; border: 1px solid #334155;">
+          
+          <!-- Banner Header -->
+          <tr>
+            <td class="banner-header" style="background-color: #059669; color: #ffffff; padding: 20px 14px; text-align: center;">
+              <h1 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.2px;">
+                Your Digital Keys are Ready!
+              </h1>
+              <p style="margin: 4px 0 0 0; font-size: 12px; color: #d1fae5; font-weight: 500; word-break: normal; overflow-wrap: break-word;">
+                Order Confirmation #${orderId} • ${appName}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td class="main-content" style="padding: 16px 12px; box-sizing: border-box; width: 100%;">
+              <p style="font-size: 13.5px; color: #ffffff; margin-top: 0; margin-bottom: 8px; font-weight: 600;">
+                Hello ${userName || 'Customer'},
+              </p>
+              <p style="font-size: 12px; line-height: 1.55; color: #cbd5e1; margin-bottom: 14px; word-break: normal; overflow-wrap: break-word;">
+                Thank you for your purchase! Your payment was successful, and your official digital license keys / credentials have been generated below:
+              </p>
+
+              <!-- Digital Keys Section -->
+              <div style="font-size: 13px; color: #ffffff; margin-bottom: 10px; font-weight: 700; border-bottom: 1px solid #334155; padding-bottom: 6px;">
+                🔑 Issued Digital Keys & Credentials
+              </div>
+              
+              ${keysHtml}
+
+              <!-- Help / Support Box -->
+              <div style="background-color: #0f172a; border-radius: 8px; padding: 10px 12px; border: 1px solid #334155; margin-top: 14px; font-size: 11.5px; line-height: 1.5; color: #94a3b8; word-break: normal; overflow-wrap: break-word;">
+                <strong style="color: #ffffff;">Need Help?</strong> If you have any questions or need help activating your subscription, you can access your keys anytime in your dashboard or contact our support team.
+              </div>
+
+              <!-- Dashboard CTA Button -->
+              <div style="text-align: center; margin: 18px 0 10px 0;">
+                <a href="${dashboardUrl}" target="_blank" class="dash-btn" style="background-color: #059669; color: #ffffff; padding: 11px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px; display: inline-block; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4); max-width: 100%;">
+                  View in My Account Dashboard
+                </a>
+              </div>
+
+              <!-- WhatsApp Support Contact Box -->
+              ${getWhatsAppContactBlock(true)}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          ${getEmailFooter(appName, true)}
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
     });
 
     if (emailSent) {
       console.log(`License keys email sent successfully to ${email}`);
+      return true;
     } else {
       console.log(`Failed to send license keys email to ${email}`);
+      return false;
     }
   } catch (error) {
     console.error('Failed to send license keys email:', error);
+    return false;
   }
 };
 
@@ -184,9 +272,9 @@ const fulfillOrder = async (merchantTransactionId) => {
     if (order.payment_status === 'Paid') {
       await connection.commit();
       const [items] = await db.query(
-        `SELECT oi.*, p.name AS product_name, p.activation_process, p.packages 
+        `SELECT oi.*, COALESCE(p.name, 'Archived Product') AS product_name, p.activation_process, p.packages 
          FROM order_items oi
-         JOIN products p ON oi.product_id = p.id
+         LEFT JOIN products p ON oi.product_id = p.id
          WHERE oi.order_id = ?`,
         [order.id]
       );
@@ -240,9 +328,9 @@ const fulfillOrder = async (merchantTransactionId) => {
     );
 
     const [items] = await connection.query(
-      `SELECT oi.*, p.name AS product_name, p.activation_process, p.packages 
+      `SELECT oi.*, COALESCE(p.name, 'Archived Product') AS product_name, p.activation_process, p.packages 
        FROM order_items oi
-       JOIN products p ON oi.product_id = p.id
+       LEFT JOIN products p ON oi.product_id = p.id
        WHERE oi.order_id = ?`,
       [order.id]
     );
@@ -369,21 +457,22 @@ const fulfillOrder = async (merchantTransactionId) => {
         }
       });
 
-      let itemsHtml = `<h3>Ordered Items</h3><table style="width: 100%; border-collapse: collapse; margin-top: 10px;" border="1">
+      let itemsHtml = `<div style="font-size: 14px; font-weight: 700; color: #1e293b; margin: 16px 0 8px 0;">Ordered Items:</div>
+      <table style="width: 100%; max-width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 13px;" border="1" cellpadding="6" cellspacing="0" bordercolor="#cbd5e1">
         <thead>
-          <tr style="background-color: #f1f5f9;">
-            <th style="padding: 8px; text-align: left;">Item</th>
-            <th style="padding: 8px; text-align: left;">Delivery Method</th>
-            <th style="padding: 8px; text-align: left;">License (If Auto)</th>
+          <tr style="background-color: #f1f5f9; color: #334155; font-size: 12px; text-transform: uppercase;">
+            <th style="padding: 8px 6px; text-align: left;">Item</th>
+            <th style="padding: 8px 6px; text-align: left; width: 28%;">Delivery</th>
+            <th style="padding: 8px 6px; text-align: left; width: 34%;">License / Status</th>
           </tr>
         </thead>
         <tbody>`;
 
       items.forEach(item => {
-        itemsHtml += `<tr><td style="padding: 8px;"><strong>${item.product_name}</strong> (Qty: ${item.quantity})`;
-        if (item.package_name) itemsHtml += `<br><small>Package: ${item.package_name}</small>`;
-        if (item.selected_device) itemsHtml += `<br><small>Device: ${item.selected_device}</small>`;
-        if (item.selected_activation) itemsHtml += `<br><small>Activation: ${item.selected_activation}</small>`;
+        itemsHtml += `<tr><td style="padding: 8px 6px; vertical-align: top;"><strong style="color: #0f172a;">${item.product_name}</strong> (Qty: ${item.quantity})`;
+        if (item.package_name) itemsHtml += `<br><small style="color: #64748b;">Package: ${item.package_name}</small>`;
+        if (item.selected_device) itemsHtml += `<br><small style="color: #64748b;">Device: ${item.selected_device}</small>`;
+        if (item.selected_activation) itemsHtml += `<br><small style="color: #64748b;">Activation: ${item.selected_activation}</small>`;
         itemsHtml += `</td>`;
 
         let actProcess = item.activation_process || 'Manual';
@@ -400,18 +489,18 @@ const fulfillOrder = async (merchantTransactionId) => {
           } catch (e) {}
         }
 
-        itemsHtml += `<td style="padding: 8px;">${actProcess}</td>`;
+        itemsHtml += `<td style="padding: 8px 6px; vertical-align: top; color: #334155; font-size: 12px;">${actProcess}</td>`;
 
         let licenseContent = '-';
         if (actProcess === 'Automatic') {
           const itemLicenses = fulfilledLicenses.filter(lic => lic.product_id === item.product_id && lic.package_name === item.package_name);
           if (itemLicenses.length > 0) {
-            licenseContent = itemLicenses.map(l => `<code style="background: #e2e8f0; padding: 2px 4px; border-radius: 4px; display: inline-block; margin: 2px 0; word-break: break-all;">${l.license_key}</code>`).join('<br>');
+            licenseContent = itemLicenses.map(l => `<code style="background: #e2e8f0; padding: 2px 4px; border-radius: 4px; display: inline-block; margin: 2px 0; word-break: normal; overflow-wrap: break-word; font-size: 11px;">${l.license_key}</code>`).join('<br>');
           } else {
-            licenseContent = '<span style="color: red;">Out of Stock</span>';
+            licenseContent = '<span style="color: #dc2626; font-weight: 700; font-size: 11px;">Out of Stock</span>';
           }
         }
-        itemsHtml += `<td style="padding: 8px;">${licenseContent}</td></tr>`;
+        itemsHtml += `<td style="padding: 8px 6px; vertical-align: top;">${licenseContent}</td></tr>`;
       });
       itemsHtml += `</tbody></table>`;
 
@@ -419,18 +508,49 @@ const fulfillOrder = async (merchantTransactionId) => {
         to: 'johirul3218@gmail.com',
         subject: `Order Completed (Paid) - Order #${order.id}`,
         text: `Order #${order.id} has been paid successfully.\nAmount: ৳${order.total_amount}\nTransaction ID: ${merchantTransactionId}\nPhone: ${order.phone}\nDelivery Email: ${order.delivery_email || order.user_email}`,
-        html: `<h3>Order Completed (Paid)</h3>
-               <p>Order #${order.id} has been paid and fulfilled successfully.</p>
-               <p><strong>Transaction Details:</strong></p>
-               <ul>
-                 <li><strong>Order ID:</strong> #${order.id}</li>
-                 <li><strong>Amount Paid:</strong> ৳${order.total_amount}</li>
-                 <li><strong>Transaction ID:</strong> ${merchantTransactionId}</li>
-                 <li><strong>Customer Name:</strong> ${order.user_name}</li>
-                 <li><strong>Customer Phone:</strong> ${order.phone}</li>
-                 <li><strong>Delivery Email:</strong> ${order.delivery_email || order.user_email}</li>
-               </ul>
-               ${itemsHtml}`
+        html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order #${order.id} Paid</title>
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    @media only screen and (max-width: 600px) {
+      .email-container { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; }
+      .body-wrapper { padding: 0 !important; }
+      .main-content { padding: 16px 12px !important; }
+    }
+  </style>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; color: #334155; width: 100%;">
+  <table class="body-wrapper" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; background-color: #f1f5f9; padding: 16px 6px;">
+    <tr>
+      <td align="center" style="padding: 6px 2px;">
+        <table class="email-container" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
+          <tr>
+            <td style="background-color: #059669; color: #ffffff; padding: 20px 24px;">
+              <h2 style="margin: 0; font-size: 18px; font-weight: 700;">Order #${order.id} Paid & Fulfilled 🎉</h2>
+              <p style="margin: 4px 0 0 0; font-size: 13px; color: #d1fae5;">Total: ৳${order.total_amount} BDT</p>
+            </td>
+          </tr>
+          <tr>
+            <td class="main-content" style="padding: 22px 20px;">
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 18px; font-size: 13px; line-height: 1.6;">
+                <div><strong>Transaction ID:</strong> ${merchantTransactionId}</div>
+                <div><strong>Customer:</strong> ${order.user_name}</div>
+                <div><strong>Phone:</strong> ${order.phone}</div>
+                <div><strong>Delivery Email:</strong> ${order.delivery_email || order.user_email}</div>
+              </div>
+              ${itemsHtml}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
       }).catch(err => console.error('Failed to send admin order completion email:', err));
     } catch (fbTrackErr) {
       console.error('FB Purchase CAPI Trigger Error:', fbTrackErr);
@@ -443,7 +563,11 @@ const fulfillOrder = async (merchantTransactionId) => {
   connection.release();
 
   if (fulfilledLicenses.length > 0) {
-    sendLicenseEmail(targetEmail, userName, orderId, fulfilledLicenses);
+    sendLicenseEmail(targetEmail, userName, orderId, fulfilledLicenses).then(sent => {
+      if (sent) {
+        db.query('UPDATE orders SET license_email_sent = 1 WHERE id = ?', [orderId]).catch(e => console.error('Failed to update license_email_sent:', e.message));
+      }
+    });
   }
 
   return { success: true, alreadyProcessed: false, activationType, orderId, pixelData };
@@ -706,3 +830,5 @@ exports.getEpsHistory = async (req, res) => {
     res.status(500).json({ message: 'Error fetching EPS history' });
   }
 };
+
+exports.sendLicenseEmail = sendLicenseEmail;

@@ -5,7 +5,7 @@ try {
   console.warn('[SubscriptionCronService] node-cron module is not installed. Background subscription cron will be disabled until installed.');
 }
 const db = require('../config/db');
-const { sendEmail } = require('../utils/mailer');
+const { sendEmail, getWhatsAppContactBlock, getEmailFooter, getWhatsAppContactText } = require('../utils/mailer');
 const { replaceTemplateTags, sendWhatsAppCloudApi } = require('./whatsappService');
 
 const getSettingsMap = async (pool) => {
@@ -144,17 +144,113 @@ const processSubscriptionReminders = async () => {
 
           if (dupCheck.length === 0) {
             const subject = replaceTemplateTags(emailSubjectTpl, templateData);
-            const textBody = replaceTemplateTags(emailBodyTpl, templateData);
-            const htmlBody = `
-              <div style="font-family: Arial, sans-serif; padding: 20px; background: #121212; color: #ffffff; border-radius: 8px;">
-                <h2 style="color: #10b981;">${subject}</h2>
-                <p>Hello <strong>${sub.customer_name}</strong>,</p>
-                <p>Your subscription for <strong>${sub.product_name}</strong> (${sub.package_plan}) expires on <strong style="color: #f59e0b;">${formattedExpiry}</strong>.</p>
-                <p>To ensure continuous service, please complete your renewal payment.</p>
-                <br/>
-                <p>Thank you,<br/><strong>ElitePassBD</strong></p>
+            const textBody = replaceTemplateTags(emailBodyTpl, templateData) + getWhatsAppContactText();
+            const appName = process.env.APP_NAME || 'ElitePassBD';
+            const frontendUrl = process.env.FRONTEND_URL || 'https://elitepassbd.com';
+            const renewUrl = `${frontendUrl}/dashboard`;
+
+            const htmlBody = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    body { margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #0b1120; }
+    .body-wrapper { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    .body-td { padding: 0 !important; margin: 0 !important; }
+    * {
+      word-break: normal !important;
+      overflow-wrap: break-word !important;
+      word-wrap: break-word !important;
+      hyphens: none !important;
+      -webkit-hyphens: none !important;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-container { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; border-left: none !important; border-right: none !important; }
+      .banner-header { padding: 18px 12px !important; }
+      .banner-header h1 { font-size: 17px !important; }
+      .main-content { padding: 14px 10px !important; }
+      .renew-btn { display: block !important; width: 100% !important; box-sizing: border-box !important; text-align: center !important; padding: 12px 14px !important; }
+    }
+  </style>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; margin: 0; padding: 0; color: #e2e8f0; width: 100%;">
+  <table class="body-wrapper" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; background-color: #0b1120; margin: 0; padding: 0; border-collapse: collapse;">
+    <tr>
+      <td align="center" class="body-td" style="padding: 0; margin: 0;">
+        <table class="email-container" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 0; overflow: hidden; border: 1px solid #334155;">
+          
+          <!-- Banner Header -->
+          <tr>
+            <td class="banner-header" style="background-color: #d97706; color: #ffffff; padding: 20px 14px; text-align: center;">
+              <div style="display: inline-block; background-color: rgba(255, 255, 255, 0.2); padding: 4px 10px; border-radius: 9999px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px;">
+                Renewal Reminder ⏳
               </div>
-            `;
+              <h1 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.2px;">
+                Subscription Expiring Soon
+              </h1>
+              <p style="margin: 4px 0 0 0; font-size: 12px; color: #fef3c7; font-weight: 500; word-break: normal; overflow-wrap: break-word;">
+                ${sub.product_name} • ${sub.package_plan}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Content Body -->
+          <tr>
+            <td class="main-content" style="padding: 16px 12px; box-sizing: border-box; width: 100%;">
+              <p style="font-size: 13.5px; color: #ffffff; margin-top: 0; margin-bottom: 8px; font-weight: 600;">
+                Hello ${sub.customer_name || 'Valued Customer'},
+              </p>
+              <p style="font-size: 12px; line-height: 1.55; color: #cbd5e1; margin-bottom: 14px; word-break: normal; overflow-wrap: break-word;">
+                This is a friendly reminder that your subscription with <strong style="color: #ffffff;">${appName}</strong> is expiring soon. To avoid any disruption to your service, please renew on time.
+              </p>
+
+              <!-- Subscription Info Box -->
+              <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 16px; box-sizing: border-box; width: 100%;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                  <tr>
+                    <td style="padding: 5px 0; color: #94a3b8; width: 38%; font-size: 11.5px;">Product:</td>
+                    <td style="padding: 5px 0; font-weight: 600; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word;">${sub.product_name}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Package:</td>
+                    <td style="padding: 5px 0; font-weight: 600; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word;">${sub.package_plan}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Expiry Date:</td>
+                    <td style="padding: 5px 0; font-weight: 700; color: #f59e0b; font-size: 12px;">${formattedExpiry}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Renewal CTA Button -->
+              <div style="text-align: center; margin: 18px 0 10px 0;">
+                <a href="${renewUrl}" target="_blank" class="renew-btn" style="background-color: #059669; color: #ffffff; padding: 11px 26px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px; display: inline-block; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4); max-width: 100%;">
+                  Renew Subscription Now
+                </a>
+              </div>
+
+              <p style="font-size: 11.5px; color: #64748b; text-align: center; margin-top: 14px; line-height: 1.5; word-break: normal; overflow-wrap: break-word;">
+                Thank you for being with <strong style="color: #cbd5e1;">${appName}</strong>. If you have already renewed, please disregard this notice.
+              </p>
+
+              <!-- WhatsApp Support Contact Box -->
+              ${getWhatsAppContactBlock(true)}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          ${getEmailFooter(appName, true)}
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 
             const sent = await sendEmail({
               to: sub.email,

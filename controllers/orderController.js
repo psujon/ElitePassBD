@@ -45,12 +45,12 @@ exports.createOrder = async (req, res) => {
       }
 
       const [stockCheck] = await connection.query(
-        'SELECT stock, name, packages FROM products WHERE id = ? FOR UPDATE',
+        'SELECT stock, name, packages, is_deleted FROM products WHERE id = ? FOR UPDATE',
         [product_id]
       );
 
-      if (stockCheck.length === 0) {
-        throw new Error(`Product not found.`);
+      if (stockCheck.length === 0 || stockCheck[0].is_deleted === 1) {
+        throw new Error(`Product not found or is no longer available.`);
       }
 
       const productName = stockCheck[0].name;
@@ -121,10 +121,6 @@ exports.createOrder = async (req, res) => {
 
     await connection.commit();
 
-    sendPurchaseConfirmationEmail(orderId).catch(err => {
-      console.error('Failed to send purchase email in createOrder:', err);
-    });
-
     res.status(201).json({
       message: 'Order placed successfully!',
       orderId: orderId
@@ -149,9 +145,9 @@ exports.getMyOrders = async (req, res) => {
     const ordersWithItems = [];
     for (const order of orders) {
       const [items] = await db.query(
-        `SELECT oi.*, p.name as product_name, p.image_url 
+        `SELECT oi.*, COALESCE(p.name, 'Archived Product') as product_name, p.image_url 
          FROM order_items oi
-         JOIN products p ON oi.product_id = p.id
+         LEFT JOIN products p ON oi.product_id = p.id
          WHERE oi.order_id = ?`,
         [order.id]
       );
@@ -196,9 +192,9 @@ exports.trackOrder = async (req, res) => {
     }
 
     const [items] = await db.query(
-      `SELECT oi.*, p.name as product_name, p.image_url 
+      `SELECT oi.*, COALESCE(p.name, 'Archived Product') as product_name, p.image_url 
        FROM order_items oi
-       JOIN products p ON oi.product_id = p.id
+       LEFT JOIN products p ON oi.product_id = p.id
        WHERE oi.order_id = ?`,
       [order.id]
     );
@@ -234,9 +230,9 @@ exports.getAllOrders = async (req, res) => {
     const ordersWithItems = [];
     for (const order of orders) {
       const [items] = await db.query(
-        `SELECT oi.*, p.name as product_name, p.image_url 
+        `SELECT oi.*, COALESCE(p.name, 'Archived Product') as product_name, p.image_url 
          FROM order_items oi
-         JOIN products p ON oi.product_id = p.id
+         LEFT JOIN products p ON oi.product_id = p.id
          WHERE oi.order_id = ?`,
         [order.id]
       );
@@ -344,7 +340,7 @@ exports.updateOrderStatus = async (req, res) => {
       );
     } else if (status === 'Delivered') {
       await connection.query(
-        'UPDATE orders SET status = ?, cancel_reason = NULL, completed_at = IFNULL(completed_at, NOW()) WHERE id = ?',
+        'UPDATE orders SET status = ?, payment_status = IF(payment_status = "Pending", "Paid", payment_status), cancel_reason = NULL, completed_at = IFNULL(completed_at, NOW()) WHERE id = ?',
         [status, id]
       );
 
@@ -362,6 +358,48 @@ exports.updateOrderStatus = async (req, res) => {
     }
 
     await connection.commit();
+
+    if (status === 'Delivered') {
+      // 1. Send Order Invoice email (if not already sent)
+      sendPurchaseConfirmationEmail(id).catch(err => {
+        console.error('[OrderController] Failed to send invoice email on delivery:', err.message);
+      });
+
+      // 2. Send Digital License keys email (if licenses assigned and not already sent)
+      (async () => {
+        try {
+          const [ordRows] = await pool.query(
+            `SELECT o.id, o.delivery_email, o.license_email_sent, u.name as user_name, u.email as user_email
+             FROM orders o
+             JOIN users u ON o.user_id = u.id
+             WHERE o.id = ?`,
+            [id]
+          );
+          if (ordRows.length > 0 && !ordRows[0].license_email_sent) {
+            const ord = ordRows[0];
+            const targetEmail = ord.delivery_email || ord.user_email;
+            const [licRows] = await pool.query(
+              `SELECT pl.license_key, pl.rules, p.name as product_name, oi.package_name, oi.selected_device, oi.selected_activation
+               FROM product_licenses pl
+               JOIN order_items oi ON pl.order_item_id = oi.id
+               JOIN products p ON oi.product_id = p.id
+               WHERE oi.order_id = ?`,
+              [id]
+            );
+            if (licRows.length > 0 && targetEmail) {
+              const { sendLicenseEmail } = require('./paymentController');
+              const sent = await sendLicenseEmail(targetEmail, ord.user_name || 'Customer', ord.id, licRows);
+              if (sent) {
+                await pool.query('UPDATE orders SET license_email_sent = 1 WHERE id = ?', [id]);
+              }
+            }
+          }
+        } catch (licErr) {
+          console.error('[OrderController] Failed to check/send license email on delivery:', licErr.message);
+        }
+      })();
+    }
+
     res.json({ message: `Order status updated to ${status} successfully!` });
   } catch (error) {
     await connection.rollback();
@@ -399,6 +437,12 @@ exports.updateOrderPayment = async (req, res) => {
 
     values.push(id);
     await db.query(`UPDATE orders SET ${fields.join(', ')} WHERE id = ?`, values);
+
+    if (payment_status === 'Paid') {
+      sendPurchaseConfirmationEmail(id).catch(err => {
+        console.error('[OrderController] Failed to send invoice on payment update:', err.message);
+      });
+    }
 
     res.json({ message: `Order #${id} payment details updated successfully!` });
   } catch (error) {
@@ -453,56 +497,131 @@ exports.deleteOrder = async (req, res) => {
 };
 
 
-const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
+const { sendEmail, getWhatsAppContactBlock, getEmailFooter, getWhatsAppContactText } = require('../utils/mailer');
 
 const sendGuestAccountEmail = async (email, name, password) => {
   try {
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT || 587;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    const appName = process.env.APP_NAME || 'ElitePassBD';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://elitepassbd.com';
+    const loginUrl = `${frontendUrl}/login`;
 
-    if (smtpHost && smtpUser && smtpPass) {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: parseInt(smtpPort),
-        secure: smtpPort === '465',
-        auth: {
-          user: smtpUser,
-          pass: smtpPass
-        },
-        tls: {
-          rejectUnauthorized: false
-        }
-      });
+    const subject = `Your Account Credentials - ${appName}`;
+    const text = `Hello ${name},\n\nAn account has been created for you at ${appName}. Here are your login details:\nEmail: ${email}\nPassword: ${password}\n\nYou can log in and view your order status at: ${loginUrl}\n\nPlease update your password after logging in.${getWhatsAppContactText()}`;
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Account Credentials - ${appName}</title>
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    body { margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #0b1120; }
+    .body-wrapper { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    .body-td { padding: 0 !important; margin: 0 !important; }
+    * {
+      word-break: normal !important;
+      overflow-wrap: break-word !important;
+      word-wrap: break-word !important;
+      hyphens: none !important;
+      -webkit-hyphens: none !important;
+    }
+    @media only screen and (max-width: 600px) {
+      .email-container { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; border-left: none !important; border-right: none !important; }
+      .banner-header { padding: 18px 12px !important; }
+      .banner-header h1 { font-size: 17px !important; }
+      .main-content { padding: 14px 10px !important; }
+      .cred-card { padding: 10px 8px !important; }
+      .login-btn { display: block !important; width: 100% !important; box-sizing: border-box !important; text-align: center !important; padding: 12px 14px !important; }
+    }
+  </style>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; margin: 0; padding: 0; color: #e2e8f0; width: 100%;">
+  <table class="body-wrapper" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; background-color: #0b1120; margin: 0; padding: 0; border-collapse: collapse;">
+    <tr>
+      <td align="center" class="body-td" style="padding: 0; margin: 0;">
+        <table class="email-container" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 0; overflow: hidden; border: 1px solid #334155;">
+          
+          <!-- Banner Header -->
+          <tr>
+            <td class="banner-header" style="background-color: #059669; color: #ffffff; padding: 20px 14px; text-align: center;">
+              <h1 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.2px;">
+                Welcome to ${appName}!
+              </h1>
+              <p style="margin: 4px 0 0 0; font-size: 12px; color: #d1fae5; font-weight: 500; word-break: normal; overflow-wrap: break-word;">
+                Your Account Credentials & Access Details
+              </p>
+            </td>
+          </tr>
 
-      await transporter.sendMail({
-        from: `"${process.env.APP_NAME || 'ElitePassBD'}" <${smtpUser}>`,
-        to: email,
-        subject: 'Your Account Credentials - ElitePassBD',
-        text: `Hello ${name},\n\nAn account has been created for you. Here are your login details:\nName: [${name}], email: [${email}], password: [${password}]\n\nYou can log in and view your order status here.`,
-        html: `<h3>Welcome to ElitePassBD</h3>
-               <p>Hello <strong>${name}</strong>,</p>
-               <p>An account has been created for you. Here are your temporary login credentials to track your orders:</p>
-               <p><strong>Login Details:</strong><br>
-                  Name: [${name}]<br>
-                  email: [${email}]<br>
-                  password: [${password}]
-               </p>
-               <p>Please log in and update your password under your profile settings.</p>`
-      });
+          <!-- Main Body -->
+          <tr>
+            <td class="main-content" style="padding: 16px 12px; box-sizing: border-box; width: 100%;">
+              <p style="font-size: 13.5px; color: #ffffff; margin-top: 0; margin-bottom: 8px; font-weight: 600;">
+                Hello ${name},
+              </p>
+              <p style="font-size: 12px; line-height: 1.55; color: #cbd5e1; margin-bottom: 14px; word-break: normal; overflow-wrap: break-word;">
+                An account has been created for you so you can easily track your orders, view license keys, and manage subscriptions. Below are your login credentials:
+              </p>
+
+              <!-- Credentials Card -->
+              <div class="cred-card" style="background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 16px; box-sizing: border-box; width: 100%;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px; width: 35%;">Name:</td>
+                    <td style="padding: 5px 0; color: #ffffff; font-size: 12px; font-weight: 600; word-break: normal; overflow-wrap: break-word;">${name}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Login Email:</td>
+                    <td style="padding: 5px 0; color: #ffffff; font-size: 12px; font-weight: 600; word-break: normal; overflow-wrap: break-word;">${email}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0; color: #94a3b8; font-size: 11.5px;">Password:</td>
+                    <td style="padding: 5px 0;">
+                      <code style="background-color: #1e293b; color: #34d399; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; border: 1px solid #334155; word-break: normal; overflow-wrap: break-word;">${password}</code>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Recommendation Note -->
+              <p style="font-size: 11.5px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px; word-break: normal; overflow-wrap: break-word;">
+                💡 <em>Tip: For security, please log in and change your password in your Profile Settings.</em>
+              </p>
+
+              <!-- Login CTA Button -->
+              <div style="text-align: center; margin: 18px 0 10px 0;">
+                <a href="${loginUrl}" target="_blank" class="login-btn" style="background-color: #059669; color: #ffffff; padding: 11px 26px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px; display: inline-block; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4); max-width: 100%;">
+                  Log In To Your Account
+                </a>
+              </div>
+
+              <!-- WhatsApp Support Contact Box -->
+              ${getWhatsAppContactBlock(true)}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          ${getEmailFooter(appName, true)}
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const sent = await sendEmail({
+      to: email,
+      subject,
+      text,
+      html
+    });
+    if (sent) {
       console.log(`Guest credentials email sent successfully to ${email}`);
-    } else {
-      console.log('----------------------------');
-      console.log(`MOCK SMTP: Guest Credentials -> Name: [${name}], email: [${email}], password: [REDACTED]`);
-      console.log('----------------------------');
     }
   } catch (error) {
     console.error('Failed to send guest credentials email:', error);
-    console.log('----------------------------');
-    console.log(`FALLBACK: Guest Credentials -> Name: [${name}], email: [${email}], password: [REDACTED]`);
-    console.log('----------------------------');
   }
 };
 
@@ -562,12 +681,12 @@ exports.createGuestOrder = async (req, res) => {
       }
 
       const [stockCheck] = await connection.query(
-        'SELECT stock, name, packages FROM products WHERE id = ? FOR UPDATE',
+        'SELECT stock, name, packages, is_deleted FROM products WHERE id = ? FOR UPDATE',
         [product_id]
       );
 
-      if (stockCheck.length === 0) {
-        throw new Error(`Product not found.`);
+      if (stockCheck.length === 0 || stockCheck[0].is_deleted === 1) {
+        throw new Error(`Product not found or is no longer available.`);
       }
 
       const productName = stockCheck[0].name;
@@ -637,10 +756,6 @@ exports.createGuestOrder = async (req, res) => {
     }
 
     await connection.commit();
-
-    sendPurchaseConfirmationEmail(orderId).catch(err => {
-      console.error('Failed to send purchase email in createGuestOrder:', err);
-    });
 
     if (isNewUser) {
       sendGuestAccountEmail(guest_email, guest_name, randomPassword);

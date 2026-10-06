@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS products (
     is_instant TINYINT DEFAULT 0,
     is_top_selling TINYINT DEFAULT 0,
     bullet_points TEXT DEFAULT NULL,
+    is_deleted TINYINT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
@@ -206,11 +207,16 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     status ENUM('Active', 'Expiring Soon', 'Expired', 'Renewed', 'Cancelled') DEFAULT 'Active',
     notes TEXT DEFAULT NULL,
     order_id INT DEFAULT NULL,
+    vendor_id INT DEFAULT NULL,
+    vendor_price DECIMAL(10, 2) DEFAULT 0.00,
+    digital_account_id INT DEFAULT NULL,
+    digital_slot_id INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL,
     INDEX idx_sub_status_expiry (status, expiry_date),
-    INDEX idx_sub_phone (whatsapp_number)
+    INDEX idx_sub_phone (whatsapp_number),
+    INDEX idx_sub_digital_acc (digital_account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 15. Renewal History Table
@@ -245,6 +251,85 @@ CREATE TABLE IF NOT EXISTS subscription_reminders (
 CREATE TABLE IF NOT EXISTS subscription_settings (
     setting_key VARCHAR(100) PRIMARY KEY,
     setting_value LONGTEXT DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 18. Vendors / Product Suppliers Table
+CREATE TABLE IF NOT EXISTS vendors (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    company_name VARCHAR(255) DEFAULT NULL,
+    phone VARCHAR(50) DEFAULT NULL,
+    whatsapp VARCHAR(50) DEFAULT NULL,
+    telegram VARCHAR(100) DEFAULT NULL,
+    email VARCHAR(255) DEFAULT NULL,
+    address TEXT DEFAULT NULL,
+    payment_details TEXT DEFAULT NULL,
+    category VARCHAR(100) DEFAULT 'General',
+    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+    balance DECIMAL(10, 2) DEFAULT 0.00,
+    notes TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 19. Digital License Accounts Table
+CREATE TABLE IF NOT EXISTS digital_license_accounts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT DEFAULT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    account_email VARCHAR(255) NOT NULL,
+    account_password VARCHAR(255) NOT NULL,
+    recovery_email VARCHAR(255) DEFAULT NULL,
+    two_factor_status ENUM('Enabled', 'Disabled') DEFAULT 'Enabled',
+    two_factor_key TEXT DEFAULT NULL,
+    total_slots INT NOT NULL DEFAULT 5,
+    status ENUM('Active', 'Expiring', 'Expired', 'Inactive') DEFAULT 'Active',
+    expiry_date DATE DEFAULT NULL,
+    vendor_id INT DEFAULT NULL,
+    vendor_name VARCHAR(255) DEFAULT NULL,
+    purchased_date DATE DEFAULT NULL,
+    renewal_date DATE DEFAULT NULL,
+    purchase_price DECIMAL(10, 2) DEFAULT 0.00,
+    renewal_cost DECIMAL(10, 2) DEFAULT 0.00,
+    payment_method VARCHAR(50) DEFAULT 'bKash',
+    invoice_no VARCHAR(100) DEFAULT NULL,
+    notes TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
+    FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE SET NULL,
+    INDEX idx_dla_product (product_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 20. Digital License Slots Table
+CREATE TABLE IF NOT EXISTS digital_license_slots (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    account_id INT NOT NULL,
+    slot_number INT NOT NULL,
+    assigned_to VARCHAR(255) DEFAULT NULL,
+    customer_name VARCHAR(255) DEFAULT NULL,
+    customer_phone VARCHAR(50) DEFAULT NULL,
+    start_date DATE DEFAULT NULL,
+    end_date DATE DEFAULT NULL,
+    status ENUM('Active', 'Available', 'Expired', 'Suspended') DEFAULT 'Available',
+    notes TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES digital_license_accounts(id) ON DELETE CASCADE,
+    INDEX idx_dls_account_slot (account_id, slot_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 21. Product Usage Rules Table
+CREATE TABLE IF NOT EXISTS product_usage_rules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL DEFAULT 'Standard Usage Rules',
+    rules_text LONGTEXT NOT NULL,
+    is_active TINYINT DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    INDEX idx_pur_product (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==========================================================

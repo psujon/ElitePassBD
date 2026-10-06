@@ -85,6 +85,7 @@ async function createTables() {
       is_highlighted TINYINT DEFAULT 0,
       is_hot_discount TINYINT DEFAULT 0,
       highlighted_text TEXT DEFAULT NULL,
+      is_deleted TINYINT DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
@@ -285,6 +286,26 @@ async function createTables() {
     );
   `;
 
+  const vendorsTable = `
+    CREATE TABLE IF NOT EXISTS vendors (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      company_name VARCHAR(255) DEFAULT NULL,
+      phone VARCHAR(50) DEFAULT NULL,
+      whatsapp VARCHAR(50) DEFAULT NULL,
+      telegram VARCHAR(100) DEFAULT NULL,
+      email VARCHAR(255) DEFAULT NULL,
+      address TEXT DEFAULT NULL,
+      payment_details TEXT DEFAULT NULL,
+      category VARCHAR(100) DEFAULT 'General',
+      status ENUM('Active', 'Inactive') DEFAULT 'Active',
+      balance DECIMAL(10, 2) DEFAULT 0.00,
+      notes TEXT DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+  `;
+
   await pool.query(usersTable);
   await pool.query(categoriesTable);
   await pool.query(productsTable);
@@ -302,6 +323,7 @@ async function createTables() {
   await pool.query(subscriptionRenewalsTable);
   await pool.query(subscriptionRemindersTable);
   await pool.query(subscriptionSettingsTable);
+  await pool.query(vendorsTable);
 
   const defaultMarqueeItems = [
     {
@@ -539,6 +561,12 @@ async function updateSchema() {
       console.log("Added column 'bullet_points' to 'products' table.");
     }
 
+    const [isDeletedCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'is_deleted'");
+    if (isDeletedCols.length === 0) {
+      await pool.query("ALTER TABLE products ADD COLUMN is_deleted TINYINT DEFAULT 0");
+      console.log("Added column 'is_deleted' to 'products' table.");
+    }
+
     const [addressCols] = await pool.query("SHOW COLUMNS FROM users LIKE 'address'");
     if (addressCols.length === 0) {
       await pool.query("ALTER TABLE users ADD COLUMN address TEXT DEFAULT NULL");
@@ -559,15 +587,38 @@ async function updateSchema() {
 
     try {
       await pool.query(`ALTER DATABASE \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-      await pool.query("ALTER TABLE product_licenses CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-      await pool.query("ALTER TABLE product_licenses MODIFY COLUMN rules LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
-      await pool.query("ALTER TABLE product_licenses MODIFY COLUMN license_key LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL");
-      await pool.query("ALTER TABLE product_licenses MODIFY COLUMN activation_option TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
-      await pool.query("ALTER TABLE product_licenses MODIFY COLUMN package_option TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
-      console.log("Updated product_licenses columns (rules, license_key) to utf8mb4_unicode_ci and LONGTEXT.");
-    } catch (err) {
-      console.error("Error updating product_licenses column types to LONGTEXT/utf8mb4:", err.message);
+    } catch (dbCharsetErr) {
+      // Shared hosting / cPanel users often don't have ALTER DATABASE permissions; safely ignore
     }
+
+    try {
+      await pool.query("ALTER TABLE product_licenses CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    } catch (tblConvertErr) {
+      // Ignore if foreign key constraint restricts table-level convert
+    }
+
+    const utf8mb4Queries = [
+      "ALTER TABLE product_licenses MODIFY COLUMN rules LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL",
+      "ALTER TABLE product_licenses MODIFY COLUMN license_key LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL",
+      "ALTER TABLE product_licenses MODIFY COLUMN activation_option TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL",
+      "ALTER TABLE product_licenses MODIFY COLUMN package_option TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL",
+      "ALTER TABLE products MODIFY COLUMN name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL",
+      "ALTER TABLE products MODIFY COLUMN description LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL",
+      "ALTER TABLE products MODIFY COLUMN additional_info LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL",
+      "ALTER TABLE products MODIFY COLUMN faqs LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL",
+      "ALTER TABLE products MODIFY COLUMN packages LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL",
+      "ALTER TABLE products MODIFY COLUMN bullet_points LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL",
+      "ALTER TABLE products MODIFY COLUMN highlighted_text TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL"
+    ];
+
+    for (const q of utf8mb4Queries) {
+      try {
+        await pool.query(q);
+      } catch (colErr) {
+        // Individual column alter error log
+      }
+    }
+    console.log("Verified product_licenses and products columns charset utf8mb4_unicode_ci.");
 
     const [revNameCols] = await pool.query("SHOW COLUMNS FROM reviews LIKE 'reviewer_name'");
     if (revNameCols.length === 0) {
@@ -615,6 +666,18 @@ async function updateSchema() {
       console.log("Added column 'review_email_sent' to 'orders' table.");
     }
 
+    const [purchaseEmailSentCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'purchase_email_sent'");
+    if (purchaseEmailSentCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN purchase_email_sent TINYINT DEFAULT 0");
+      console.log("Added column 'purchase_email_sent' to 'orders' table.");
+    }
+
+    const [licenseEmailSentCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'license_email_sent'");
+    if (licenseEmailSentCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN license_email_sent TINYINT DEFAULT 0");
+      console.log("Added column 'license_email_sent' to 'orders' table.");
+    }
+
     const [completedAtCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'completed_at'");
     if (completedAtCols.length === 0) {
       await pool.query("ALTER TABLE orders ADD COLUMN completed_at TIMESTAMP NULL DEFAULT NULL");
@@ -655,6 +718,72 @@ async function updateSchema() {
         console.log("Created index 'idx_sub_phone' on 'subscriptions' table.");
       }
     } catch (e) {}
+
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS vendors (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          company_name VARCHAR(255) DEFAULT NULL,
+          phone VARCHAR(50) DEFAULT NULL,
+          whatsapp VARCHAR(50) DEFAULT NULL,
+          telegram VARCHAR(100) DEFAULT NULL,
+          email VARCHAR(255) DEFAULT NULL,
+          address TEXT DEFAULT NULL,
+          payment_details TEXT DEFAULT NULL,
+          category VARCHAR(100) DEFAULT 'General',
+          status ENUM('Active', 'Inactive') DEFAULT 'Active',
+          balance DECIMAL(10, 2) DEFAULT 0.00,
+          notes TEXT DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+      `);
+      console.log("Vendors table verified/created.");
+
+      const [tgCols] = await pool.query("SHOW COLUMNS FROM vendors LIKE 'telegram'");
+      if (tgCols.length === 0) {
+        await pool.query("ALTER TABLE vendors ADD COLUMN telegram VARCHAR(100) DEFAULT NULL AFTER whatsapp");
+        console.log("Added column 'telegram' to 'vendors' table.");
+      }
+    } catch (err) {
+      console.error("Error creating vendors table:", err.message);
+    }
+
+    try {
+      const [vIdCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'vendor_id'");
+      if (vIdCols.length === 0) {
+        await pool.query("ALTER TABLE subscriptions ADD COLUMN vendor_id INT DEFAULT NULL AFTER order_id");
+        console.log("Added column 'vendor_id' to 'subscriptions' table.");
+      }
+
+      const [vPriceCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'vendor_price'");
+      if (vPriceCols.length === 0) {
+        await pool.query("ALTER TABLE subscriptions ADD COLUMN vendor_price DECIMAL(10, 2) DEFAULT 0.00 AFTER vendor_id");
+        console.log("Added column 'vendor_price' to 'subscriptions' table.");
+      }
+    } catch (subColErr) {
+      console.error("Error ensuring vendor columns on subscriptions:", subColErr.message);
+    }
+
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS product_usage_rules (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          product_id INT NOT NULL,
+          title VARCHAR(255) NOT NULL DEFAULT 'Standard Usage Rules',
+          rules_text LONGTEXT NOT NULL,
+          is_active TINYINT DEFAULT 1,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+          INDEX idx_pur_product (product_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+      console.log("Product usage rules table verified/created.");
+    } catch (ruleTableErr) {
+      console.error("Error ensuring product_usage_rules table:", ruleTableErr.message);
+    }
   } catch (error) {
     console.error("Error updating database schema:", error.message);
   }

@@ -39,7 +39,8 @@ import {
   Copy,
   ArrowUpDown,
   ChevronLeft,
-  RotateCcw
+  RotateCcw,
+  Store
 } from 'lucide-react';
 
 const getDurationDays = (durationStr) => {
@@ -99,6 +100,9 @@ export default function SubscriptionManager() {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [productFilter, setProductFilter] = useState('All Products');
+  const [productFilterInput, setProductFilterInput] = useState('');
+  const [productFilterOpen, setProductFilterOpen] = useState(false);
+  const productFilterRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [expiryFilter, setExpiryFilter] = useState('All Dates');
   const [sourceFilter, setSourceFilter] = useState('All Sources');
@@ -136,8 +140,14 @@ export default function SubscriptionManager() {
     selling_price: '0',
     payment_status: 'Paid',
     notes: '',
-    order_id: ''
+    order_id: '',
+    vendor_id: '',
+    vendor_price: '',
+    digital_account_id: ''
   });
+  const [digitalAccounts, setDigitalAccounts] = useState([]);
+  const [loadingDigitalAccounts, setLoadingDigitalAccounts] = useState(false);
+  const [vendors, setVendors] = useState([]);
   const [subFormSubmitting, setSubFormSubmitting] = useState(false);
 
   // Renewal form state
@@ -237,6 +247,30 @@ export default function SubscriptionManager() {
 
     return Array.from(productMap.values());
   }, [catalogProducts, subscriptions]);
+
+  const filteredProductOptions = React.useMemo(() => {
+    const q = (productFilterInput || '').trim().toLowerCase();
+    if (!q) return combinedProducts;
+    return combinedProducts.filter(p => (p.name || '').toLowerCase().includes(q));
+  }, [combinedProducts, productFilterInput]);
+
+  const handleSelectProduct = (productName) => {
+    setProductFilter(productName);
+    setProductFilterInput(productName === 'All Products' ? '' : productName);
+    setProductFilterOpen(false);
+    setSubPage(1);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (productFilterRef.current && !productFilterRef.current.contains(e.target)) {
+        setProductFilterOpen(false);
+        setProductFilterInput(productFilter === 'All Products' ? '' : productFilter);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [productFilter]);
 
   const selectedProductPackages = React.useMemo(() => {
     if (!subForm.product_name) return [];
@@ -353,6 +387,106 @@ export default function SubscriptionManager() {
       fetchAvailableLicenses(subForm.product_name, subForm.package_plan);
     }
   }, [showAddForm, subForm.product_name, subForm.package_plan]);
+
+  const fetchDigitalAccounts = async () => {
+    try {
+      setLoadingDigitalAccounts(true);
+      const res = await api.get('/digital-licenses');
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+      setDigitalAccounts(list);
+    } catch (err) {
+      console.error('Failed to fetch digital license accounts:', err);
+    } finally {
+      setLoadingDigitalAccounts(false);
+    }
+  };
+
+  const isAccountMatchingProduct = (acc, productName) => {
+    if (!acc || !productName) return false;
+    const target = (productName || '').toLowerCase().trim();
+    const accName = (acc.product_name || '').toLowerCase().trim();
+    if (!accName || !target) return false;
+    if (accName === target) return true;
+    if (target.includes(accName) || accName.includes(target)) return true;
+
+    const targetWords = target.split(/[\s–—\-_,./\\|()]+/).filter(w => w.length > 2);
+    const accWords = accName.split(/[\s–—\-_,./\\|()]+/).filter(w => w.length > 2);
+    const common = accWords.filter(w => targetWords.includes(w));
+    if (common.length >= 2) return true;
+    if (common.length === 1 && (accWords.length === 1 || ['adobe', 'creative', 'canva', 'chatgpt', 'netflix', 'spotify', 'zoom', 'antivirus', 'office', '365'].includes(common[0]))) {
+      return true;
+    }
+    return false;
+  };
+
+  const { matchingDigitalAccounts, otherDigitalAccounts } = React.useMemo(() => {
+    if (!subForm.product_name) {
+      return { matchingDigitalAccounts: [], otherDigitalAccounts: digitalAccounts };
+    }
+    const matching = [];
+    const others = [];
+    digitalAccounts.forEach(acc => {
+      if (isAccountMatchingProduct(acc, subForm.product_name)) {
+        matching.push(acc);
+      } else {
+        others.push(acc);
+      }
+    });
+    return { matchingDigitalAccounts: matching, otherDigitalAccounts: others };
+  }, [digitalAccounts, subForm.product_name]);
+
+  const selectedDigitalAccount = React.useMemo(() => {
+    if (!subForm.digital_account_id) return null;
+    return digitalAccounts.find(a => String(a.id) === String(subForm.digital_account_id)) || null;
+  }, [digitalAccounts, subForm.digital_account_id]);
+
+  const handleDigitalAccountChange = (accId) => {
+    if (!accId) {
+      setSubForm(prev => ({
+        ...prev,
+        digital_account_id: ''
+      }));
+      return;
+    }
+
+    const acc = digitalAccounts.find(a => String(a.id) === String(accId));
+    setSubForm(prev => {
+      let updatedAccountGiven = prev.account_given;
+      if (!updatedAccountGiven && acc) {
+        const parts = [`Email: ${acc.account_email}`, `Password: ${acc.account_password}`];
+        if (acc.two_factor_key && acc.two_factor_key.trim()) {
+          parts.push(`2FA: ${acc.two_factor_key.trim()}`);
+        }
+        updatedAccountGiven = parts.join(' | ');
+      }
+      return {
+        ...prev,
+        digital_account_id: accId,
+        account_given: updatedAccountGiven
+      };
+    });
+  };
+
+  const handleOrderLookup = async (orderIdToLookup) => {
+    const cleanId = String(orderIdToLookup || '').replace(/[^0-9]/g, '');
+    if (!cleanId) return;
+    try {
+      const res = await api.get(`/digital-licenses/order-lookup/${cleanId}`);
+      const ord = res?.order || res;
+      if (ord) {
+        setSubForm(prev => ({
+          ...prev,
+          customer_name: prev.customer_name || ord.user_name || ord.customer_name || '',
+          whatsapp_number: prev.whatsapp_number || ord.user_whatsapp || ord.phone || '',
+          email: prev.email || ord.user_email || ord.delivery_email || '',
+          selling_price: (!prev.selling_price || prev.selling_price === '0') ? (ord.total_amount ? String(ord.total_amount) : prev.selling_price) : prev.selling_price
+        }));
+        toast.success(`Loaded details from Order #${cleanId}!`);
+      }
+    } catch (err) {
+      // Order lookup is optional
+    }
+  };
 
   // Fetch available unused licenses for Renew Modal matching product & package
   const fetchRenewLicenses = async (productName, packagePlan) => {
@@ -477,10 +611,21 @@ export default function SubscriptionManager() {
     }
   };
 
-  // Fetch initial catalog products & settings on mount
+  const fetchVendors = async () => {
+    try {
+      const res = await api.get('/vendors');
+      setVendors(Array.isArray(res) ? res : []);
+    } catch (err) {
+      console.error('Failed to fetch vendors for subscriptions:', err);
+    }
+  };
+
+  // Fetch initial catalog products, settings, vendors & digital accounts on mount
   useEffect(() => {
     fetchCatalogProducts();
     fetchSettings();
+    fetchVendors();
+    fetchDigitalAccounts();
   }, []);
 
   // Fetch subscriptions whenever search/filter parameters change
@@ -496,6 +641,7 @@ export default function SubscriptionManager() {
     }
 
     setEditingSub(null);
+    fetchDigitalAccounts();
     const defaultProduct = catalogProducts.length > 0 ? (catalogProducts[0].name || '') : '';
     let defaultPrice = '0';
     let defaultPackagePlan = 'Monthly';
@@ -540,7 +686,11 @@ export default function SubscriptionManager() {
       license_rules: '',
       selling_price: defaultPrice,
       payment_status: 'Paid',
-      notes: ''
+      notes: '',
+      order_id: '',
+      vendor_id: '',
+      vendor_price: '',
+      digital_account_id: ''
     });
     setProductSearchQuery('');
     setShowProductDropdown(false);
@@ -553,6 +703,7 @@ export default function SubscriptionManager() {
 
   const handleOpenEditModal = (sub) => {
     setEditingSub(sub);
+    fetchDigitalAccounts();
     const subProd = sub.product_name || '';
     setSubForm({
       customer_name: sub.customer_name || '',
@@ -571,7 +722,10 @@ export default function SubscriptionManager() {
       selling_price: sub.selling_price || '',
       payment_status: sub.payment_status || 'Paid',
       notes: sub.notes || '',
-      order_id: sub.order_id || ''
+      order_id: sub.order_id || '',
+      vendor_id: sub.vendor_id || '',
+      vendor_price: sub.vendor_price !== undefined && sub.vendor_price !== null ? String(sub.vendor_price) : '',
+      digital_account_id: sub.digital_account_id ? String(sub.digital_account_id) : ''
     });
     setLicenseInputMode('manual');
     setProductSearchQuery('');
@@ -602,20 +756,24 @@ export default function SubscriptionManager() {
         ...subForm,
         product_name: targetProductName,
         order_id: subForm.order_id ? parseInt(subForm.order_id, 10) : null,
-        license_id: (licenseInputMode === 'dropdown' && subForm.selected_license_id) ? subForm.selected_license_id : null
+        vendor_id: subForm.vendor_id ? parseInt(subForm.vendor_id, 10) : null,
+        vendor_price: subForm.vendor_price !== '' && subForm.vendor_price !== null ? parseFloat(subForm.vendor_price) : 0,
+        license_id: (licenseInputMode === 'dropdown' && subForm.selected_license_id) ? subForm.selected_license_id : null,
+        digital_account_id: subForm.digital_account_id ? parseInt(subForm.digital_account_id, 10) : null
       };
 
       if (editingSub) {
         await api.put(`/subscriptions/${editingSub.id}`, payload);
         toast.success('Subscription updated successfully!');
       } else {
-        await api.post('/subscriptions', payload);
-        toast.success('Customer subscription added successfully!');
+        const res = await api.post('/subscriptions', payload);
+        toast.success(res?.message || 'Customer subscription added successfully!');
       }
 
       setShowAddForm(false);
       setEditingSub(null);
       fetchSubscriptions();
+      fetchDigitalAccounts();
     } catch (err) {
       console.error('Error saving subscription:', err);
       toast.error(err.message || err.response?.data?.message || 'Failed to save subscription.');
@@ -972,6 +1130,9 @@ export default function SubscriptionManager() {
                   placeholder="e.g. 1025"
                   value={subForm.order_id || ''}
                   onChange={(e) => setSubForm({ ...subForm, order_id: e.target.value })}
+                  onBlur={(e) => {
+                    if (e.target.value) handleOrderLookup(e.target.value);
+                  }}
                   className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
@@ -1043,7 +1204,8 @@ export default function SubscriptionManager() {
                                 product_name: currentProd.name,
                                 package_plan: newPackagePlan,
                                 selling_price: newPrice,
-                                validity_days: newValidity
+                                validity_days: newValidity,
+                                digital_account_id: ''
                               }));
                               setProductSearchQuery('');
                               setShowProductDropdown(false);
@@ -1300,6 +1462,139 @@ export default function SubscriptionManager() {
                 </select>
               </div>
 
+              {/* Vendor / Supplier */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Store size={12} className="text-purple-600" />
+                    <span>Vendor / Supplier</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">Internal</span>
+                </label>
+                <select
+                  value={subForm.vendor_id || ''}
+                  onChange={(e) => setSubForm({ ...subForm, vendor_id: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="">-- No Vendor Selected --</option>
+                  {vendors.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name} {v.company_name ? `(${v.company_name})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">Select supplier (not shared with customer)</p>
+              </div>
+
+              {/* Vendor Price (Buying Cost) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Vendor Price (BDT)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Buying Cost</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={subForm.vendor_price}
+                  onChange={(e) => setSubForm({ ...subForm, vendor_price: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {subForm.selling_price && subForm.vendor_price && parseFloat(subForm.selling_price) >= parseFloat(subForm.vendor_price) ? (
+                    <span className="text-emerald-600 font-semibold">
+                      Profit: ৳{(parseFloat(subForm.selling_price) - parseFloat(subForm.vendor_price)).toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">Supplier buying cost (never sent in email)</span>
+                  )}
+                </p>
+              </div>
+
+              {/* License Manager Account (Product-Wise) */}
+              <div className="col-span-1 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Key size={13} className="text-violet-600" />
+                    <span>License Manager Account</span>
+                  </label>
+                  {matchingDigitalAccounts.length > 0 && (
+                    <span className="text-[10px] bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full font-bold">
+                      {matchingDigitalAccounts.length} matching product
+                    </span>
+                  )}
+                </div>
+                <select
+                  value={subForm.digital_account_id || ''}
+                  onChange={(e) => handleDigitalAccountChange(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer shadow-xs"
+                >
+                  <option value="">-- No Account Selected --</option>
+                  {matchingDigitalAccounts.length > 0 && (
+                    <optgroup label={`Matching Product Accounts (${matchingDigitalAccounts.length})`}>
+                      {matchingDigitalAccounts.map(acc => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.account_email} • {acc.available_slots} / {acc.total_slots} Slots Free ({acc.product_name})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {otherDigitalAccounts.length > 0 && (
+                    <optgroup label={matchingDigitalAccounts.length > 0 ? "Other Available Accounts" : "All License Accounts"}>
+                      {otherDigitalAccounts.map(acc => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.account_email} • {acc.available_slots} / {acc.total_slots} Slots Free ({acc.product_name})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {matchingDigitalAccounts.length > 0
+                    ? `Showing ${matchingDigitalAccounts.length} accounts matching product`
+                    : (subForm.product_name ? 'No accounts specifically matching this product title' : 'Select a product above to filter accounts')}
+                </p>
+              </div>
+
+              {/* Available Slots Display (Blank if no account selected) */}
+              <div className="col-span-1 sm:col-span-1 md:col-span-2 lg:col-span-2 xl:col-span-2">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Shield size={13} className="text-emerald-600" />
+                    <span>Available Slots</span>
+                  </label>
+                  {selectedDigitalAccount && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      selectedDigitalAccount.available_slots > 0
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-red-50 text-red-700 border-red-200'
+                    }`}>
+                      {selectedDigitalAccount.available_slots > 0 ? `${selectedDigitalAccount.available_slots} Free` : 'No Free Slots'}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  readOnly
+                  placeholder=""
+                  value={selectedDigitalAccount ? `${selectedDigitalAccount.available_slots} / ${selectedDigitalAccount.total_slots} Slots Available` : ''}
+                  className={`w-full border rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none transition-colors ${
+                    selectedDigitalAccount
+                      ? (selectedDigitalAccount.available_slots > 0
+                          ? 'bg-emerald-50/60 border-emerald-300 text-emerald-800'
+                          : 'bg-red-50/60 border-red-300 text-red-700')
+                      : 'bg-slate-50 border-slate-300 text-slate-400'
+                  }`}
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {selectedDigitalAccount
+                    ? (selectedDigitalAccount.available_slots > 0
+                        ? '✓ Auto-assigns the next free slot on save'
+                        : '⚠️ No available slots remaining in this account')
+                    : 'Blank until an account is chosen'}
+                </p>
+              </div>
+
               {/* Notes (Spans all columns) */}
               <div className="col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5">
                 <label className="block text-xs font-bold text-slate-700 mb-1">Notes</label>
@@ -1441,6 +1736,26 @@ export default function SubscriptionManager() {
         })}
       </div>
 
+      {/* Product Filter Active Indicator for Stat Cards */}
+      {productFilter && productFilter !== 'All Products' && (
+        <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-800 bg-emerald-50/80 border border-emerald-200/90 px-3 py-1.5 rounded-xl shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>
+              Showing stats for: <strong className="font-extrabold text-emerald-900">{productFilter}</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleSelectProduct('All Products')}
+            className="text-[10px] font-extrabold text-emerald-700 hover:text-emerald-900 bg-white/80 hover:bg-white px-2 py-0.5 rounded border border-emerald-200 transition-all cursor-pointer shadow-2xs"
+            title="Reset to All Products stats"
+          >
+            Show All Products Stats
+          </button>
+        </div>
+      )}
+
       {/* 7 Dashboard Stat Cards Grid matching concept mockup */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-2.5">
         {/* Card 1: Active Subscriptions */}
@@ -1527,13 +1842,13 @@ export default function SubscriptionManager() {
           <div className="text-lg sm:text-xl font-black text-teal-700">{stats.renewed}</div>
         </div>
 
-        {/* Card 7: Total Customers */}
+        {/* Card 7: Unique Customer */}
         <div
           onClick={() => { setStatusFilter('All Status'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); }}
           className="bg-white hover:bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200/90 hover:border-blue-400 transition-all cursor-pointer shadow-2xs group"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-[10.5px] font-bold truncate" title="Total Customers">Total Customers</span>
+            <span className="text-[10.5px] font-bold truncate" title="Unique Customer">Unique Customer</span>
             <div className="p-1 rounded-md bg-blue-50 text-blue-600 group-hover:scale-105 transition-transform shrink-0">
               <Users size={13} />
             </div>
@@ -1801,35 +2116,156 @@ export default function SubscriptionManager() {
           <div className="p-3 border-b border-slate-200/90 bg-slate-50/80 flex flex-wrap items-center gap-2">
 
             {/* Search Input */}
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-[220px]">
               <Search className="absolute left-2.5 top-2 text-slate-400" size={14} />
               <input
                 type="text"
-                placeholder="Search name, mobile or email..."
+                placeholder="Search order no (e.g. #53), name, mobile or email..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   setSubPage(1);
                 }}
-                className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-2xs"
+                className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-2xs"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSubPage(1);
+                  }}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  title="Clear search"
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
 
-            {/* Product Select Filter */}
-            <div className="w-full sm:w-auto min-w-[140px]">
-              <select
-                value={productFilter}
-                onChange={(e) => {
-                  setProductFilter(e.target.value);
-                  setSubPage(1);
-                }}
-                className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 font-medium focus:outline-none focus:border-emerald-500 transition-all shadow-2xs cursor-pointer"
-              >
-                <option value="All Products">All Products</option>
-                {combinedProducts.map((p, i) => (
-                  <option key={i} value={p.name}>{p.name}</option>
-                ))}
-              </select>
+            {/* Product Type & Search Combobox Filter */}
+            <div ref={productFilterRef} className="relative w-full sm:w-auto min-w-[160px] sm:min-w-[210px]">
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={productFilterOpen ? productFilterInput : (productFilter === 'All Products' ? '' : productFilter)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setProductFilterInput(val);
+                    if (!productFilterOpen) setProductFilterOpen(true);
+                  }}
+                  onFocus={() => {
+                    setProductFilterInput(productFilter === 'All Products' ? '' : productFilter);
+                    setProductFilterOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (filteredProductOptions.length > 0) {
+                        handleSelectProduct(filteredProductOptions[0].name);
+                      } else if (productFilterInput.trim()) {
+                        handleSelectProduct(productFilterInput.trim());
+                      } else {
+                        handleSelectProduct('All Products');
+                      }
+                    } else if (e.key === 'Escape') {
+                      setProductFilterOpen(false);
+                      setProductFilterInput(productFilter === 'All Products' ? '' : productFilter);
+                    }
+                  }}
+                  placeholder={productFilter === 'All Products' ? 'All Products' : productFilter}
+                  title="Type product name to search or select from list"
+                  className={`w-full bg-white border rounded-lg pl-2.5 pr-11 py-1.5 text-[11px] placeholder-slate-400 focus:outline-none transition-all shadow-2xs ${
+                    productFilter !== 'All Products'
+                      ? 'border-emerald-500 bg-emerald-50/40 text-emerald-900 font-bold focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500'
+                      : 'border-slate-300 text-slate-800 font-medium focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
+                  }`}
+                />
+
+                {/* Right controls: Clear (X) + Dropdown Chevron */}
+                <div className="absolute right-1.5 flex items-center gap-0.5">
+                  {(productFilter !== 'All Products' || (productFilterOpen && productFilterInput)) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectProduct('All Products');
+                      }}
+                      className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                      title="Clear product filter"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!productFilterOpen) {
+                        setProductFilterInput(productFilter === 'All Products' ? '' : productFilter);
+                      }
+                      setProductFilterOpen(prev => !prev);
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors cursor-pointer"
+                    title="Toggle product list"
+                  >
+                    <ChevronDown size={13} className={`transition-transform duration-200 ${productFilterOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Dropdown Menu */}
+              {productFilterOpen && (
+                <div className="absolute left-0 top-full mt-1 w-full min-w-[240px] max-w-xs bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                  <div className="px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+                    <span>Products ({filteredProductOptions.length})</span>
+                    <span className="text-[8.5px] text-slate-400 font-normal">Type to filter</span>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto custom-scrollbar divide-y divide-slate-50">
+                    {/* Option: All Products */}
+                    <div
+                      onClick={() => handleSelectProduct('All Products')}
+                      className={`px-3 py-1.5 text-[11px] flex items-center justify-between cursor-pointer transition-colors ${
+                        productFilter === 'All Products'
+                          ? 'bg-emerald-50 text-emerald-700 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${productFilter === 'All Products' ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
+                        <span>All Products</span>
+                      </span>
+                      {productFilter === 'All Products' && <Check size={12} className="text-emerald-600" />}
+                    </div>
+
+                    {/* Filtered Products */}
+                    {filteredProductOptions.map((p, i) => {
+                      const isSelected = productFilter.toLowerCase() === p.name.toLowerCase();
+                      return (
+                        <div
+                          key={i}
+                          onClick={() => handleSelectProduct(p.name)}
+                          className={`px-3 py-1.5 text-[11px] flex items-center justify-between cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-emerald-50 text-emerald-700 font-bold'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className="truncate pr-2 font-medium" title={p.name}>
+                            {p.name}
+                          </span>
+                          {isSelected && <Check size={12} className="text-emerald-600 shrink-0" />}
+                        </div>
+                      );
+                    })}
+
+                    {filteredProductOptions.length === 0 && (
+                      <div className="px-3 py-3 text-[11px] text-slate-400 text-center italic">
+                        No products match "{productFilterInput}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Status Select */}
@@ -1905,6 +2341,8 @@ export default function SubscriptionManager() {
                 onClick={() => {
                   setSearchQuery('');
                   setProductFilter('All Products');
+                  setProductFilterInput('');
+                  setProductFilterOpen(false);
                   setStatusFilter('All Status');
                   setExpiryFilter('All Dates');
                   setSubSortField('expiry');
@@ -2029,6 +2467,8 @@ export default function SubscriptionManager() {
                           onClick={() => {
                             setSearchQuery('');
                             setProductFilter('All Products');
+                            setProductFilterInput('');
+                            setProductFilterOpen(false);
                             setStatusFilter('All Status');
                             setExpiryFilter('All Dates');
                             setSubPage(1);
@@ -2153,6 +2593,14 @@ export default function SubscriptionManager() {
                           <div>
                             <span className="font-bold text-slate-900 text-[11px] block">{sub.product_name}</span>
                             <span className="text-[10px] text-slate-500 font-medium">{sub.package_plan}</span>
+                            {sub.vendor_name && (
+                              <div className="mt-0.5">
+                                <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-purple-700 bg-purple-50 border border-purple-200/80 px-1.5 py-0.2 rounded-md">
+                                  <Store size={9} />
+                                  <span className="truncate max-w-[120px]">{sub.vendor_name}</span>
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </td>
 
@@ -2191,10 +2639,22 @@ export default function SubscriptionManager() {
 
                         {/* Payment */}
                         <td className="py-2 px-3 border-r border-b border-slate-200/80 align-middle">
-                          <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold border shadow-2xs ${sub.payment_status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}>
-                            {sub.payment_status}
-                          </span>
+                          <div className="space-y-0.5">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9.5px] font-bold border shadow-2xs ${sub.payment_status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}>
+                              {sub.payment_status}
+                            </span>
+                            {sub.selling_price !== undefined && sub.selling_price !== null && (
+                              <div className="text-[10px] font-bold text-slate-800 font-mono">
+                                ৳{parseFloat(sub.selling_price || 0).toLocaleString()}
+                              </div>
+                            )}
+                            {sub.vendor_price !== undefined && sub.vendor_price !== null && parseFloat(sub.vendor_price) > 0 && (
+                              <div className="text-[9px] text-slate-400 font-medium font-mono" title="Vendor buying cost">
+                                Cost: ৳{parseFloat(sub.vendor_price).toFixed(0)}
+                              </div>
+                            )}
+                          </div>
                         </td>
 
                         {/* Status */}
@@ -2356,6 +2816,17 @@ export default function SubscriptionManager() {
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
                         Order #{selectedSubDetail.order_id || selectedSubDetail.id}
                       </span>
+                      {selectedSubDetail.vendor_name && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                          <Store size={10} />
+                          Vendor: {selectedSubDetail.vendor_name} {selectedSubDetail.vendor_company ? `(${selectedSubDetail.vendor_company})` : ''}
+                        </span>
+                      )}
+                      {selectedSubDetail.vendor_price !== null && selectedSubDetail.vendor_price !== undefined && parseFloat(selectedSubDetail.vendor_price) > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                          Buying Cost: ৳{parseFloat(selectedSubDetail.vendor_price).toFixed(2)}
+                        </span>
+                      )}
                       {(selectedSubDetail.order_created_at || selectedSubDetail.created_at || selectedSubDetail.purchase_date) && (
                         <p className="text-[11px] text-slate-500 flex items-center gap-1.5 font-medium">
                           <Calendar size={11} className="text-emerald-600 shrink-0" />
