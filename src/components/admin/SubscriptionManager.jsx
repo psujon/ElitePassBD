@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
 import { api } from '../../utils/api';
+import * as XLSX from 'xlsx';
 import {
   Users,
   Clock,
@@ -40,7 +41,19 @@ import {
   ArrowUpDown,
   ChevronLeft,
   RotateCcw,
-  Store
+  Store,
+  Eye,
+  EyeOff,
+  ScrollText,
+  UserX,
+  XCircle,
+  FileText,
+  BookmarkPlus,
+  Server,
+  Save,
+  Loader2,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 
 const getDurationDays = (durationStr) => {
@@ -93,6 +106,7 @@ export default function SubscriptionManager() {
     within7Days: 0,
     expired: 0,
     renewed: 0,
+    notRenewed: 0,
     totalCustomers: 0,
     totalSubscriptions: 0
   });
@@ -110,12 +124,27 @@ export default function SubscriptionManager() {
   const [subSortAsc, setSubSortAsc] = useState(true);
   const [subPage, setSubPage] = useState(1);
 
+  // Excel Export state
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef(null);
+  const [headerExportMenuOpen, setHeaderExportMenuOpen] = useState(false);
+  const headerExportMenuRef = useRef(null);
+
   // Modals & Forms state
   const [showAddForm, setShowAddForm] = useState(false);
   const customerFormRef = useRef(null);
   const [editingSub, setEditingSub] = useState(null); // null = Add, object = Edit
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedSubDetail, setSelectedSubDetail] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingSub, setViewingSub] = useState(null);
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [inlineCredsEdit, setInlineCredsEdit] = useState(false);
+  const [inlineCredsValue, setInlineCredsValue] = useState('');
+  const [inlineDigitalAccId, setInlineDigitalAccId] = useState('');
+  const [savingInlineCreds, setSavingInlineCreds] = useState(false);
+  const [togglingNotRenewedId, setTogglingNotRenewedId] = useState(null);
 
   // Available licenses state
   const [availableLicenses, setAvailableLicenses] = useState([]);
@@ -139,14 +168,21 @@ export default function SubscriptionManager() {
     license_rules: '',
     selling_price: '0',
     payment_status: 'Paid',
+    status: 'Active',
     notes: '',
+    customer_notes: '',
+    admin_notes: '',
     order_id: '',
     vendor_id: '',
     vendor_price: '',
-    digital_account_id: ''
+    digital_account_id: '',
+    send_email: true
   });
   const [digitalAccounts, setDigitalAccounts] = useState([]);
   const [loadingDigitalAccounts, setLoadingDigitalAccounts] = useState(false);
+  const [allUsageRules, setAllUsageRules] = useState([]);
+  const [loadingRules, setLoadingRules] = useState(false);
+  const [selectedRuleId, setSelectedRuleId] = useState('');
   const [vendors, setVendors] = useState([]);
   const [subFormSubmitting, setSubFormSubmitting] = useState(false);
 
@@ -158,6 +194,8 @@ export default function SubscriptionManager() {
     new_expiry_date: '',
     payment_amount: '',
     notes: 'Subscription renewed',
+    customer_notes: '',
+    admin_notes: '',
     license_id: null,
     account_given: '',
     license_rules: '',
@@ -189,6 +227,15 @@ export default function SubscriptionManager() {
   const [settingsActiveTab, setSettingsActiveTab] = useState('whatsapp'); // 'whatsapp', 'email'
   const [settingsSubmitting, setSettingsSubmitting] = useState(false);
 
+  // Customer Note Templates state
+  const [noteTemplates, setNoteTemplates] = useState([]);
+  const [loadingNoteTemplates, setLoadingNoteTemplates] = useState(false);
+  const [showManageTemplatesModal, setShowManageTemplatesModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null); // null = new, object = editing
+  const [templateForm, setTemplateForm] = useState({ title: '', content: '' });
+  const [templateSubmitting, setTemplateSubmitting] = useState(false);
+  const [activeTemplateTab, setActiveTemplateTab] = useState('list'); // 'list' | 'add'
+
   // Action Menu dropdown state (rendered via portal with fixed coords to prevent table overflow clipping)
   const [activeMenuSub, setActiveMenuSub] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, openUp: false });
@@ -201,10 +248,10 @@ export default function SubscriptionManager() {
     }
     const rect = e.currentTarget.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
-    const openUp = spaceBelow < 170;
+    const openUp = spaceBelow < 200;
     setMenuPosition({
-      top: openUp ? Math.max(10, rect.top - 124) : (rect.bottom + 4),
-      left: Math.max(10, rect.right - 144),
+      top: openUp ? Math.max(10, rect.top - 160) : (rect.bottom + 4),
+      left: Math.max(10, rect.right - 156),
       openUp
     });
     setActiveMenuSub(sub);
@@ -267,6 +314,12 @@ export default function SubscriptionManager() {
         setProductFilterOpen(false);
         setProductFilterInput(productFilter === 'All Products' ? '' : productFilter);
       }
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setExportMenuOpen(false);
+      }
+      if (headerExportMenuRef.current && !headerExportMenuRef.current.contains(e.target)) {
+        setHeaderExportMenuOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -285,11 +338,61 @@ export default function SubscriptionManager() {
     }
   }, [subForm.product_name, catalogProducts]);
 
+  // Product Usage Rules matching only the current selected product in form
+  const matchingProductRules = React.useMemo(() => {
+    if (!subForm.product_name) return [];
+    const normalize = (str) => (str || '').trim().toLowerCase().replace(/[\s\-_–—|]+/g, ' ');
+    const targetName = normalize(subForm.product_name);
+
+    const matchedCatalogProd = catalogProducts.find(
+      p => p.name && (normalize(p.name) === targetName || normalize(p.name).includes(targetName) || targetName.includes(normalize(p.name)))
+    );
+    const targetId = matchedCatalogProd ? matchedCatalogProd.id : null;
+
+    return allUsageRules.filter(r => {
+      if (r.is_active === 0) return false;
+      if (targetId && r.product_id === targetId) return true;
+      if (r.product_name) {
+        const rName = normalize(r.product_name);
+        if (rName === targetName || rName.includes(targetName) || targetName.includes(rName)) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }, [allUsageRules, subForm.product_name, catalogProducts]);
+
+  const getStatusPriority = (status) => {
+    switch (status) {
+      case 'Expired': return 1;
+      case 'Not Renewed': return 2;
+      case 'Expiring Soon': return 3;
+      case 'Active': return 4;
+      case 'Renewed': return 5;
+      case 'Cancelled': return 6;
+      default: return 7;
+    }
+  };
+
   const subsPerPage = 15;
   const sortedSubscriptions = React.useMemo(() => {
     return [...subscriptions].sort((a, b) => {
       let comparison = 0;
-      if (subSortField === 'expiry') {
+      if (subSortField === 'expiry' || subSortField === 'status') {
+        const pA = getStatusPriority(a.status);
+        const pB = getStatusPriority(b.status);
+        if (pA !== pB) {
+          comparison = pA - pB;
+        } else {
+          const expA = a.expiry_date ? new Date(a.expiry_date).getTime() : 0;
+          const expB = b.expiry_date ? new Date(b.expiry_date).getTime() : 0;
+          if (a.status === 'Expired' || a.status === 'Not Renewed') {
+            comparison = expB - expA; // Most recently expired first
+          } else {
+            comparison = expA - expB; // Expiring soonest first
+          }
+        }
+      } else if (subSortField === 'expiry_date_only') {
         const expA = a.expiry_date ? new Date(a.expiry_date).getTime() : 0;
         const expB = b.expiry_date ? new Date(b.expiry_date).getTime() : 0;
         comparison = expA - expB;
@@ -301,8 +404,6 @@ export default function SubscriptionManager() {
         comparison = (a.customer_name || '').localeCompare(b.customer_name || '');
       } else if (subSortField === 'product') {
         comparison = (a.product_name || '').localeCompare(b.product_name || '');
-      } else if (subSortField === 'status') {
-        comparison = (a.status || '').localeCompare(b.status || '');
       } else if (subSortField === 'amount') {
         comparison = (parseFloat(a.selling_price) || 0) - (parseFloat(b.selling_price) || 0);
       }
@@ -355,14 +456,14 @@ export default function SubscriptionManager() {
             return {
               ...prev,
               account_given: match.license_key,
-              license_rules: match.rules || ''
+              license_rules: prev.license_rules || match.rules || ''
             };
           } else {
             return {
               ...prev,
               selected_license_id: licList[0].id,
               account_given: licList[0].license_key,
-              license_rules: licList[0].rules || ''
+              license_rules: prev.license_rules || licList[0].rules || ''
             };
           }
         });
@@ -451,30 +552,10 @@ export default function SubscriptionManager() {
   }, [digitalAccounts, subForm.digital_account_id]);
 
   const handleDigitalAccountChange = (accId) => {
-    if (!accId) {
-      setSubForm(prev => ({
-        ...prev,
-        digital_account_id: ''
-      }));
-      return;
-    }
-
-    const acc = digitalAccounts.find(a => String(a.id) === String(accId));
-    setSubForm(prev => {
-      let updatedAccountGiven = prev.account_given;
-      if (!updatedAccountGiven && acc) {
-        const parts = [`Email: ${acc.account_email}`, `Password: ${acc.account_password}`];
-        if (acc.two_factor_key && acc.two_factor_key.trim()) {
-          parts.push(`2FA: ${acc.two_factor_key.trim()}`);
-        }
-        updatedAccountGiven = parts.join(' | ');
-      }
-      return {
-        ...prev,
-        digital_account_id: accId,
-        account_given: updatedAccountGiven
-      };
-    });
+    setSubForm(prev => ({
+      ...prev,
+      digital_account_id: accId || ''
+    }));
   };
 
   const handleOrderLookup = async (orderIdToLookup) => {
@@ -484,11 +565,12 @@ export default function SubscriptionManager() {
       const res = await api.get(`/digital-licenses/order-lookup/${cleanId}`);
       const ord = res?.order || res;
       if (ord) {
+        const resolvedEmail = ord.delivery_email || (ord.user_role !== 'admin' ? ord.customer_email : '') || '';
         setSubForm(prev => ({
           ...prev,
           customer_name: prev.customer_name || ord.user_name || ord.customer_name || '',
           whatsapp_number: prev.whatsapp_number || ord.user_whatsapp || ord.phone || '',
-          email: prev.email || ord.user_email || ord.delivery_email || '',
+          email: prev.email || resolvedEmail,
           selling_price: (!prev.selling_price || prev.selling_price === '0') ? (ord.total_amount ? String(ord.total_amount) : prev.selling_price) : prev.selling_price
         }));
         toast.success(`Loaded details from Order #${cleanId}!`);
@@ -630,13 +712,79 @@ export default function SubscriptionManager() {
     }
   };
 
-  // Fetch initial catalog products, settings, vendors & digital accounts on mount
+  const fetchUsageRules = async () => {
+    try {
+      setLoadingRules(true);
+      const res = await api.get('/product-usage-rules');
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+      setAllUsageRules(list);
+    } catch (err) {
+      console.error('Failed to fetch product usage rules for subscriptions:', err);
+    } finally {
+      setLoadingRules(false);
+    }
+  };
+
+  const fetchNoteTemplates = async () => {
+    try {
+      setLoadingNoteTemplates(true);
+      const res = await api.get('/subscriptions/note-templates');
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+      setNoteTemplates(list);
+    } catch (err) {
+      console.error('Failed to fetch note templates:', err);
+    } finally {
+      setLoadingNoteTemplates(false);
+    }
+  };
+
+  // Fetch initial catalog products, settings, vendors, digital accounts, usage rules & note templates on mount
   useEffect(() => {
     fetchCatalogProducts();
     fetchSettings();
     fetchVendors();
     fetchDigitalAccounts();
+    fetchUsageRules();
+    fetchNoteTemplates();
   }, []);
+
+  // Auto-load matching product rules if rules were fetched after form opened
+  useEffect(() => {
+    if (!showAddForm || editingSub) return;
+    if (matchingProductRules.length > 0) {
+      const alreadyChosen = matchingProductRules.find(r => String(r.id) === String(selectedRuleId));
+      if (!alreadyChosen && selectedRuleId !== '__custom__' && selectedRuleId !== '__none__') {
+        const topRule = matchingProductRules[0];
+        setSelectedRuleId(String(topRule.id));
+        setSubForm(prev => ({
+          ...prev,
+          license_rules: topRule.rules_text || ''
+        }));
+      }
+    } else {
+      if (selectedRuleId !== '__custom__' && selectedRuleId !== '__none__') {
+        setSelectedRuleId('__none__');
+        setSubForm(prev => ({
+          ...prev,
+          license_rules: ''
+        }));
+      }
+    }
+  }, [matchingProductRules, showAddForm, editingSub, selectedRuleId]);
+
+  const handleUsageRuleChange = (val) => {
+    setSelectedRuleId(val);
+    if (val === '__none__') {
+      setSubForm(prev => ({ ...prev, license_rules: '' }));
+    } else if (val === '__custom__') {
+      // Keep whatever text is currently typed/edited
+    } else {
+      const chosen = allUsageRules.find(r => String(r.id) === String(val));
+      if (chosen) {
+        setSubForm(prev => ({ ...prev, license_rules: chosen.rules_text || '' }));
+      }
+    }
+  };
 
   // Fetch subscriptions whenever search/filter parameters change
   useEffect(() => {
@@ -680,6 +828,25 @@ export default function SubscriptionManager() {
       }
     }
 
+    let defaultRuleText = '';
+    let defaultRuleId = '__none__';
+    if (catalogProducts.length > 0 && allUsageRules.length > 0) {
+      const prod0 = catalogProducts[0];
+      const normalize = (str) => (str || '').trim().toLowerCase().replace(/[\s\-_–—|]+/g, ' ');
+      const prod0Norm = normalize(prod0.name);
+      const foundRule = allUsageRules.find(r =>
+        r.is_active !== 0 && (
+          (prod0.id && r.product_id === prod0.id) ||
+          (r.product_name && (normalize(r.product_name) === prod0Norm || normalize(r.product_name).includes(prod0Norm) || prod0Norm.includes(normalize(r.product_name))))
+        )
+      );
+      if (foundRule) {
+        defaultRuleText = foundRule.rules_text || '';
+        defaultRuleId = String(foundRule.id);
+      }
+    }
+    setSelectedRuleId(defaultRuleId);
+
     setSubForm({
       customer_name: '',
       whatsapp_number: '',
@@ -693,14 +860,17 @@ export default function SubscriptionManager() {
       expiry_date: '',
       account_given: '',
       selected_license_id: null,
-      license_rules: '',
+      license_rules: defaultRuleText,
       selling_price: defaultPrice,
       payment_status: 'Paid',
       notes: '',
+      customer_notes: '',
+      admin_notes: '',
       order_id: '',
       vendor_id: '',
       vendor_price: '',
-      digital_account_id: ''
+      digital_account_id: '',
+      send_email: true
     });
     setProductSearchQuery('');
     setShowProductDropdown(false);
@@ -715,6 +885,12 @@ export default function SubscriptionManager() {
     setEditingSub(sub);
     fetchDigitalAccounts();
     const subProd = sub.product_name || '';
+    const existingRules = sub.license_rules || '';
+    const matchedEditRule = allUsageRules.find(r =>
+      r.rules_text && existingRules && r.rules_text.trim() === existingRules.trim()
+    );
+    setSelectedRuleId(matchedEditRule ? String(matchedEditRule.id) : (existingRules ? '__custom__' : '__none__'));
+
     setSubForm({
       customer_name: sub.customer_name || '',
       whatsapp_number: sub.whatsapp_number || '',
@@ -728,14 +904,18 @@ export default function SubscriptionManager() {
       expiry_date: sub.expiry_date ? new Date(sub.expiry_date).toISOString().slice(0, 10) : '',
       account_given: sub.account_given || '',
       selected_license_id: null,
-      license_rules: '',
+      license_rules: existingRules,
       selling_price: sub.selling_price || '',
       payment_status: sub.payment_status || 'Paid',
-      notes: sub.notes || '',
+      status: sub.status || 'Active',
+      notes: sub.admin_notes || sub.notes || '',
+      customer_notes: sub.customer_notes || '',
+      admin_notes: sub.admin_notes || sub.notes || '',
       order_id: sub.order_id || '',
       vendor_id: sub.vendor_id || '',
       vendor_price: sub.vendor_price !== undefined && sub.vendor_price !== null ? String(sub.vendor_price) : '',
-      digital_account_id: sub.digital_account_id ? String(sub.digital_account_id) : ''
+      digital_account_id: sub.digital_account_id ? String(sub.digital_account_id) : '',
+      send_email: false
     });
     setLicenseInputMode('manual');
     setProductSearchQuery('');
@@ -764,12 +944,14 @@ export default function SubscriptionManager() {
       setSubFormSubmitting(true);
       const payload = {
         ...subForm,
+        email: (subForm.email || '').trim() || '',
         product_name: targetProductName,
         order_id: subForm.order_id ? parseInt(subForm.order_id, 10) : null,
         vendor_id: subForm.vendor_id ? parseInt(subForm.vendor_id, 10) : null,
         vendor_price: subForm.vendor_price !== '' && subForm.vendor_price !== null ? parseFloat(subForm.vendor_price) : 0,
         license_id: (licenseInputMode === 'dropdown' && subForm.selected_license_id) ? subForm.selected_license_id : null,
-        digital_account_id: subForm.digital_account_id ? parseInt(subForm.digital_account_id, 10) : null
+        digital_account_id: subForm.digital_account_id ? parseInt(subForm.digital_account_id, 10) : null,
+        send_email: Boolean(subForm.email && subForm.email.trim() && subForm.send_email !== false)
       };
 
       if (editingSub) {
@@ -845,6 +1027,8 @@ export default function SubscriptionManager() {
       new_expiry_date: formattedAutoExpiry,
       payment_amount: initAmount,
       notes: 'Subscription renewed',
+      customer_notes: '',
+      admin_notes: '',
       license_id: null,
       account_given: '',
       license_rules: '',
@@ -869,13 +1053,114 @@ export default function SubscriptionManager() {
           renewals: freshData.renewals || prev?.renewals || [],
           reminders: freshData.reminders || prev?.reminders || []
         }));
-        if (freshData.email && !sub.email) {
-          setRenewForm(prev => ({ ...prev, customer_email: freshData.email }));
+        if (freshData?.customer_email && !sub.email && freshData?.user_role !== 'admin') {
+          setRenewForm(prev => ({ ...prev, customer_email: freshData.customer_email }));
         }
       }
     } catch (fetchErr) {
       console.warn('Background fetch for subscription details:', fetchErr.message);
     }
+  };
+
+  // Open Full View Details Modal
+  const handleOpenViewModal = async (sub) => {
+    setShowCredentials(false);
+    setInlineCredsEdit(false);
+    setInlineCredsValue('');
+    setInlineDigitalAccId('');
+    setViewingSub({
+      ...sub,
+      renewals: sub.renewals || [],
+      reminders: sub.reminders || []
+    });
+    setShowViewModal(true);
+    setActiveMenuSub(null);
+
+    try {
+      const res = await api.get(`/subscriptions/${sub.id}`);
+      const freshData = (res && typeof res === 'object' && !res.data) ? res : (res?.data || {});
+      if (freshData && freshData.id) {
+        setViewingSub(prev => ({
+          ...prev,
+          ...freshData,
+          renewals: freshData.renewals || prev?.renewals || [],
+          reminders: freshData.reminders || prev?.reminders || []
+        }));
+      }
+    } catch (err) {
+      console.warn('Background fetch for subscription details error:', err.message);
+    }
+  };
+
+  // Save inline credentials from View Modal
+  const handleSaveInlineCredentials = async () => {
+    if (!viewingSub) return;
+    try {
+      setSavingInlineCreds(true);
+      const accId = inlineDigitalAccId ? parseInt(inlineDigitalAccId, 10) : null;
+      await api.put(`/subscriptions/${viewingSub.id}`, {
+        ...viewingSub,
+        account_given: inlineCredsValue,
+        digital_account_id: accId
+      });
+
+      // Re-fetch detail to get fresh slot info and joined renewal row
+      const res = await api.get(`/subscriptions/${viewingSub.id}`);
+      const freshData = (res && typeof res === 'object' && !res.data) ? res : (res?.data || {});
+      if (freshData && freshData.id) {
+        setViewingSub(prev => ({
+          ...prev,
+          ...freshData,
+          renewals: freshData.renewals || prev?.renewals || [],
+          reminders: freshData.reminders || prev?.reminders || []
+        }));
+      } else {
+        setViewingSub(prev => ({
+          ...prev,
+          account_given: inlineCredsValue,
+          digital_account_id: accId
+        }));
+      }
+
+      // Also update in subscriptions list
+      setSubscriptions(prev => prev.map(s => s.id === viewingSub.id ? {
+        ...s,
+        account_given: inlineCredsValue,
+        digital_account_id: accId
+      } : s));
+
+      setInlineCredsEdit(false);
+      toast.success('Account credentials saved & history updated!');
+    } catch (err) {
+      console.error('Failed to save credentials:', err);
+      toast.error('Failed to save credentials: ' + (err.message || ''));
+    } finally {
+      setSavingInlineCreds(false);
+    }
+  };
+
+  // Copy structured subscription summary to clipboard
+  const handleCopySubscriptionSummary = (sub) => {
+    if (!sub) return;
+    const lines = [
+      `📋 Subscription Summary:`,
+      `Customer: ${sub.customer_name}`,
+      `WhatsApp: ${sub.whatsapp_number || 'N/A'}`,
+      sub.email ? `Email: ${sub.email}` : null,
+      `Product: ${sub.product_name}`,
+      `Plan: ${sub.package_plan}`,
+      `Order: #${sub.order_id || sub.id}`,
+      `Validity: ${sub.validity_days || 30} Days`,
+      `Expiry Date: ${sub.expiry_date ? new Date(sub.expiry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}`,
+      `Selling Price: ৳${sub.selling_price || 0}`,
+      `Status: ${sub.status}`,
+      sub.account_given ? `Credentials: ${sub.account_given}` : null,
+      sub.customer_notes ? `Customer Notes: ${sub.customer_notes}` : null,
+      (sub.admin_notes || sub.notes) ? `Admin Notes: ${sub.admin_notes || sub.notes}` : null
+    ].filter(Boolean);
+
+    navigator.clipboard.writeText(lines.join('\n'));
+    toast.success('Subscription details copied to clipboard!');
   };
 
   const handleConfirmRenewal = async (e) => {
@@ -932,6 +1217,137 @@ export default function SubscriptionManager() {
     }
   };
 
+  const handleToggleNotRenewed = async (sub, e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (!sub || !sub.id) return;
+    if (togglingNotRenewedId === sub.id) return;
+
+    const isCurrentlyNotRenewed = sub.status === 'Not Renewed';
+    const isPastExpiry = sub.expiry_date && new Date(sub.expiry_date).getTime() < new Date().setHours(0, 0, 0, 0);
+    const newStatus = isCurrentlyNotRenewed
+      ? (isPastExpiry ? 'Expired' : 'Active')
+      : 'Not Renewed';
+
+    setTogglingNotRenewedId(sub.id);
+
+    // Optimistically update list and modal
+    setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, status: newStatus } : s));
+    if (selectedSubDetail && selectedSubDetail.id === sub.id) {
+      setSelectedSubDetail(prev => prev ? ({ ...prev, status: newStatus }) : null);
+    }
+
+    try {
+      await api.put(`/subscriptions/${sub.id}/status`, { status: newStatus });
+      toast.success(isCurrentlyNotRenewed ? `Subscription marked as ${newStatus}` : 'Marked as Not Renewed');
+      await fetchSubscriptions();
+    } catch (err) {
+      console.error('Error updating status:', err);
+      // Revert optimistic update on failure
+      setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, status: sub.status } : s));
+      if (selectedSubDetail && selectedSubDetail.id === sub.id) {
+        setSelectedSubDetail(prev => prev ? ({ ...prev, status: sub.status }) : null);
+      }
+      toast.error(err.response?.data?.message || err.message || 'Failed to update status.');
+    } finally {
+      setTogglingNotRenewedId(null);
+    }
+  };
+
+  const handleSelectNoteTemplate = (templateId, targetForm = 'subForm') => {
+    if (!templateId) return;
+    const tpl = noteTemplates.find(t => String(t.id) === String(templateId));
+    if (!tpl) return;
+
+    if (targetForm === 'subForm') {
+      setSubForm(prev => ({
+        ...prev,
+        customer_notes: tpl.content
+      }));
+    } else if (targetForm === 'renewForm') {
+      setRenewForm(prev => ({
+        ...prev,
+        customer_notes: tpl.content
+      }));
+    }
+    toast.success(`Applied template: "${tpl.title}"`);
+  };
+
+  const handleQuickSaveAsTemplate = (currentNote) => {
+    setEditingTemplate(null);
+    setTemplateForm({
+      title: '',
+      content: (currentNote || '').trim()
+    });
+    setActiveTemplateTab('add');
+    setShowManageTemplatesModal(true);
+  };
+
+  const handleStartEditTemplate = (tpl) => {
+    setEditingTemplate(tpl);
+    setTemplateForm({
+      title: tpl.title || '',
+      content: tpl.content || ''
+    });
+    setActiveTemplateTab('add');
+  };
+
+  const handleSaveTemplate = async (e) => {
+    e?.preventDefault();
+    const tTitle = (templateForm.title || '').trim();
+    const tContent = (templateForm.content || '').trim();
+
+    if (!tTitle) {
+      toast.error('Template title is required.');
+      return;
+    }
+    if (!tContent) {
+      toast.error('Template content is required.');
+      return;
+    }
+
+    try {
+      setTemplateSubmitting(true);
+      if (editingTemplate) {
+        await api.put(`/subscriptions/note-templates/${editingTemplate.id}`, {
+          title: tTitle,
+          content: tContent
+        });
+        toast.success('Template updated successfully!');
+      } else {
+        await api.post('/subscriptions/note-templates', {
+          title: tTitle,
+          content: tContent
+        });
+        toast.success('New template saved successfully!');
+      }
+      setEditingTemplate(null);
+      setTemplateForm({ title: '', content: '' });
+      setActiveTemplateTab('list');
+      fetchNoteTemplates();
+    } catch (err) {
+      console.error('Save template error:', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to save template.');
+    } finally {
+      setTemplateSubmitting(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (id, title) => {
+    if (!window.confirm(`Are you sure you want to delete template "${title}"?`)) return;
+    try {
+      await api.delete(`/subscriptions/note-templates/${id}`);
+      toast.success('Template deleted.');
+      if (editingTemplate?.id === id) {
+        setEditingTemplate(null);
+        setTemplateForm({ title: '', content: '' });
+      }
+      fetchNoteTemplates();
+    } catch (err) {
+      console.error('Delete template error:', err);
+      toast.error('Failed to delete template.');
+    }
+  };
+
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     try {
@@ -968,8 +1384,148 @@ export default function SubscriptionManager() {
         return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black bg-rose-50 text-rose-700 border border-rose-200/80 shadow-2xs"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Expired</span>;
       case 'Renewed':
         return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black bg-cyan-50 text-cyan-700 border border-cyan-200/80 shadow-2xs"><span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span> Renewed</span>;
+      case 'Not Renewed':
+        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs"><span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span> Not Renewed</span>;
       default:
-        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs"><span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Cancelled</span>;
+        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs"><span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span> {status || 'Cancelled'}</span>;
+    }
+  };
+
+  const hasActiveFilters = Boolean(
+    searchQuery ||
+    (productFilter && productFilter !== 'All Products') ||
+    (statusFilter && statusFilter !== 'All Status') ||
+    (expiryFilter && expiryFilter !== 'All Dates') ||
+    (sourceFilter && sourceFilter !== 'All Sources')
+  );
+
+  const handleExportExcel = async (mode = 'auto') => {
+    // mode: 'auto' | 'filtered' | 'all'
+    try {
+      setExportingExcel(true);
+      let dataToExport = [];
+      let isFilteredExport = false;
+
+      if (mode === 'all') {
+        if (!hasActiveFilters && subscriptions.length > 0) {
+          dataToExport = sortedSubscriptions;
+        } else {
+          // Fetch complete list from backend
+          const res = await api.get('/subscriptions');
+          const data = res?.subscriptions !== undefined ? res : (res?.data || {});
+          dataToExport = data.subscriptions || [];
+        }
+        isFilteredExport = false;
+      } else if (mode === 'filtered') {
+        dataToExport = sortedSubscriptions;
+        isFilteredExport = true;
+      } else {
+        if (hasActiveFilters) {
+          dataToExport = sortedSubscriptions;
+          isFilteredExport = true;
+        } else {
+          dataToExport = sortedSubscriptions.length > 0 ? sortedSubscriptions : subscriptions;
+          isFilteredExport = false;
+        }
+      }
+
+      if (!dataToExport || dataToExport.length === 0) {
+        toast.error('No subscriptions found to export.');
+        return;
+      }
+
+      const rows = dataToExport.map((sub, idx) => {
+        const remDays = getRemainingDays(sub.expiry_date);
+        let remainingText = '-';
+        if (remDays !== null) {
+          if (remDays < 0) remainingText = `Expired (${Math.abs(remDays)}d ago)`;
+          else if (remDays === 0) remainingText = 'Expires Today';
+          else remainingText = `${remDays} days left`;
+        }
+
+        const purchaseDateStr = sub.purchase_date
+          ? new Date(sub.purchase_date).toISOString().slice(0, 10)
+          : (sub.order_created_at ? new Date(sub.order_created_at).toISOString().slice(0, 10) : '-');
+
+        const expiryDateStr = sub.expiry_date
+          ? new Date(sub.expiry_date).toISOString().slice(0, 10)
+          : '-';
+
+        const sellPrice = parseFloat(sub.selling_price) || 0;
+        const venPrice = parseFloat(sub.vendor_price) || 0;
+        const profit = sellPrice - venPrice;
+
+        return {
+          'SL': idx + 1,
+          'Order ID': sub.order_id ? `#${sub.order_id}` : (sub.id ? `SUB-${sub.id}` : '-'),
+          'Customer Name': sub.customer_name || 'N/A',
+          'WhatsApp / Phone': sub.whatsapp_number || '-',
+          'Email': sub.email || '-',
+          'Product Name': sub.product_name || '-',
+          'Package / Plan': sub.package_plan || '-',
+          'Source': sub.customer_source || 'Website',
+          'Purchase Date': purchaseDateStr,
+          'Validity (Days)': sub.validity_days || 30,
+          'Expiry Date': expiryDateStr,
+          'Remaining Days': remainingText,
+          'Status': sub.status || 'Active',
+          'Selling Price (BDT)': sellPrice,
+          'Payment Status': sub.payment_status || 'Paid',
+          'Vendor Name': sub.vendor_name || sub.vendor_company || '-',
+          'Vendor Cost (BDT)': venPrice,
+          'Profit (BDT)': profit,
+          'Account / Key Credentials': sub.account_given || '-',
+          'License Rules': sub.license_rules || '-',
+          'Customer Notes': sub.customer_notes || '-',
+          'Admin Notes': sub.admin_notes || sub.notes || '-',
+          'Order Date': sub.order_created_at ? new Date(sub.order_created_at).toLocaleString() : '-'
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const colWidths = [
+        { wch: 6 },  // SL
+        { wch: 12 }, // Order ID
+        { wch: 22 }, // Customer Name
+        { wch: 18 }, // WhatsApp / Phone
+        { wch: 26 }, // Email
+        { wch: 25 }, // Product Name
+        { wch: 16 }, // Package / Plan
+        { wch: 12 }, // Source
+        { wch: 14 }, // Purchase Date
+        { wch: 14 }, // Validity
+        { wch: 14 }, // Expiry Date
+        { wch: 18 }, // Remaining Days
+        { wch: 14 }, // Status
+        { wch: 18 }, // Selling Price
+        { wch: 15 }, // Payment Status
+        { wch: 18 }, // Vendor Name
+        { wch: 16 }, // Vendor Cost
+        { wch: 14 }, // Profit
+        { wch: 30 }, // Account / Key Credentials
+        { wch: 25 }, // License Rules
+        { wch: 25 }, // Customer Notes
+        { wch: 25 }, // Admin Notes
+        { wch: 20 }, // Order Date
+      ];
+      ws['!cols'] = colWidths;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Subscriptions');
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10);
+      const filterTag = isFilteredExport ? 'Filtered_' : 'All_';
+      const filename = `ElitePassBD_Subscriptions_${filterTag}${dateStr}.xlsx`;
+
+      XLSX.writeFile(wb, filename);
+      toast.success(`Successfully exported ${dataToExport.length} subscriptions to Excel!`);
+    } catch (err) {
+      console.error('Failed to export subscriptions to Excel:', err);
+      toast.error('Failed to export Excel file. Please try again.');
+    } finally {
+      setExportingExcel(false);
+      setExportMenuOpen(false);
+      setHeaderExportMenuOpen(false);
     }
   };
 
@@ -1009,6 +1565,82 @@ export default function SubscriptionManager() {
               </span>
             )}
           </button>
+
+          {/* Header Excel Export Button with Dropdown */}
+          <div className="relative" ref={headerExportMenuRef}>
+            <div className="inline-flex rounded-lg shadow-2xs">
+              <button
+                type="button"
+                onClick={() => handleExportExcel(hasActiveFilters ? 'filtered' : 'all')}
+                disabled={exportingExcel || sortedSubscriptions.length === 0}
+                className="flex items-center gap-1.5 px-3 py-1.75 bg-emerald-50 hover:bg-emerald-100/90 active:bg-emerald-200 text-emerald-800 font-bold text-xs rounded-l-lg border border-emerald-300 border-r-emerald-400 transition-all cursor-pointer disabled:opacity-50"
+                title="Download subscriptions as Excel (.xlsx)"
+              >
+                {exportingExcel ? (
+                  <Loader2 size={14} className="animate-spin text-emerald-600" />
+                ) : (
+                  <FileSpreadsheet size={15} className="text-emerald-600" />
+                )}
+                <span className="hidden sm:inline">Export Excel</span>
+                <span className="sm:hidden">Excel</span>
+                {hasActiveFilters && (
+                  <span className="bg-emerald-200 text-emerald-900 text-[9px] px-1.5 py-0.2 rounded-full font-extrabold ml-0.5">
+                    {sortedSubscriptions.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setHeaderExportMenuOpen(!headerExportMenuOpen)}
+                disabled={exportingExcel}
+                className="px-1.5 py-1.75 bg-emerald-50 hover:bg-emerald-100/90 active:bg-emerald-200 text-emerald-800 font-bold text-xs rounded-r-lg border border-l-0 border-emerald-300 transition-all cursor-pointer disabled:opacity-50"
+                title="Export Options"
+              >
+                <ChevronDown size={13} className={`transition-transform duration-200 ${headerExportMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+
+            {headerExportMenuOpen && (
+              <div className="absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1 text-slate-800 text-xs animate-in fade-in-50 zoom-in-95">
+                <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  Excel Export Options
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeaderExportMenuOpen(false);
+                    handleExportExcel('filtered');
+                  }}
+                  disabled={sortedSubscriptions.length === 0}
+                  className="w-full text-left px-3 py-2 hover:bg-emerald-50/70 flex items-center justify-between text-slate-700 hover:text-emerald-700 transition-colors disabled:opacity-40 cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Download size={13} className="text-emerald-600" />
+                    <span>Export Current View</span>
+                  </div>
+                  <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                    {sortedSubscriptions.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeaderExportMenuOpen(false);
+                    handleExportExcel('all');
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-emerald-50/70 flex items-center justify-between text-slate-700 hover:text-emerald-700 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet size={13} className="text-emerald-600" />
+                    <span>Export All Subscriptions</span>
+                  </div>
+                  <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                    {stats.totalSubscriptions || subscriptions.length}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             onClick={handleToggleAddForm}
@@ -1076,7 +1708,7 @@ export default function SubscriptionManager() {
             </button>
           </div>
 
-          <form onSubmit={handleSaveCustomerSub} className="space-y-4">
+          <form onSubmit={handleSaveCustomerSub} autoComplete="off" className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
 
               {/* Customer Name */}
@@ -1107,10 +1739,26 @@ export default function SubscriptionManager() {
 
               {/* Email Address */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">Email Address</label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] select-none text-slate-600 hover:text-emerald-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(subForm.send_email)}
+                      onChange={(e) => setSubForm({ ...subForm, send_email: e.target.checked })}
+                      className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer accent-emerald-600"
+                    />
+                    <span className="font-medium">মেইল পাঠান</span>
+                  </label>
+                </div>
                 <input
                   type="email"
-                  placeholder="e.g. customer@example.com"
+                  name="customer_subscription_email_address"
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                  placeholder="e.g. customer@example.com (ঐচ্ছিক)"
                   value={subForm.email}
                   onChange={(e) => setSubForm({ ...subForm, email: e.target.value })}
                   className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
@@ -1209,14 +1857,26 @@ export default function SubscriptionManager() {
                                 if (days) newValidity = days;
                               }
 
+                              // Auto-load matching rule for selected product
+                              const normalize = (str) => (str || '').trim().toLowerCase().replace(/[\s\-_–—|]+/g, ' ');
+                              const prodNorm = normalize(currentProd.name);
+                              const matchedRule = allUsageRules.find(r =>
+                                r.is_active !== 0 && (
+                                  (currentProd.id && r.product_id === currentProd.id) ||
+                                  (r.product_name && (normalize(r.product_name) === prodNorm || normalize(r.product_name).includes(prodNorm) || prodNorm.includes(normalize(r.product_name))))
+                                )
+                              );
+
                               setSubForm(prev => ({
                                 ...prev,
                                 product_name: currentProd.name,
                                 package_plan: newPackagePlan,
                                 selling_price: newPrice,
                                 validity_days: newValidity,
-                                digital_account_id: ''
+                                digital_account_id: '',
+                                license_rules: matchedRule ? (matchedRule.rules_text || '') : ''
                               }));
+                              setSelectedRuleId(matchedRule ? String(matchedRule.id) : '__none__');
                               setProductSearchQuery('');
                               setShowProductDropdown(false);
                             }}
@@ -1472,6 +2132,23 @@ export default function SubscriptionManager() {
                 </select>
               </div>
 
+              {/* Subscription Status */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Subscription Status *</label>
+                <select
+                  value={subForm.status || 'Active'}
+                  onChange={(e) => setSubForm({ ...subForm, status: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Expiring Soon">Expiring Soon</option>
+                  <option value="Expired">Expired</option>
+                  <option value="Renewed">Renewed</option>
+                  <option value="Not Renewed">Not Renewed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+
               {/* Vendor / Supplier */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
@@ -1609,49 +2286,284 @@ export default function SubscriptionManager() {
                 </p>
               </div>
 
-              {/* Notes (Spans all columns) */}
-              <div className="col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5">
-                <label className="block text-xs font-bold text-slate-700 mb-1">Notes</label>
-                <textarea
-                  rows={2}
-                  placeholder="Add any additional notes..."
-                  value={subForm.notes}
-                  onChange={(e) => setSubForm({ ...subForm, notes: e.target.value })}
-                  className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
-                />
+              {/* Product Usages Rules Section (Auto-loaded on product select & sent in email) */}
+              <div className="col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5 bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-slate-50/80 p-3 sm:p-3.5 rounded-xl border border-emerald-200/90 shadow-2xs space-y-2.5">
+                {/* Header with Title, Matching Product Badge & Email Badge */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                      <ScrollText size={14} className="text-emerald-600" />
+                      <span>Product Usages Rules</span>
+                    </label>
+                    {matchingProductRules.length > 0 ? (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        ✓ Auto-loaded for {subForm.product_name}
+                      </span>
+                    ) : subForm.product_name ? (
+                      <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+                        No saved rules for "{subForm.product_name}"
+                      </span>
+                    ) : null}
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                    ✉️ Sent in Customer Email
+                  </span>
+                </div>
+
+                {/* Selection Dropdown + Reload Default Button */}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <select
+                      value={selectedRuleId || (subForm.license_rules ? '__custom__' : '__none__')}
+                      onChange={(e) => handleUsageRuleChange(e.target.value)}
+                      disabled={loadingRules}
+                      className="w-full bg-white border border-emerald-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-xs disabled:bg-slate-50 disabled:cursor-not-allowed"
+                    >
+                      {loadingRules ? (
+                        <option value="">Loading product usage rules...</option>
+                      ) : matchingProductRules.length > 0 ? (
+                        <>
+                          {matchingProductRules.map(rule => (
+                            <option key={rule.id} value={String(rule.id)}>
+                              ✓ {rule.title} ({rule.product_name})
+                            </option>
+                          ))}
+                          <option value="__none__">-- No Rules (Do Not Send Rules in Email) --</option>
+                          <option value="__custom__">✏️ Custom / Edit Rules Text Below</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="__none__">
+                            {subForm.product_name
+                              ? `-- No Rules Saved for "${subForm.product_name}" --`
+                              : '-- Select a Product First --'}
+                          </option>
+                          <option value="__custom__">✏️ Type Custom Rules Text Below</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  {/* Quick Reload Rule Button */}
+                  {matchingProductRules.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const defaultR = matchingProductRules[0];
+                        setSelectedRuleId(String(defaultR.id));
+                        setSubForm(prev => ({ ...prev, license_rules: defaultR.rules_text || '' }));
+                        toast.success(`Reset to "${defaultR.title}"`);
+                      }}
+                      className="px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-white hover:bg-emerald-50 border border-emerald-300 rounded-lg shrink-0 flex items-center gap-1 transition-colors shadow-2xs"
+                      title="Reload default product rule"
+                    >
+                      <RotateCcw size={11} />
+                      <span>Reload Rule</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Rules Text Editor / Preview */}
+                <div className="space-y-1">
+                  <textarea
+                    rows={3}
+                    placeholder="Select a rule above or type custom product usage rules to send with customer's activation email..."
+                    value={subForm.license_rules || ''}
+                    onChange={(e) => {
+                      const newText = e.target.value;
+                      setSubForm(prev => ({ ...prev, license_rules: newText }));
+                      if (selectedRuleId !== '__none__' && selectedRuleId !== '__custom__') {
+                        const matched = allUsageRules.find(r => String(r.id) === String(selectedRuleId));
+                        if (matched && matched.rules_text !== newText) {
+                          setSelectedRuleId('__custom__');
+                        }
+                      }
+                    }}
+                    className="w-full bg-white border border-emerald-200/90 rounded-lg p-2.5 text-xs text-slate-800 placeholder-slate-400 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all leading-relaxed custom-scrollbar"
+                  />
+                  <div className="flex items-center justify-between text-[10.5px] text-emerald-800/90 font-medium">
+                    <span>
+                      {subForm.license_rules?.trim()
+                        ? '✓ These rules will be styled into bullet guidelines and included in the customer email.'
+                        : '⚠️ No rules selected. Email will only contain license credentials.'}
+                    </span>
+                    {subForm.license_rules?.trim() && (
+                      <span className="text-slate-500 font-mono text-[10px]">
+                        {subForm.license_rules.length} chars
+                      </span>
+                    )}
+                  </div>
+
+                  {subForm.license_rules?.trim() && /<\/?[a-z][\s\S]*>/i.test(subForm.license_rules) && (
+                    <div className="mt-1.5 p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-lg text-xs text-slate-800 leading-relaxed max-h-36 overflow-y-auto">
+                      <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-1 flex items-center gap-1">
+                        <Eye size={11} className="text-emerald-600" />
+                        <span>Live Formatted Preview (Email Display):</span>
+                      </div>
+                      <div className="rule-html-content" dangerouslySetInnerHTML={{ __html: subForm.license_rules }} />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Notes Section: Customer Notes (sent in email) & Admin Notes (internal only) */}
+              <div className="col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5 grid grid-cols-1 lg:grid-cols-2 gap-3.5 pt-2">
+
+                {/* 1. Customer Notes (Will be sent in email to customer) */}
+                <div className="bg-emerald-50/50 p-3 sm:p-3.5 rounded-xl border border-emerald-200/80 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Mail size={13} className="text-emerald-600" />
+                      <span className="text-xs font-bold text-emerald-900">Customer Notes (Sent in Email)</span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full border border-emerald-200">
+                        ✉️ Sent to Customer
+                      </span>
+                    </div>
+
+                    {/* Template Selector & Manage Actions */}
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value === '__manage__') {
+                            setActiveTemplateTab('list');
+                            setShowManageTemplatesModal(true);
+                          } else if (e.target.value) {
+                            handleSelectNoteTemplate(e.target.value, 'subForm');
+                          }
+                        }}
+                        className="bg-white border border-emerald-300 hover:border-emerald-400 text-emerald-950 font-semibold rounded-lg px-2.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-2xs max-w-[210px] sm:max-w-[260px] truncate"
+                        title="Choose a pre-saved note template to auto-fill"
+                      >
+                        <option value="">⚡ Select Note Template...</option>
+                        {noteTemplates.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.title}
+                          </option>
+                        ))}
+                        <option value="__manage__">⚙️ Manage All Templates...</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuickSaveAsTemplate(subForm.customer_notes)}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-bold flex items-center gap-1 transition-all shadow-2xs cursor-pointer shrink-0"
+                        title="Save note as template to database for future use"
+                      >
+                        <BookmarkPlus size={12} />
+                        <span>Save as Template</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Account activation instructions, rules, or special message for customer..."
+                    value={subForm.customer_notes}
+                    onChange={(e) => setSubForm({ ...subForm, customer_notes: e.target.value })}
+                    className="w-full bg-white border border-emerald-200 rounded-lg p-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-sans leading-relaxed"
+                  />
+                  <div className="flex items-center justify-between text-[10.5px] text-emerald-700/90 font-medium">
+                    <span>This note will be included in the activation email sent to the customer.</span>
+                    {subForm.customer_notes && (
+                      <button
+                        type="button"
+                        onClick={() => setSubForm({ ...subForm, customer_notes: '' })}
+                        className="text-rose-600 hover:text-rose-700 hover:underline cursor-pointer font-bold"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Admin Notes (Private - only for admin, will NOT be sent in email) */}
+                <div className="bg-slate-50 p-3 sm:p-3.5 rounded-xl border border-slate-200/90 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                      <Shield size={13} className="text-amber-600" />
+                      <span>Admin Notes (Private / Internal)</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded-full border border-slate-300">
+                      🔒 Admin Only
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Supplier contact, vendor payment reference, internal reminder..."
+                    value={subForm.admin_notes}
+                    onChange={(e) => setSubForm({ ...subForm, admin_notes: e.target.value, notes: e.target.value })}
+                    className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                  <p className="text-[10.5px] text-slate-500 font-medium">
+                    Private internal notes. Will never be sent to the customer.
+                  </p>
+                </div>
+
               </div>
 
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4 mt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddForm(false);
-                  setEditingSub(null);
-                }}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition-colors"
+            {/* Actions & Email Notification Option */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-200 pt-4 mt-4">
+              {/* Checkbox Button: কাস্টমারকে মেইল পাঠাবো কি না */}
+              <label
+                className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border cursor-pointer select-none transition-all ${
+                  subForm.send_email
+                    ? 'bg-emerald-50/90 border-emerald-300 text-emerald-900 shadow-2xs'
+                    : 'bg-slate-100/90 border-slate-300 text-slate-600 hover:bg-slate-100'
+                }`}
+                title="চেক করা থাকলে কাস্টমারকে মেইল পাঠানো হবে, আনচেক থাকলে কোনো মেইল যাবে না"
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={subFormSubmitting}
-                className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-emerald-700/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
-              >
-                {subFormSubmitting ? (
-                  <>
-                    <RefreshCw size={14} className="animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Check size={14} />
-                    {editingSub ? 'Update Subscription' : 'Save Customer'}
-                  </>
-                )}
-              </button>
+                <input
+                  type="checkbox"
+                  checked={Boolean(subForm.send_email)}
+                  onChange={(e) => setSubForm({ ...subForm, send_email: e.target.checked })}
+                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer accent-emerald-600"
+                />
+                <div className="flex items-center gap-1.5 text-xs font-bold">
+                  <Mail size={14} className={subForm.send_email ? 'text-emerald-600' : 'text-slate-400'} />
+                  <span>কাস্টমারকে মেইল পাঠাবো কি না?</span>
+                </div>
+                <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
+                  subForm.send_email
+                    ? 'bg-emerald-100/90 text-emerald-800 border-emerald-200'
+                    : 'bg-slate-200/90 text-slate-600 border-slate-300'
+                }`}>
+                  {subForm.send_email ? '✓ হ্যাঁ, মেইল যাবে' : '✕ না, মেইল যাবে না'}
+                </span>
+              </label>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setEditingSub(null);
+                  }}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={subFormSubmitting}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-emerald-700/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+                >
+                  {subFormSubmitting ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} />
+                      {editingSub ? 'Update Subscription' : 'Save Customer'}
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
           </form>
@@ -1728,6 +2640,11 @@ export default function SubscriptionManager() {
               onClick={() => {
                 if (tab.id === 'add_customer') {
                   handleOpenAddModal();
+                } else if (tab.id === 'renewals') {
+                  setStatusFilter('Renewed');
+                  setExpiryFilter('All Dates');
+                  setActiveSubTab('subscriptions');
+                  setSubPage(1);
                 } else {
                   setActiveSubTab(tab.id);
                 }
@@ -1770,12 +2687,16 @@ export default function SubscriptionManager() {
         </div>
       )}
 
-      {/* 7 Dashboard Stat Cards Grid matching concept mockup */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-2.5">
+      {/* 8 Dashboard Stat Cards Grid matching concept mockup */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5">
         {/* Card 1: Active Subscriptions */}
         <div
-          onClick={() => { setStatusFilter('Active'); setActiveSubTab('subscriptions'); }}
-          className="bg-white hover:bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200/90 hover:border-emerald-500/40 transition-all cursor-pointer shadow-2xs group"
+          onClick={() => { setStatusFilter('Active'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
+            statusFilter === 'Active' && expiryFilter === 'All Dates'
+              ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/20'
+              : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-emerald-500/40'
+          }`}
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Active">Active</span>
@@ -1788,8 +2709,12 @@ export default function SubscriptionManager() {
 
         {/* Card 2: Expiring Today */}
         <div
-          onClick={() => { setExpiryFilter('today'); setActiveSubTab('subscriptions'); }}
-          className="bg-white hover:bg-rose-50/50 p-2.5 sm:p-3 rounded-xl border border-rose-200/90 hover:border-rose-300 transition-all cursor-pointer shadow-2xs group"
+          onClick={() => { setStatusFilter('All Status'); setExpiryFilter('today'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
+            expiryFilter === 'today'
+              ? 'bg-rose-50/80 border-rose-500 ring-2 ring-rose-500/20'
+              : 'bg-white hover:bg-rose-50/50 border-rose-200/90 hover:border-rose-300'
+          }`}
         >
           <div className="flex items-center justify-between text-rose-600 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Expiring Today">Expiring Today</span>
@@ -1802,8 +2727,12 @@ export default function SubscriptionManager() {
 
         {/* Card 3: Within 3 Days */}
         <div
-          onClick={() => { setExpiryFilter('3days'); setActiveSubTab('subscriptions'); }}
-          className="bg-white hover:bg-amber-50/50 p-2.5 sm:p-3 rounded-xl border border-amber-200/90 hover:border-amber-300 transition-all cursor-pointer shadow-2xs group"
+          onClick={() => { setStatusFilter('All Status'); setExpiryFilter('3days'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
+            expiryFilter === '3days'
+              ? 'bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20'
+              : 'bg-white hover:bg-amber-50/50 border-amber-200/90 hover:border-amber-300'
+          }`}
         >
           <div className="flex items-center justify-between text-amber-600 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Within 3 Days">Within 3 Days</span>
@@ -1816,8 +2745,12 @@ export default function SubscriptionManager() {
 
         {/* Card 4: Within 7 Days */}
         <div
-          onClick={() => { setExpiryFilter('7days'); setActiveSubTab('subscriptions'); }}
-          className="bg-white hover:bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200/90 hover:border-yellow-500/40 transition-all cursor-pointer shadow-2xs group"
+          onClick={() => { setStatusFilter('All Status'); setExpiryFilter('7days'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
+            expiryFilter === '7days'
+              ? 'bg-yellow-50/80 border-yellow-500 ring-2 ring-yellow-500/20'
+              : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-yellow-500/40'
+          }`}
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Within 7 Days">Within 7 Days</span>
@@ -1830,8 +2763,12 @@ export default function SubscriptionManager() {
 
         {/* Card 5: Expired */}
         <div
-          onClick={() => { setStatusFilter('Expired'); setActiveSubTab('subscriptions'); }}
-          className="bg-white hover:bg-rose-50/50 p-2.5 sm:p-3 rounded-xl border border-rose-200/90 hover:border-rose-300 transition-all cursor-pointer shadow-2xs group"
+          onClick={() => { setStatusFilter('Expired'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
+            statusFilter === 'Expired' && expiryFilter === 'All Dates'
+              ? 'bg-rose-50/80 border-rose-500 ring-2 ring-rose-500/20'
+              : 'bg-white hover:bg-rose-50/50 border-rose-200/90 hover:border-rose-300'
+          }`}
         >
           <div className="flex items-center justify-between text-rose-600 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Expired">Expired</span>
@@ -1844,8 +2781,12 @@ export default function SubscriptionManager() {
 
         {/* Card 6: Renewed */}
         <div
-          onClick={() => { setStatusFilter('Renewed'); setActiveSubTab('subscriptions'); }}
-          className="bg-white hover:bg-teal-50/50 p-2.5 sm:p-3 rounded-xl border border-slate-200/90 hover:border-teal-400 transition-all cursor-pointer shadow-2xs group"
+          onClick={() => { setStatusFilter('Renewed'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
+            statusFilter === 'Renewed' && expiryFilter === 'All Dates'
+              ? 'bg-teal-50/80 border-teal-500 ring-2 ring-teal-500/20'
+              : 'bg-white hover:bg-teal-50/50 border-slate-200/90 hover:border-teal-400'
+          }`}
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Renewed">Renewed</span>
@@ -1856,10 +2797,32 @@ export default function SubscriptionManager() {
           <div className="text-lg sm:text-xl font-black text-teal-700">{stats.renewed}</div>
         </div>
 
-        {/* Card 7: Unique Customer */}
+        {/* Card 7: Not Renewed */}
         <div
-          onClick={() => { setStatusFilter('All Status'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); }}
-          className="bg-white hover:bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200/90 hover:border-blue-400 transition-all cursor-pointer shadow-2xs group"
+          onClick={() => { setStatusFilter('Not Renewed'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
+            statusFilter === 'Not Renewed' && expiryFilter === 'All Dates'
+              ? 'bg-slate-200/80 border-slate-600 ring-2 ring-slate-600/30'
+              : 'bg-white hover:bg-slate-100/70 border-slate-200/90 hover:border-slate-400'
+          }`}
+        >
+          <div className="flex items-center justify-between text-slate-600 mb-1">
+            <span className="text-[10.5px] font-bold truncate" title="Not Renewed">Not Renewed</span>
+            <div className="p-1 rounded-md bg-slate-100 text-slate-600 group-hover:scale-105 transition-transform shrink-0">
+              <UserX size={13} />
+            </div>
+          </div>
+          <div className="text-lg sm:text-xl font-black text-slate-800">{stats.notRenewed || 0}</div>
+        </div>
+
+        {/* Card 8: Unique Customer */}
+        <div
+          onClick={() => { setStatusFilter('All Status'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
+            statusFilter === 'All Status' && expiryFilter === 'All Dates' && searchQuery === '' && productFilter === 'All Products'
+              ? 'bg-blue-50/70 border-blue-500 ring-2 ring-blue-500/20'
+              : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-blue-400'
+          }`}
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Unique Customer">Unique Customer</span>
@@ -2292,10 +3255,12 @@ export default function SubscriptionManager() {
                 }}
                 className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 font-medium focus:outline-none focus:border-emerald-500 transition-all shadow-2xs cursor-pointer"
               >
-                <option value="All Status">All Status</option>
-                <option value="Active">Active</option>
-                <option value="Expiring Soon">Expiring Soon</option>
+                <option value="All Status">All Status (Expired & Not Renewed First)</option>
                 <option value="Expired">Expired</option>
+                <option value="Not Renewed">Not Renewed</option>
+                <option value="Expired & Not Renewed">Expired & Not Renewed</option>
+                <option value="Expiring Soon">Expiring Soon</option>
+                <option value="Active">Active</option>
                 <option value="Renewed">Renewed</option>
                 <option value="Cancelled">Cancelled</option>
               </select>
@@ -2329,11 +3294,12 @@ export default function SubscriptionManager() {
                 }}
                 className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 font-medium focus:outline-none focus:border-emerald-500 transition-all shadow-2xs cursor-pointer"
               >
-                <option value="expiry">Sort: Expiry Date</option>
+                <option value="expiry">Sort: Priority (Expired First)</option>
+                <option value="expiry_date_only">Sort: Expiry Date (Strict)</option>
                 <option value="order_date">Sort: Order Date</option>
                 <option value="customer">Sort: Customer Name</option>
                 <option value="product">Sort: Product Name</option>
-                <option value="status">Sort: Status</option>
+                <option value="status">Sort: Status Priority</option>
                 <option value="amount">Sort: Amount</option>
               </select>
             </div>
@@ -2370,6 +3336,81 @@ export default function SubscriptionManager() {
                 Reset
               </button>
             )}
+
+            {/* Export Excel Button in Toolbar */}
+            <div className="relative sm:ml-auto" ref={exportMenuRef}>
+              <div className="inline-flex rounded-lg shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => handleExportExcel(hasActiveFilters ? 'filtered' : 'all')}
+                  disabled={exportingExcel || sortedSubscriptions.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 text-white text-[11px] font-bold rounded-l-lg border-r border-emerald-500 transition-all cursor-pointer shadow-2xs"
+                  title="Download subscriptions as Excel (.xlsx)"
+                >
+                  {exportingExcel ? (
+                    <Loader2 size={13} className="animate-spin text-white" />
+                  ) : (
+                    <FileSpreadsheet size={14} className="text-emerald-100" />
+                  )}
+                  <span>Export Excel</span>
+                  {hasActiveFilters && (
+                    <span className="bg-emerald-800/80 text-emerald-100 text-[9.5px] px-1.5 py-0.2 rounded-full font-bold ml-0.5">
+                      {sortedSubscriptions.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                  disabled={exportingExcel}
+                  className="px-1.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 text-white text-[11px] font-bold rounded-r-lg transition-all cursor-pointer shadow-2xs"
+                  title="Export Options"
+                >
+                  <ChevronDown size={13} className={`transition-transform duration-200 ${exportMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {exportMenuOpen && (
+                <div className="absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-30 py-1 text-slate-800 text-xs animate-in fade-in-50 zoom-in-95">
+                  <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    Excel Export Options
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExportMenuOpen(false);
+                      handleExportExcel('filtered');
+                    }}
+                    disabled={sortedSubscriptions.length === 0}
+                    className="w-full text-left px-3 py-2 hover:bg-emerald-50/70 flex items-center justify-between text-slate-700 hover:text-emerald-700 transition-colors disabled:opacity-40 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Download size={13} className="text-emerald-600" />
+                      <span>Export Current View</span>
+                    </div>
+                    <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                      {sortedSubscriptions.length}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExportMenuOpen(false);
+                      handleExportExcel('all');
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-emerald-50/70 flex items-center justify-between text-slate-700 hover:text-emerald-700 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet size={13} className="text-emerald-600" />
+                      <span>Export All Subscriptions</span>
+                    </div>
+                    <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                      {stats.totalSubscriptions || subscriptions.length}
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
 
           </div>
 
@@ -2509,9 +3550,14 @@ export default function SubscriptionManager() {
                               {sub.customer_name ? sub.customer_name.charAt(0).toUpperCase() : 'C'}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-[11.5px] truncate max-w-[150px]">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenViewModal(sub)}
+                                className="font-bold text-slate-900 group-hover:text-emerald-700 hover:underline transition-colors text-[11.5px] truncate max-w-[150px] text-left cursor-pointer block"
+                                title="Click to view full subscription details"
+                              >
                                 {sub.customer_name}
-                              </p>
+                              </button>
                               <div className="flex items-center gap-1 text-[10.5px] text-slate-600">
                                 <span>{sub.whatsapp_number}</span>
                                 {sub.whatsapp_number && (
@@ -2693,6 +3739,16 @@ export default function SubscriptionManager() {
                               </a>
                             )}
 
+                            {/* View Full Details Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenViewModal(sub)}
+                              className="p-1 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 transition-colors shadow-2xs cursor-pointer"
+                              title="View Full Subscription Details"
+                            >
+                              <Eye size={13} />
+                            </button>
+
                             {/* Renew / View Button */}
                             {sub.status === 'Expiring Soon' || sub.status === 'Expired' ? (
                               <button
@@ -2707,6 +3763,39 @@ export default function SubscriptionManager() {
                                 className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] rounded-md border border-slate-200 transition-colors cursor-pointer"
                               >
                                 Renew
+                              </button>
+                            )}
+
+                            {/* Not Renewed Action Button */}
+                            {sub.status === 'Not Renewed' ? (
+                              <button
+                                type="button"
+                                disabled={togglingNotRenewedId === sub.id}
+                                onClick={(e) => handleToggleNotRenewed(sub, e)}
+                                className="px-2 py-1 bg-slate-700 hover:bg-slate-800 text-white font-bold text-[10.5px] rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-60"
+                                title="Marked as Not Renewed (Click to revert status)"
+                              >
+                                {togglingNotRenewedId === sub.id ? (
+                                  <RefreshCw size={11} className="animate-spin text-slate-300" />
+                                ) : (
+                                  <XCircle size={11} className="text-rose-400" />
+                                )}
+                                <span>Not Renewed</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={togglingNotRenewedId === sub.id}
+                                onClick={(e) => handleToggleNotRenewed(sub, e)}
+                                className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200/80 font-bold text-[10.5px] rounded-md transition-colors shadow-2xs cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-60"
+                                title="Mark as Not Renewed (Customer will not renew)"
+                              >
+                                {togglingNotRenewedId === sub.id ? (
+                                  <RefreshCw size={11} className="animate-spin text-rose-600" />
+                                ) : (
+                                  <UserX size={11} />
+                                )}
+                                <span>Not Renew</span>
                               </button>
                             )}
 
@@ -2741,6 +3830,7 @@ export default function SubscriptionManager() {
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500"></span> Expiring Soon</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500"></span> Expired</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-500"></span> Renewed</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-500"></span> Not Renewed</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400"></span> Cancelled</span>
             </div>
 
@@ -2822,6 +3912,26 @@ export default function SubscriptionManager() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 truncate">{selectedSubDetail.customer_name}</h3>
                       {formatStatusBadge(selectedSubDetail.status)}
+                      <button
+                        type="button"
+                        disabled={togglingNotRenewedId === selectedSubDetail.id}
+                        onClick={(e) => handleToggleNotRenewed(selectedSubDetail, e)}
+                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition-all cursor-pointer flex items-center gap-1 disabled:opacity-60 ${
+                          selectedSubDetail.status === 'Not Renewed'
+                            ? 'bg-slate-700 text-white border-slate-700 hover:bg-slate-800'
+                            : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                        }`}
+                        title={selectedSubDetail.status === 'Not Renewed' ? 'Click to revert status' : 'Click to mark as Not Renewed (will not renew)'}
+                      >
+                        {togglingNotRenewedId === selectedSubDetail.id ? (
+                          <RefreshCw size={10} className="animate-spin text-slate-300" />
+                        ) : selectedSubDetail.status === 'Not Renewed' ? (
+                          <XCircle size={10} className="text-rose-400" />
+                        ) : (
+                          <UserX size={10} />
+                        )}
+                        <span>{selectedSubDetail.status === 'Not Renewed' ? 'Revert Status' : 'Mark as Not Renewed'}</span>
+                      </button>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 truncate">
                       {selectedSubDetail.product_name} • {selectedSubDetail.package_plan} | WhatsApp: {selectedSubDetail.whatsapp_number}
@@ -3189,8 +4299,8 @@ export default function SubscriptionManager() {
                             )}
                           </div>
 
-                          {/* Row 2: Customer Email (Span 1 col) */}
-                          <div className="col-span-1 sm:col-span-2 lg:col-span-1 space-y-1">
+                          {/* Row 2: Customer Email (Span 2 cols) */}
+                          <div className="col-span-1 sm:col-span-2 lg:col-span-2 space-y-1">
                             <div className="flex items-center justify-between">
                               <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
                                 <Mail size={12} className="text-emerald-600" />
@@ -3202,22 +4312,121 @@ export default function SubscriptionManager() {
                             </div>
                             <input
                               type="email"
+                              name="renew_customer_email_address"
+                              autoComplete="new-password"
+                              autoCorrect="off"
+                              autoCapitalize="off"
+                              spellCheck="false"
                               value={renewForm.customer_email || ''}
                               onChange={(e) => setRenewForm({ ...renewForm, customer_email: e.target.value })}
-                              placeholder="customer@email.com"
+                              placeholder="customer@email.com (ঐচ্ছিক)"
                               className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
                             />
                             <p className="text-[10px] text-slate-400 truncate">
-                              Sends renewal mail on confirm
+                              Dispatches renewal confirmation email with credentials and customer notes.
                             </p>
                           </div>
 
-                          {/* Row 2: Confirm Renewal Button (Span 1 col) */}
-                          <div className="col-span-1 sm:col-span-2 lg:col-span-1 flex flex-col justify-end">
+                          {/* Row 3: Customer Notes (Sent in Email) (Span 2 cols) */}
+                          <div className="col-span-1 sm:col-span-2 lg:col-span-2 bg-emerald-50/50 p-2.5 sm:p-3 rounded-xl border border-emerald-200/80 space-y-1.5">
+                            <div className="flex flex-wrap items-center justify-between gap-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <Mail size={12} className="text-emerald-600" />
+                                <span className="text-[11px] font-bold text-emerald-900">Customer Notes (Sent in Email)</span>
+                                <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full border border-emerald-200">
+                                  ✉️ Sent to Customer
+                                </span>
+                              </div>
+
+                              {/* Template Selector for Renewal */}
+                              <div className="flex items-center gap-1">
+                                <select
+                                  value=""
+                                  onChange={(e) => {
+                                    if (e.target.value === '__manage__') {
+                                      setActiveTemplateTab('list');
+                                      setShowManageTemplatesModal(true);
+                                    } else if (e.target.value) {
+                                      handleSelectNoteTemplate(e.target.value, 'renewForm');
+                                    }
+                                  }}
+                                  className="bg-white border border-emerald-300 hover:border-emerald-400 text-emerald-950 font-semibold rounded-lg px-2 py-0.5 text-[10.5px] focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-2xs max-w-[200px] truncate"
+                                  title="Choose a pre-saved note template to auto-fill"
+                                >
+                                  <option value="">⚡ Select Template...</option>
+                                  {noteTemplates.map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.title}
+                                    </option>
+                                  ))}
+                                  <option value="__manage__">⚙️ Manage...</option>
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickSaveAsTemplate(renewForm.customer_notes)}
+                                  className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold flex items-center gap-1 transition-all shadow-2xs cursor-pointer shrink-0"
+                                  title="Save this note as a template for future use"
+                                >
+                                  <BookmarkPlus size={10} />
+                                  <span>Save</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            <textarea
+                              rows={2}
+                              value={renewForm.customer_notes || ''}
+                              onChange={(e) => setRenewForm({ ...renewForm, customer_notes: e.target.value })}
+                              placeholder="e.g. Renewal instructions, account access details, or thank you message for customer..."
+                              className="w-full bg-white border border-emerald-200 rounded-lg p-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans leading-relaxed"
+                            />
+                            <div className="flex items-center justify-between text-[10px] text-emerald-700/80 font-medium">
+                              <span>This note will be included in the renewal confirmation email.</span>
+                              {renewForm.customer_notes && (
+                                <button
+                                  type="button"
+                                  onClick={() => setRenewForm({ ...renewForm, customer_notes: '' })}
+                                  className="text-rose-600 hover:text-rose-700 hover:underline cursor-pointer font-bold"
+                                >
+                                  Clear
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Row 3: Admin Notes (Private) (Span 2 cols) */}
+                          <div className="col-span-1 sm:col-span-2 lg:col-span-2 bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200/90 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-800">
+                                <Shield size={12} className="text-amber-600" />
+                                <span>Admin Notes (Private)</span>
+                              </label>
+                              <span className="text-[9.5px] font-bold text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded-full border border-slate-300">
+                                🔒 Admin Only
+                              </span>
+                            </div>
+                            <textarea
+                              rows={2}
+                              value={renewForm.admin_notes || ''}
+                              onChange={(e) => setRenewForm({ ...renewForm, admin_notes: e.target.value, notes: e.target.value })}
+                              placeholder="e.g. Internal renewal note, supplier cost reference, customer interaction note..."
+                              className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <p className="text-[10px] text-slate-400 font-medium">
+                              Private internal notes. Strictly for admin reference, never sent in email.
+                            </p>
+                          </div>
+
+                          {/* Row 4: Action Footer (Span 4 cols) */}
+                          <div className="col-span-1 sm:col-span-2 lg:col-span-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1 border-t border-slate-200/60">
+                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                              <RefreshCw size={12} className="text-emerald-600 shrink-0" />
+                              <span>Clicking confirm will extend validity, record renewal history, and email customer credentials.</span>
+                            </div>
                             <button
                               type="submit"
                               disabled={renewSubmitting}
-                              className="w-full h-[38px] bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                              className="w-full sm:w-auto min-w-[190px] h-[38px] px-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
                             >
                               {renewSubmitting ? (
                                 <>
@@ -3253,33 +4462,100 @@ export default function SubscriptionManager() {
                     </div>
 
                     <div className="overflow-x-auto rounded-lg border border-slate-250 bg-white shadow-2xs">
-                      <table className="w-full min-w-[380px] text-left text-[10.5px] border-collapse">
+                      <table className="w-full min-w-[500px] text-left text-[10.5px] border-collapse">
                         <thead>
                           <tr className="border-b-2 border-slate-250 text-slate-700 font-black uppercase text-[9.5px] bg-slate-100 tracking-wider">
                             <th className="py-2 px-2.5 border-r border-slate-250">Start Date</th>
                             <th className="py-2 px-2.5 border-r border-slate-250">End Date</th>
                             <th className="py-2 px-2.5 border-r border-slate-250">Amount</th>
-                            <th className="py-2 px-2.5">Status</th>
+                            <th className="py-2 px-2.5 border-r border-slate-250">Status</th>
+                            <th className="py-2 px-2.5 border-r border-slate-250 min-w-[150px]">Account / License Given</th>
+                            <th className="py-2 px-2.5">Notes</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/70">
                           {selectedSubDetail.renewals && selectedSubDetail.renewals.length > 0 ? (
                             selectedSubDetail.renewals.map((ren) => (
                               <tr key={ren.id} className="odd:bg-white even:bg-slate-50/40 hover:bg-emerald-50/20 transition-colors">
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 text-slate-800 font-medium">{new Date(ren.start_date).toISOString().slice(0, 10)}</td>
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 text-slate-800 font-medium">{new Date(ren.end_date).toISOString().slice(0, 10)}</td>
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 font-bold text-emerald-700">BDT {ren.amount}</td>
-                                <td className="py-1.75 px-2.5">
+                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 text-slate-800 font-medium whitespace-nowrap">{new Date(ren.start_date).toISOString().slice(0, 10)}</td>
+                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 text-slate-800 font-medium whitespace-nowrap">{new Date(ren.end_date).toISOString().slice(0, 10)}</td>
+                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 font-bold text-emerald-700 whitespace-nowrap">BDT {ren.amount}</td>
+                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 whitespace-nowrap">
                                   <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold border shadow-2xs ${ren.status === 'Current' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'
                                     }`}>
                                     {ren.status}
                                   </span>
                                 </td>
+                                <td className="py-1.75 px-2.5 border-r border-slate-200/80">
+                                  <div className="space-y-1 max-w-[220px]">
+                                    {(ren.digital_account_email || ren.digital_slot_number || ren.digital_account_product) && (
+                                      <div className="flex items-center gap-1 text-[9.5px] font-semibold text-blue-700 bg-blue-50/90 border border-blue-200 px-1.5 py-0.5 rounded leading-tight">
+                                        <Server size={10} className="shrink-0 text-blue-600" />
+                                        <span className="truncate" title={`${ren.digital_account_product || 'Account'}: ${ren.digital_account_email || ''}`}>
+                                          {ren.digital_account_email || ren.digital_account_product || 'Digital Account'}
+                                        </span>
+                                        {ren.digital_slot_number && (
+                                          <span className="bg-blue-600 text-white text-[8.5px] font-bold px-1 rounded-xs shrink-0">
+                                            #{ren.digital_slot_number}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {ren.account_given ? (
+                                      <div className="flex items-center gap-1 bg-slate-900 text-emerald-300 font-mono text-[9.5px] px-1.5 py-0.5 rounded border border-slate-800 leading-tight">
+                                        <Key size={10} className="shrink-0 text-emerald-400" />
+                                        <span className="truncate flex-1 select-all font-mono" title={ren.account_given}>
+                                          {ren.account_given}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigator.clipboard.writeText(ren.account_given);
+                                            toast.success('Account credentials copied!');
+                                          }}
+                                          title="Copy credentials"
+                                          className="text-slate-400 hover:text-emerald-300 p-0.5 rounded hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                                        >
+                                          <Copy size={10} />
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                    {!ren.account_given && !ren.digital_account_email && !ren.digital_slot_number && !ren.digital_account_product && (
+                                      <span className="text-slate-400 italic text-[9.5px]">- Not recorded -</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-1.75 px-2.5 text-slate-700">
+                                  <div className="space-y-1 max-w-[220px]">
+                                    {ren.customer_notes && (
+                                      <div className="flex items-start gap-1 bg-emerald-50/90 text-emerald-800 text-[10px] p-1 rounded border border-emerald-200 leading-tight">
+                                        <Mail size={11} className="shrink-0 text-emerald-600 mt-0.5" />
+                                        <span className="font-normal break-words line-clamp-2" title={`Customer Note: ${ren.customer_notes}`}>
+                                          <strong className="font-semibold text-emerald-900">Cust:</strong> {ren.customer_notes}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {(ren.admin_notes || (ren.notes && ren.notes !== 'Subscription renewed' && ren.notes !== 'Initial purchase')) ? (
+                                      <div className="flex items-start gap-1 bg-slate-100 text-slate-700 text-[10px] p-1 rounded border border-slate-200 leading-tight">
+                                        <Shield size={11} className="shrink-0 text-amber-600 mt-0.5" />
+                                        <span className="font-normal break-words line-clamp-2" title={`Admin Note: ${ren.admin_notes || ren.notes}`}>
+                                          <strong className="font-semibold text-slate-800">Admin:</strong> {ren.admin_notes || ren.notes}
+                                        </span>
+                                      </div>
+                                    ) : (ren.notes && !ren.customer_notes && !ren.admin_notes ? (
+                                      <span className="text-[10px] text-slate-500 italic">{ren.notes}</span>
+                                    ) : null)}
+                                    {!ren.customer_notes && !ren.admin_notes && (!ren.notes || ren.notes === 'Subscription renewed' || ren.notes === 'Initial purchase') && (
+                                      <span className="text-slate-400 italic text-[10px]">-</span>
+                                    )}
+                                  </div>
+                                </td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={4} className="py-3 text-center text-slate-400 font-medium">No renewal history recorded yet.</td>
+                              <td colSpan={6} className="py-3 text-center text-slate-400 font-medium">No renewal history recorded yet.</td>
                             </tr>
                           )}
                         </tbody>
@@ -3341,6 +4617,655 @@ export default function SubscriptionManager() {
         document.body
       )}
 
+      {/* MODAL 3: VIEW FULL SUBSCRIPTION DETAILS (COMPREHENSIVE MODAL) */}
+      {showViewModal && viewingSub && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[999999] bg-slate-900/70 backdrop-blur-sm overflow-y-auto p-3 sm:p-6 animate-in fade-in duration-200"
+          onClick={() => setShowViewModal(false)}
+        >
+          <div className="min-h-full flex items-center justify-center py-4 sm:py-8">
+            <div
+              className="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full max-h-[88vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6 shadow-2xl text-left overflow-hidden text-slate-900 relative my-auto animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3 shrink-0 gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center font-black text-base sm:text-lg shrink-0 shadow-xs">
+                    {viewingSub.customer_name ? viewingSub.customer_name.charAt(0).toUpperCase() : 'C'}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 truncate">
+                        {viewingSub.customer_name}
+                      </h3>
+                      {formatStatusBadge(viewingSub.status)}
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                        Order #{viewingSub.order_id || viewingSub.id}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate font-medium">
+                      {viewingSub.product_name} • {viewingSub.package_plan}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {viewingSub.direct_whatsapp_url && (
+                    <a
+                      href={viewingSub.direct_whatsapp_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Open WhatsApp Chat"
+                    >
+                      <MessageSquare size={13} />
+                      <span className="hidden sm:inline">WhatsApp</span>
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleCopySubscriptionSummary(viewingSub)}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Copy Summary to Clipboard"
+                  >
+                    <Copy size={13} />
+                    <span className="hidden sm:inline">Copy</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowViewModal(false)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                    title="Close"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Content Body */}
+              <div className="overflow-y-auto mt-4 pr-1 flex-1 custom-scrollbar space-y-4">
+
+                {/* 4 Cards Overview Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+
+                  {/* Card 1: Customer Profile */}
+                  <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/90 space-y-2">
+                    <div className="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
+                      <User size={13} className="text-blue-600" />
+                      <span>Customer Info</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">WhatsApp / Mobile</span>
+                        <div className="flex items-center gap-1 font-semibold text-slate-800">
+                          <span>{viewingSub.whatsapp_number || 'N/A'}</span>
+                          {viewingSub.whatsapp_number && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(viewingSub.whatsapp_number);
+                                toast.success('Phone copied!');
+                              }}
+                              className="text-slate-400 hover:text-emerald-600 cursor-pointer p-0.5"
+                              title="Copy"
+                            >
+                              <Copy size={11} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">Email Address</span>
+                        <div className="flex items-center gap-1 text-slate-800 truncate">
+                          <span className="truncate">{viewingSub.email || 'Not provided'}</span>
+                          {viewingSub.email && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(viewingSub.email);
+                                toast.success('Email copied!');
+                              }}
+                              className="text-slate-400 hover:text-emerald-600 cursor-pointer p-0.5 shrink-0"
+                              title="Copy"
+                            >
+                              <Copy size={11} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">Source</span>
+                        <div className="mt-0.5">{formatSourceBadge(viewingSub.customer_source)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Subscription Timeline */}
+                  <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/90 space-y-2">
+                    <div className="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
+                      <Calendar size={13} className="text-emerald-600" />
+                      <span>Timeline & Validity</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">Purchase / Start Date</span>
+                        <span className="font-semibold text-slate-800">
+                          {viewingSub.purchase_date ? new Date(viewingSub.purchase_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">Validity Duration</span>
+                        <span className="font-semibold text-slate-800">{viewingSub.validity_days || 30} Days</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">Expiry Date</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-900">
+                            {viewingSub.expiry_date ? new Date(viewingSub.expiry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                          </span>
+                          {viewingSub.expiry_date && (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                              {(() => {
+                                const days = getRemainingDays(viewingSub.expiry_date);
+                                if (days === null) return '-';
+                                if (days > 1) return `${days}d left`;
+                                if (days === 1) return `1d left`;
+                                if (days === 0) return `Today`;
+                                return `${Math.abs(days)}d ago`;
+                              })()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Financials & Pricing */}
+                  <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/90 space-y-2">
+                    <div className="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
+                      <Shield size={13} className="text-amber-600" />
+                      <span>Payment & Pricing</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">Selling Price</span>
+                        <span className="font-black text-emerald-700 text-sm">৳{parseFloat(viewingSub.selling_price || 0).toLocaleString()} BDT</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">Payment Status</span>
+                        <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold mt-0.5 ${viewingSub.payment_status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                          {viewingSub.payment_status || 'Paid'}
+                        </span>
+                      </div>
+                      {viewingSub.vendor_price !== null && viewingSub.vendor_price !== undefined && parseFloat(viewingSub.vendor_price) > 0 && (
+                        <div>
+                          <span className="text-slate-400 text-[10.5px] block">Supplier Buying Cost</span>
+                          <span className="text-slate-700 font-semibold">৳{parseFloat(viewingSub.vendor_price).toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card 4: Vendor & Order Ref */}
+                  <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/90 space-y-2">
+                    <div className="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
+                      <Store size={13} className="text-purple-600" />
+                      <span>Order & Supplier</span>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">Order Ref Number</span>
+                        <span className="font-bold text-blue-700">#{viewingSub.order_id || viewingSub.id}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">Vendor / Supplier</span>
+                        <span className="font-semibold text-slate-800">
+                          {viewingSub.vendor_name ? `${viewingSub.vendor_name} ${viewingSub.vendor_company ? `(${viewingSub.vendor_company})` : ''}` : 'Self / In-house'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10.5px] block">Created Date & Time</span>
+                        <span className="text-slate-600 text-[11px]">
+                          {viewingSub.order_created_at || viewingSub.created_at
+                            ? new Date(viewingSub.order_created_at || viewingSub.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            : '-'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* License Key & Credentials Section */}
+                <div className="bg-slate-900 rounded-xl p-4 text-white space-y-2.5 border border-slate-800 shadow-md">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Key size={15} className="text-emerald-400" />
+                      <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                        Digital License Key / Account Credentials
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {!inlineCredsEdit && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInlineCredsValue(viewingSub.account_given || '');
+                            setInlineDigitalAccId(viewingSub.digital_account_id ? String(viewingSub.digital_account_id) : '');
+                            setInlineCredsEdit(true);
+                          }}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer border border-slate-700"
+                          title="Assign or update account credentials"
+                        >
+                          <Edit2 size={12} />
+                          <span>{viewingSub.account_given ? 'Edit' : 'Assign'}</span>
+                        </button>
+                      )}
+                      {viewingSub.account_given && !inlineCredsEdit && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowCredentials(!showCredentials)}
+                            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer border border-slate-700"
+                          >
+                            {showCredentials ? <EyeOff size={12} /> : <Eye size={12} />}
+                            <span>{showCredentials ? 'Hide' : 'Reveal'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(viewingSub.account_given);
+                              toast.success('Credentials copied to clipboard!');
+                            }}
+                            className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <Copy size={12} />
+                            <span>Copy</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {inlineCredsEdit ? (
+                    <div className="bg-slate-950 p-3 rounded-lg border border-emerald-500/50 space-y-2.5">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-emerald-400 mb-1">
+                          Account Access / Credentials / License Key:
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={inlineCredsValue}
+                          onChange={(e) => setInlineCredsValue(e.target.value)}
+                          placeholder="Type or paste credentials (e.g. Email: ... | Password: ...) or license key..."
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-emerald-300 font-mono focus:outline-none focus:border-emerald-500 leading-relaxed"
+                        />
+                      </div>
+
+                      {digitalAccounts && digitalAccounts.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <label className="text-slate-400 text-[11px] font-medium">Link Digital Account Slot:</label>
+                          <select
+                            value={inlineDigitalAccId}
+                            onChange={(e) => setInlineDigitalAccId(e.target.value)}
+                            className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="">-- No Account Linked --</option>
+                            {digitalAccounts.map(acc => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.product_name} ({acc.account_email})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setInlineCredsEdit(false)}
+                          className="px-2.5 py-1 text-slate-400 hover:text-white text-xs font-medium cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingInlineCreds}
+                          onClick={handleSaveInlineCredentials}
+                          className="px-3.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                        >
+                          {savingInlineCreds ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                          <span>Save & Update History</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : viewingSub.account_given ? (
+                    <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs text-emerald-300 whitespace-pre-wrap break-all select-all leading-relaxed">
+                      {showCredentials ? viewingSub.account_given : (
+                        viewingSub.account_given.length > 50
+                          ? `${viewingSub.account_given.slice(0, 15)}••••••••••••••••••••••••••••••••${viewingSub.account_given.slice(-10)}`
+                          : viewingSub.account_given.replace(/[a-zA-Z0-9]/g, '•')
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800/80 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
+                      <span className="italic">No license key or account credentials assigned to this subscription yet.</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInlineCredsValue('');
+                          setInlineDigitalAccId(viewingSub.digital_account_id ? String(viewingSub.digital_account_id) : '');
+                          setInlineCredsEdit(true);
+                        }}
+                        className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer not-italic shadow-xs"
+                      >
+                        <Key size={12} />
+                        <span>Assign Credentials Now</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Associated Digital License Slot info if linked */}
+                  {(viewingSub.digital_account_product || viewingSub.digital_account_id || viewingSub.digital_account_email) && (
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300 pt-1 border-t border-slate-800">
+                      <span className="text-slate-400">Linked License Account:</span>
+                      <span className="font-bold text-white bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                        {viewingSub.digital_account_product || `Account #${viewingSub.digital_account_id}`}
+                      </span>
+                      {viewingSub.digital_account_email && (
+                        <span className="font-mono text-emerald-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                          {viewingSub.digital_account_email}
+                        </span>
+                      )}
+                      {viewingSub.digital_slot_number && (
+                        <span className="font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-800 px-2 py-0.5 rounded">
+                          Slot #{viewingSub.digital_slot_number}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Product Usages Rules Display (if assigned) */}
+                {viewingSub.license_rules && (
+                  <div className="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200/90 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
+                        <ScrollText size={13} className="text-emerald-600" />
+                        <span>Product Usages Rules (Sent in Email)</span>
+                      </div>
+                      <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+                        ✉️ Included in Customer Email
+                      </span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-lg border border-emerald-200 text-xs text-slate-800 leading-relaxed max-h-48 overflow-y-auto custom-scrollbar">
+                      {/<\/?[a-z][\s\S]*>/i.test(viewingSub.license_rules) ? (
+                        <div className="rule-html-content" dangerouslySetInnerHTML={{ __html: viewingSub.license_rules }} />
+                      ) : (
+                        <div className="whitespace-pre-wrap font-sans">{viewingSub.license_rules}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes Section: Customer Notes & Admin Notes */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+                  {/* Customer Notes */}
+                  <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200/80 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
+                        <Mail size={13} className="text-emerald-600" />
+                        <span>Customer Notes</span>
+                      </div>
+                      <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full border border-emerald-200">
+                        ✉️ Included in Email
+                      </span>
+                    </div>
+                    {viewingSub.customer_notes ? (
+                      <div className="bg-white p-2.5 rounded-lg border border-emerald-200 text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
+                        {viewingSub.customer_notes}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No customer notes provided.</p>
+                    )}
+                  </div>
+
+                  {/* Admin Notes */}
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/90 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                        <Shield size={13} className="text-amber-600" />
+                        <span>Admin Notes</span>
+                      </div>
+                      <span className="text-[9.5px] font-bold text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded-full border border-slate-300">
+                        🔒 Private / Admin Only
+                      </span>
+                    </div>
+                    {(viewingSub.admin_notes || viewingSub.notes) ? (
+                      <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
+                        {viewingSub.admin_notes || viewingSub.notes}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No private admin notes recorded.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Renewal & Reminder History */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Renewal History */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <History size={13} className="text-slate-600" />
+                        Renewal History
+                      </h4>
+                      <span className="text-[10px] text-slate-500 font-semibold">
+                        {viewingSub.renewals?.length || 0} record(s)
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                      <table className="w-full min-w-[540px] text-left text-[10.5px] border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-100 text-[9.5px] uppercase">
+                            <th className="py-1.5 px-2">Start</th>
+                            <th className="py-1.5 px-2">End</th>
+                            <th className="py-1.5 px-2">Amount</th>
+                            <th className="py-1.5 px-2">Status</th>
+                            <th className="py-1.5 px-2 min-w-[150px]">Account / License Given</th>
+                            <th className="py-1.5 px-2">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {viewingSub.renewals && viewingSub.renewals.length > 0 ? (
+                            viewingSub.renewals.map(r => (
+                              <tr key={r.id} className="hover:bg-slate-50">
+                                <td className="py-1.5 px-2 whitespace-nowrap">{new Date(r.start_date).toISOString().slice(0, 10)}</td>
+                                <td className="py-1.5 px-2 whitespace-nowrap">{new Date(r.end_date).toISOString().slice(0, 10)}</td>
+                                <td className="py-1.5 px-2 font-bold text-emerald-700 whitespace-nowrap">৳{r.amount}</td>
+                                <td className="py-1.5 px-2 whitespace-nowrap">
+                                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${r.status === 'Current' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                                    {r.status}
+                                  </span>
+                                </td>
+                                <td className="py-1.5 px-2">
+                                  <div className="space-y-1 max-w-[220px]">
+                                    {(r.digital_account_email || r.digital_slot_number || r.digital_account_product) && (
+                                      <div className="flex items-center gap-1 text-[9.5px] font-semibold text-blue-700 bg-blue-50/90 border border-blue-200 px-1.5 py-0.5 rounded leading-tight">
+                                        <Server size={10} className="shrink-0 text-blue-600" />
+                                        <span className="truncate" title={`${r.digital_account_product || 'Account'}: ${r.digital_account_email || ''}`}>
+                                          {r.digital_account_email || r.digital_account_product || 'Digital Account'}
+                                        </span>
+                                        {r.digital_slot_number && (
+                                          <span className="bg-blue-600 text-white text-[8.5px] font-bold px-1 rounded-xs shrink-0">
+                                            #{r.digital_slot_number}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {r.account_given ? (
+                                      <div className="flex items-center gap-1 bg-slate-900 text-emerald-300 font-mono text-[9.5px] px-1.5 py-0.5 rounded border border-slate-800 leading-tight">
+                                        <Key size={10} className="shrink-0 text-emerald-400" />
+                                        <span className="truncate flex-1 select-all font-mono" title={r.account_given}>
+                                          {r.account_given}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigator.clipboard.writeText(r.account_given);
+                                            toast.success('Account credentials copied!');
+                                          }}
+                                          title="Copy credentials"
+                                          className="text-slate-400 hover:text-emerald-300 p-0.5 rounded hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                                        >
+                                          <Copy size={10} />
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                    {!r.account_given && !r.digital_account_email && !r.digital_slot_number && !r.digital_account_product && (
+                                      <span className="text-slate-400 italic text-[9.5px]">- Not recorded -</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-1.5 px-2 text-slate-700">
+                                  <div className="space-y-1 max-w-[180px]">
+                                    {r.customer_notes && (
+                                      <div className="flex items-start gap-1 bg-emerald-50/80 text-emerald-800 text-[9.5px] p-1 rounded border border-emerald-200 leading-tight">
+                                        <Mail size={10} className="shrink-0 text-emerald-600 mt-0.5" />
+                                        <span className="font-normal break-words line-clamp-2" title={`Customer Note: ${r.customer_notes}`}>
+                                          <strong className="font-semibold text-emerald-900">Cust:</strong> {r.customer_notes}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {(r.admin_notes || (r.notes && r.notes !== 'Subscription renewed' && r.notes !== 'Initial purchase')) ? (
+                                      <div className="flex items-start gap-1 bg-slate-100 text-slate-700 text-[9.5px] p-1 rounded border border-slate-200 leading-tight">
+                                        <Shield size={10} className="shrink-0 text-amber-600 mt-0.5" />
+                                        <span className="font-normal break-words line-clamp-2" title={`Admin Note: ${r.admin_notes || r.notes}`}>
+                                          <strong className="font-semibold text-slate-800">Admin:</strong> {r.admin_notes || r.notes}
+                                        </span>
+                                      </div>
+                                    ) : (r.notes && !r.customer_notes && !r.admin_notes ? (
+                                      <span className="text-[9.5px] text-slate-500 italic">{r.notes}</span>
+                                    ) : null)}
+                                    {!r.customer_notes && !r.admin_notes && (!r.notes || r.notes === 'Subscription renewed' || r.notes === 'Initial purchase') && (
+                                      <span className="text-slate-400 italic text-[9.5px]">-</span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={6} className="py-2.5 text-center text-slate-400 italic">No renewal records yet</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Reminder Logs */}
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Bell size={13} className="text-slate-600" />
+                        Reminder Logs
+                      </h4>
+                      <span className="text-[10px] text-slate-500 font-semibold">
+                        {viewingSub.reminders?.length || 0} log(s)
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                      <table className="w-full text-left text-[10.5px] border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-100 text-[9.5px] uppercase">
+                            <th className="py-1.5 px-2">Channel</th>
+                            <th className="py-1.5 px-2">Time</th>
+                            <th className="py-1.5 px-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {viewingSub.reminders && viewingSub.reminders.length > 0 ? (
+                            viewingSub.reminders.map(rem => (
+                              <tr key={rem.id} className="hover:bg-slate-50">
+                                <td className="py-1.5 px-2 font-semibold">{rem.channel}</td>
+                                <td className="py-1.5 px-2 text-slate-500">{new Date(rem.scheduled_at).toLocaleDateString()}</td>
+                                <td className="py-1.5 px-2">
+                                  <span className={`font-bold ${rem.status === 'Sent' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    {rem.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={3} className="py-2.5 text-center text-slate-400 italic">No reminder records yet</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Modal Footer */}
+              <div className="border-t border-slate-200 pt-3 mt-4 shrink-0 flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopySubscriptionSummary(viewingSub)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Copy size={13} />
+                  <span>Copy Full Summary</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = viewingSub;
+                      setShowViewModal(false);
+                      handleOpenEditModal(s);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Edit2 size={13} />
+                    <span>Edit</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = viewingSub;
+                      setShowViewModal(false);
+                      handleOpenDetailModal(s);
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <RefreshCw size={13} />
+                    <span>Renew</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowViewModal(false)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Floating Action Menu Dropdown (Portal - completely immune to table container overflow/clipping) */}
       {activeMenuSub && typeof document !== 'undefined' && createPortal(
         <div
@@ -3348,12 +5273,22 @@ export default function SubscriptionManager() {
             position: 'fixed',
             top: `${menuPosition.top}px`,
             left: `${menuPosition.left}px`,
-            width: '144px',
+            width: '156px',
             zIndex: 999999
           }}
           onClick={(e) => e.stopPropagation()}
           className="bg-white border border-slate-200 rounded-xl shadow-2xl py-1 text-xs text-left ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100"
         >
+          <button
+            onClick={() => {
+              const s = activeMenuSub;
+              setActiveMenuSub(null);
+              handleOpenViewModal(s);
+            }}
+            className="w-full px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 font-medium cursor-pointer transition-colors"
+          >
+            <Eye size={13} className="text-blue-600" /> View Details
+          </button>
           <button
             onClick={() => {
               const s = activeMenuSub;
@@ -3374,6 +5309,24 @@ export default function SubscriptionManager() {
           >
             <History size={13} className="text-slate-500" /> History
           </button>
+          <button
+            onClick={(e) => {
+              const s = activeMenuSub;
+              setActiveMenuSub(null);
+              handleToggleNotRenewed(s, e);
+            }}
+            className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-medium cursor-pointer transition-colors"
+          >
+            {activeMenuSub?.status === 'Not Renewed' ? (
+              <>
+                <XCircle size={13} className="text-rose-500" /> Revert Status
+              </>
+            ) : (
+              <>
+                <UserX size={13} className="text-rose-500" /> Mark Not Renewed
+              </>
+            )}
+          </button>
           <div className="border-t border-slate-100 my-1"></div>
           <button
             onClick={() => {
@@ -3385,6 +5338,235 @@ export default function SubscriptionManager() {
           >
             <Trash2 size={13} className="text-rose-500" /> Delete
           </button>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL: MANAGE CUSTOMER NOTES TEMPLATES */}
+      {showManageTemplatesModal && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[999999] bg-slate-900/70 backdrop-blur-sm overflow-y-auto p-3 sm:p-6 animate-in fade-in duration-200"
+          onClick={() => setShowManageTemplatesModal(false)}
+        >
+          <div className="min-h-full flex items-center justify-center py-4 sm:py-8">
+            <div
+              className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full flex flex-col p-5 sm:p-6 shadow-2xl text-left overflow-hidden text-slate-900 relative my-auto animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3 shrink-0 gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <ScrollText size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                      Customer Note Templates (গ্রাহক নোট টেমপ্লেট)
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Pre-saved note templates saved in database to quickly insert into customer activation and renewal emails.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowManageTemplatesModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Navigation Tabs */}
+              <div className="flex items-center justify-between gap-2 mt-4 border-b border-slate-150 pb-2">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTemplateTab('list');
+                      setEditingTemplate(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activeTemplateTab === 'list'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Saved Templates ({noteTemplates.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTemplateTab('add');
+                      if (!editingTemplate) {
+                        setTemplateForm({ title: '', content: '' });
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      activeTemplateTab === 'add'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <Plus size={12} />
+                    <span>{editingTemplate ? 'Edit Template' : 'Add New Template'}</span>
+                  </button>
+                </div>
+
+                {activeTemplateTab === 'add' && editingTemplate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTemplate(null);
+                      setTemplateForm({ title: '', content: '' });
+                      setActiveTemplateTab('list');
+                    }}
+                    className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                  >
+                    Cancel Editing
+                  </button>
+                )}
+              </div>
+
+              {/* Tab Content */}
+              <div className="mt-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-1">
+                {activeTemplateTab === 'list' ? (
+                  <div className="space-y-3">
+                    {loadingNoteTemplates ? (
+                      <div className="py-8 text-center text-slate-400 text-xs">
+                        <RefreshCw size={16} className="animate-spin inline mr-2 text-emerald-600" />
+                        Loading templates from database...
+                      </div>
+                    ) : noteTemplates.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 text-xs space-y-2">
+                        <p>No note templates saved yet.</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingTemplate(null);
+                            setTemplateForm({ title: '', content: '' });
+                            setActiveTemplateTab('add');
+                          }}
+                          className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors"
+                        >
+                          + Create First Template
+                        </button>
+                      </div>
+                    ) : (
+                      noteTemplates.map((tpl) => (
+                        <div
+                          key={tpl.id}
+                          className="bg-slate-50 hover:bg-emerald-50/30 p-3.5 rounded-xl border border-slate-200 transition-all space-y-2 group"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                              {tpl.title}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {/* Apply to Form */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (showDetailModal) {
+                                    handleSelectNoteTemplate(tpl.id, 'renewForm');
+                                  } else {
+                                    handleSelectNoteTemplate(tpl.id, 'subForm');
+                                  }
+                                  setShowManageTemplatesModal(false);
+                                }}
+                                className="px-2 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10.5px] font-bold transition-colors cursor-pointer"
+                                title="Insert this template into Customer Notes field"
+                              >
+                                Insert into Notes
+                              </button>
+                              {/* Edit */}
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditTemplate(tpl)}
+                                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                                title="Edit this template"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                              {/* Delete */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
+                                className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                title="Delete template from database"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200/80 whitespace-pre-wrap leading-relaxed font-sans">
+                            {tpl.content}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  /* Create / Edit Form */
+                  <form onSubmit={handleSaveTemplate} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Template Title *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={templateForm.title}
+                        onChange={(e) => setTemplateForm({ ...templateForm, title: e.target.value })}
+                        placeholder="e.g. Do Not Change Password Warning, Account Login Instructions..."
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Template Content (Sent to Customer in Email) *
+                      </label>
+                      <textarea
+                        rows={5}
+                        required
+                        value={templateForm.content}
+                        onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })}
+                        placeholder="Write the message that will be inserted into the customer activation/renewal email..."
+                        className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-sans leading-relaxed"
+                      />
+                      <p className="text-[10.5px] text-slate-400 mt-1">
+                        This text will be saved to the database and will appear in the template dropdown for all future subscriptions and renewals.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTemplateTab('list');
+                          setEditingTemplate(null);
+                        }}
+                        className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={templateSubmitting}
+                        className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-700/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Check size={14} />
+                        <span>{templateSubmitting ? 'Saving to Database...' : (editingTemplate ? 'Update Template' : 'Save Template to DB')}</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          </div>
         </div>,
         document.body
       )}

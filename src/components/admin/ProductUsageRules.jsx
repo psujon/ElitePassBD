@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
+import JoditEditor from 'jodit-react';
 import { api } from '../../utils/api';
 import {
   ScrollText,
@@ -25,6 +26,7 @@ import {
   SlidersHorizontal,
   ChevronDown
 } from 'lucide-react';
+import ProductSearchSelect from './ProductSearchSelect';
 
 export default function ProductUsageRules() {
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,7 @@ export default function ProductUsageRules() {
   const [showModal, setShowModal] = useState(false);
   const [editingRule, setEditingRule] = useState(null); // null = new
   const [savingRule, setSavingRule] = useState(false);
+  const [editorMode, setEditorMode] = useState('rich'); // 'rich' | 'plain'
   const [modalForm, setModalForm] = useState({
     product_id: '',
     title: 'Standard Usage Rules',
@@ -47,6 +50,67 @@ export default function ProductUsageRules() {
   });
 
   const textareaRef = useRef(null);
+  const editorRef = useRef(null);
+
+  // Jodit WYSIWYG configuration with 100% paste and formatting preservation
+  const joditConfig = useMemo(() => ({
+    readonly: false,
+    height: 'auto',
+    minHeight: 260,
+    enableDragAndDropFileToEditor: true,
+    askBeforePasteHTML: false,
+    askBeforePasteFromWord: false,
+    defaultActionOnPaste: 'insert_as_html',
+    defaultActionOnPasteFromWord: 'insert_as_html',
+    processPasteHTML: false,
+    processPasteFromWord: false,
+    cleanOnPaste: false,
+    cleanHTML: {
+      cleanOnPaste: false,
+      removeEmptyElements: false,
+      replaceOldTags: false,
+      fillEmptyParagraph: false,
+      allowTags: false,
+      denyTags: false,
+      allowedStyles: false
+    },
+    beautifyHTML: false,
+    toolbarAdaptive: true,
+    toolbarButtonSize: 'middle',
+    showXPathInStatusbar: false,
+    showCharsCounter: true,
+    showWordsCounter: true,
+    toolbarSticky: false,
+    buttons: [
+      'source', '|',
+      'bold', 'strikethrough', 'underline', 'italic', '|',
+      'ul', 'ol', '|',
+      'outdent', 'indent', '|',
+      'font', 'fontsize', 'brush', 'paragraph', '|',
+      'table', 'link', '|',
+      'align', 'undo', 'redo', '|',
+      'hr', 'eraser'
+    ]
+  }), []);
+
+  // Helper to render formatted rules content (HTML rich styling or preserved line-breaks)
+  const renderRuleContent = (text, className = '') => {
+    if (!text) return <span className="text-slate-400 italic">No rules text specified.</span>;
+    const isHtml = /<\/?[a-z][\s\S]*>/i.test(text);
+    if (isHtml) {
+      return (
+        <div
+          className={`rule-html-content text-xs text-slate-800 leading-relaxed font-sans ${className}`}
+          dangerouslySetInnerHTML={{ __html: text }}
+        />
+      );
+    }
+    return (
+      <div className={`whitespace-pre-wrap font-sans text-xs text-slate-800 leading-relaxed ${className}`}>
+        {text}
+      </div>
+    );
+  };
 
   // Fetch initial data
   const fetchData = async () => {
@@ -95,47 +159,77 @@ export default function ProductUsageRules() {
     });
   }, [rules, productFilter, searchQuery]);
 
-  // Copy rule text to clipboard exactly as it is
-  const handleCopyText = (text, id = null) => {
+  // Copy rule text to clipboard with full rich & clean plain text support
+  const handleCopyText = async (text, id = null) => {
     if (!text) {
       toast.error('No rules text to copy.');
       return;
     }
 
     try {
-      navigator.clipboard.writeText(text);
+      const isHtml = /<\/?[a-z][\s\S]*>/i.test(text);
+      if (isHtml && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = text;
+        tempDiv.querySelectorAll('br').forEach((el) => el.replaceWith('\n'));
+        tempDiv.querySelectorAll('p, div, li, h1, h2, h3, h4, tr').forEach((el) => {
+          el.prepend(document.createTextNode('\n'));
+        });
+        const plainText = (tempDiv.innerText || tempDiv.textContent || '').trim();
+
+        const blobHtml = new Blob([text], { type: 'text/html' });
+        const blobText = new Blob([plainText], { type: 'text/plain' });
+        const item = new ClipboardItem({
+          'text/html': blobHtml,
+          'text/plain': blobText
+        });
+        await navigator.clipboard.write([item]);
+      } else {
+        await navigator.clipboard.writeText(text);
+      }
       if (id !== null) {
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 2200);
       }
-      toast.success('Rules text copied as-is! Ready to paste into WhatsApp / Messenger.');
+      toast.success('Rules copied with formatting! Ready to paste into WhatsApp / Email.');
     } catch (e) {
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      if (id !== null) {
-        setCopiedId(id);
-        setTimeout(() => setCopiedId(null), 2200);
+      try {
+        await navigator.clipboard.writeText(text);
+        if (id !== null) {
+          setCopiedId(id);
+          setTimeout(() => setCopiedId(null), 2200);
+        }
+        toast.success('Rules text copied!');
+      } catch (err) {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        if (id !== null) {
+          setCopiedId(id);
+          setTimeout(() => setCopiedId(null), 2200);
+        }
+        toast.success('Rules text copied!');
       }
-      toast.success('Rules text copied as-is!');
     }
   };
 
   // Open modal for Create
   const handleOpenCreateModal = (defaultProductId = '') => {
     setEditingRule(null);
+    setEditorMode('rich');
     const prodId = defaultProductId || (catalogProducts[0]?.id ? String(catalogProducts[0].id) : '');
     const selectedProd = catalogProducts.find((p) => String(p.id) === String(prodId));
     const prodName = selectedProd ? selectedProd.name : 'Product';
+    const initText = `📌 <strong>${prodName} - Usage Rules & Guidelines:</strong><br/>─────────────────────────────────────────────<br/><strong>1. 🔐 Security & Access:</strong><br/>• Do NOT change the registered account credentials or recovery info.<br/>• Single designated user login only.<br/><br/><strong>2. 💻 Device Limit:</strong><br/>• Only use on authorized device.<br/>• No unauthorized reselling or sharing.<br/><br/><strong>3. ⚠️ Warranty Policy:</strong><br/>• Full support & warranty during the active subscription period.<br/>• Tampering with credentials voids warranty immediately.<br/>─────────────────────────────────────────────<br/>📞 <strong>Official Support:</strong> Contact via website or WhatsApp for any assistance.`;
 
     setModalForm({
       product_id: prodId,
       title: 'Standard Usage Rules & Terms',
-      rules_text: `📌 ${prodName} - Usage Rules & Instructions:\n─────────────────────────────────────────────\n1. 🔐 Account & Security:\n   - Do NOT change the registered account credentials or recovery info.\n   - Single designated profile login only.\n2. 💻 Device Limit:\n   - Only use on authorized device.\n   - No unauthorized reselling or multi-sharing.\n3. ⚠️ Warranty Policy:\n   - Full replacement warranty during the active subscription period.\n   - Violation of these rules voids the warranty without refund.\n─────────────────────────────────────────────\n📞 Support WhatsApp: 01355667788 | ElitePassBD`,
+      rules_text: initText,
       is_active: 1
     });
     setShowModal(true);
@@ -144,6 +238,7 @@ export default function ProductUsageRules() {
   // Open modal for Edit
   const handleOpenEditModal = (rule) => {
     setEditingRule(rule);
+    setEditorMode('rich');
     setModalForm({
       product_id: String(rule.product_id),
       title: rule.title || 'Standard Usage Rules',
@@ -153,14 +248,52 @@ export default function ProductUsageRules() {
     setShowModal(true);
   };
 
-  // Insert helper snippet into textarea at current cursor
+  // Handle product selection change in modal
+  const handleProductChange = (newProductId, newProduct) => {
+    setModalForm((prev) => {
+      const prevProd = catalogProducts.find((p) => String(p.id) === String(prev.product_id));
+      const prevName = prevProd ? prevProd.name : '';
+      const newName = newProduct ? newProduct.name : '';
+
+      let nextRulesText = prev.rules_text;
+      // In create mode, if rules_text still contains the old product name in header, update it
+      if (!editingRule && prevName && newName && nextRulesText && nextRulesText.includes(prevName)) {
+        nextRulesText = nextRulesText.split(prevName).join(newName);
+        if (editorRef.current && typeof editorRef.current.value !== 'undefined') {
+          editorRef.current.value = nextRulesText;
+        }
+      }
+
+      return {
+        ...prev,
+        product_id: String(newProductId || ''),
+        rules_text: nextRulesText
+      };
+    });
+  };
+
+  // Insert helper snippet into editor at current position
   const handleInsertSnippet = (snippet) => {
+    if (editorMode === 'rich' && editorRef.current) {
+      try {
+        const htmlSnippet = snippet.replace(/\n/g, '<br/>');
+        if (editorRef.current.selection && typeof editorRef.current.selection.insertHTML === 'function') {
+          editorRef.current.selection.insertHTML(htmlSnippet);
+        }
+        const updated = editorRef.current?.value || modalForm.rules_text;
+        setModalForm((prev) => ({ ...prev, rules_text: updated }));
+        return;
+      } catch (e) {
+        // Fallback below
+      }
+    }
+
     const textarea = textareaRef.current;
     if (!textarea) {
-      setModalForm((prev) => ({
-        ...prev,
-        rules_text: prev.rules_text ? `${prev.rules_text}\n${snippet}` : snippet
-      }));
+      setModalForm((prev) => {
+        const next = prev.rules_text ? `${prev.rules_text}\n${snippet}` : snippet;
+        return { ...prev, rules_text: next };
+      });
       return;
     }
 
@@ -184,51 +317,20 @@ export default function ProductUsageRules() {
 
     let tpl = '';
     if (type === 'shared_account') {
-      tpl = `📌 ${prodName} (Shared Account Rules):
-─────────────────────────────────────────────
-1. 🔐 Login Policy:
-   - Login only on your designated profile/screen.
-   - Do NOT edit or alter other profile names or PINs.
-2. 🚫 Strictly Prohibited:
-   - Changing email, password, or subscription settings.
-   - Sharing credentials with friends or family.
-3. ⚠️ Warranty Terms:
-   - 100% active warranty during your subscription validity.
-   - Account breach or password modification will lock your access.
-─────────────────────────────────────────────
-📞 Support WhatsApp: 01355667788 | ElitePassBD`;
+      tpl = `📌 <strong>${prodName} (Shared Account Rules):</strong><br/>─────────────────────────────────────────────<br/><strong>1. 🔐 Login Policy:</strong><br/>• Login only on your designated profile/screen.<br/>• Do NOT edit or alter other profile names or PINs.<br/><br/><strong>2. 🚫 Strictly Prohibited:</strong><br/>• Changing email, password, or subscription settings.<br/>• Sharing credentials with friends or family.<br/><br/><strong>3. ⚠️ Warranty Terms:</strong><br/>• 100% active warranty during your subscription validity.<br/>• Account breach or password modification will lock your access.<br/>─────────────────────────────────────────────<br/>📞 <strong>Support WhatsApp:</strong> 01355667788 | ElitePassBD`;
     } else if (type === 'license_key') {
-      tpl = `🔑 ${prodName} - Official License Activation Guide:
-─────────────────────────────────────────────
-1. 🛡️ Genuine Activation:
-   - License key is 100% official and valid for 1 PC/Device.
-   - Redeem/activate directly inside the official software settings.
-2. ⚠️ Important Notes:
-   - Do not attempt to activate on multiple machines simultaneously.
-   - Keep a copy of your invoice and key safe for reinstallations.
-3. 📞 Need Activation Help?
-   - Send us a screenshot if you encounter any error code.
-─────────────────────────────────────────────
-Official Website: elitepassbd.com | Support WhatsApp: 01355667788`;
+      tpl = `🔑 <strong>${prodName} - Official License Activation Guide:</strong><br/>─────────────────────────────────────────────<br/><strong>1. 🛡️ Genuine Activation:</strong><br/>• License key is 100% official and valid for 1 PC/Device.<br/>• Redeem/activate directly inside the official software settings.<br/><br/><strong>2. ⚠️ Important Notes:</strong><br/>• Do not attempt to activate on multiple machines simultaneously.<br/>• Keep a copy of your invoice and key safe for reinstallations.<br/><br/><strong>3. 📞 Need Activation Help?</strong><br/>• Send us a screenshot if you encounter any error code.<br/>─────────────────────────────────────────────<br/>🌐 Official Website: elitepassbd.com | 📞 Support WhatsApp: 01355667788`;
     } else if (type === 'vpn') {
-      tpl = `🛡️ ${prodName} - VPN Usage Instructions:
-─────────────────────────────────────────────
-1. 🌐 Connection Rules:
-   - Maximum 1 device connection at any given time.
-   - Log out when switching between PC and Phone.
-2. ⚠️ Security Warnings:
-   - Do not tamper with account credentials.
-   - Torrenting or malicious activity will result in ban.
-3. 🔄 Renewal & Help:
-   - Renew before expiration to keep current configuration.
-─────────────────────────────────────────────
-ElitePassBD Digital Support: 01355667788`;
+      tpl = `🛡️ <strong>${prodName} - VPN Usage Instructions:</strong><br/>─────────────────────────────────────────────<br/><strong>1. 🌐 Connection Rules:</strong><br/>• Maximum 1 device connection at any given time.<br/>• Log out when switching between PC and Phone.<br/><br/><strong>2. ⚠️ Security Warnings:</strong><br/>• Do not tamper with account credentials.<br/>• Torrenting or malicious activity will result in ban.<br/><br/><strong>3. 🔄 Renewal & Help:</strong><br/>• Renew before expiration to keep current configuration.<br/>─────────────────────────────────────────────<br/>📞 ElitePassBD Digital Support: 01355667788`;
     }
 
     setModalForm((prev) => ({
       ...prev,
       rules_text: tpl
     }));
+    if (editorRef.current && typeof editorRef.current.value !== 'undefined') {
+      editorRef.current.value = tpl;
+    }
     toast.success('Template applied! You can customize and save.');
   };
 
@@ -239,18 +341,28 @@ ElitePassBD Digital Support: 01355667788`;
       toast.error('Please select a catalog product.');
       return;
     }
-    if (!modalForm.rules_text.trim()) {
+
+    const currentText = (editorMode === 'rich'
+      ? (editorRef.current?.value || modalForm.rules_text)
+      : (textareaRef.current?.value || modalForm.rules_text)) || modalForm.rules_text;
+
+    if (!currentText || !currentText.trim()) {
       toast.error('Please enter the usage rules text.');
       return;
     }
 
+    const payload = {
+      ...modalForm,
+      rules_text: currentText
+    };
+
     try {
       setSavingRule(true);
       if (editingRule) {
-        await api.put(`/product-usage-rules/${editingRule.id}`, modalForm);
+        await api.put(`/product-usage-rules/${editingRule.id}`, payload);
         toast.success('Usage rules updated successfully!');
       } else {
-        await api.post('/product-usage-rules', modalForm);
+        await api.post('/product-usage-rules', payload);
         toast.success('Usage rules created successfully!');
       }
       setShowModal(false);
@@ -278,11 +390,24 @@ ElitePassBD Digital Support: 01355667788`;
     }
   };
 
+  // Existing rule product IDs set
+  const existingRuleProductIds = useMemo(() => {
+    return new Set(rules.map((r) => r.product_id));
+  }, [rules]);
+
+  // Rule counts per product
+  const ruleCountsByProduct = useMemo(() => {
+    const counts = {};
+    rules.forEach((r) => {
+      counts[r.product_id] = (counts[r.product_id] || 0) + 1;
+    });
+    return counts;
+  }, [rules]);
+
   // Products that do not have rules yet
   const productsWithoutRules = useMemo(() => {
-    const coveredProductIds = new Set(rules.map((r) => r.product_id));
-    return catalogProducts.filter((p) => !coveredProductIds.has(p.id));
-  }, [catalogProducts, rules]);
+    return catalogProducts.filter((p) => !existingRuleProductIds.has(p.id));
+  }, [catalogProducts, existingRuleProductIds]);
 
   return (
     <div className="space-y-4 max-w-full text-slate-800 pb-12">
@@ -373,23 +498,19 @@ ElitePassBD Digital Support: 01355667788`;
             />
           </div>
 
-          {/* Product Filter Dropdown */}
-          <div className="w-full sm:w-64">
-            <select
+          {/* Product Filter Type & Search Dropdown */}
+          <div className="w-full sm:w-72">
+            <ProductSearchSelect
+              products={catalogProducts}
               value={productFilter}
-              onChange={(e) => setProductFilter(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-            >
-              <option value="all">📦 All Catalog Products ({rules.length})</option>
-              {catalogProducts.map((p) => {
-                const count = rules.filter((r) => r.product_id === p.id).length;
-                return (
-                  <option key={p.id} value={p.id}>
-                    {p.name} {count > 0 ? `(${count})` : ''}
-                  </option>
-                );
-              })}
-            </select>
+              onChange={(val) => setProductFilter(val || 'all')}
+              allowAllOption={true}
+              allOptionLabel="All Catalog Products"
+              allOptionCount={rules.length}
+              ruleCounts={ruleCountsByProduct}
+              size="sm"
+              placeholder="Search & filter by product..."
+            />
           </div>
         </div>
 
@@ -398,18 +519,16 @@ ElitePassBD Digital Support: 01355667788`;
           <button
             type="button"
             onClick={() => setViewMode('cards')}
-            className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
-              viewMode === 'cards' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-            }`}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === 'cards' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+              }`}
           >
             Card View
           </button>
           <button
             type="button"
             onClick={() => setViewMode('table')}
-            className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
-              viewMode === 'table' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-            }`}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === 'table' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+              }`}
           >
             Table View
           </button>
@@ -509,11 +628,10 @@ ElitePassBD Digital Support: 01355667788`;
                       <button
                         type="button"
                         onClick={() => handleCopyText(rule.rules_text, rule.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
-                          isCopied
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-white hover:bg-blue-50 text-blue-700 border border-blue-200'
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${isCopied
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-white hover:bg-blue-50 text-blue-700 border border-blue-200'
+                          }`}
                         title="Copy exact formatted text for WhatsApp/Messenger"
                       >
                         {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -521,8 +639,8 @@ ElitePassBD Digital Support: 01355667788`;
                       </button>
                     </div>
 
-                    <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-4 text-xs font-mono text-slate-800 whitespace-pre-wrap leading-relaxed max-h-[300px] overflow-y-auto selection:bg-blue-200 selection:text-blue-900 select-all shadow-inner">
-                      {rule.rules_text}
+                    <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-4 text-xs text-slate-800 leading-relaxed max-h-[320px] overflow-y-auto selection:bg-blue-200 selection:text-blue-900 shadow-inner">
+                      {renderRuleContent(rule.rules_text)}
                     </div>
                   </div>
                 </div>
@@ -575,8 +693,8 @@ ElitePassBD Digital Support: 01355667788`;
                       </td>
                       <td className="py-3 px-3 font-semibold text-slate-700">{rule.title}</td>
                       <td className="py-3 px-4 max-w-md">
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200/70 font-mono text-[11px] text-slate-700 whitespace-pre-wrap line-clamp-3">
-                          {rule.rules_text}
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200/70 text-[11px] text-slate-700 leading-relaxed line-clamp-3">
+                          {renderRuleContent(rule.rules_text, 'line-clamp-3')}
                         </div>
                       </td>
                       <td className="py-3 px-3 text-center whitespace-nowrap">
@@ -596,11 +714,10 @@ ElitePassBD Digital Support: 01355667788`;
                           <button
                             type="button"
                             onClick={() => handleCopyText(rule.rules_text, rule.id)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                              isCopied
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-                            }`}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${isCopied
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                              }`}
                             title="Copy exact rules text"
                           >
                             {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -677,19 +794,14 @@ ElitePassBD Digital Support: 01355667788`;
                       <Layers className="w-3.5 h-3.5 text-blue-600" />
                       Select Product <span className="text-rose-500">*</span>
                     </label>
-                    <select
+                    <ProductSearchSelect
+                      products={catalogProducts}
                       value={modalForm.product_id}
-                      onChange={(e) => setModalForm({ ...modalForm, product_id: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                      onChange={handleProductChange}
+                      existingRuleProductIds={existingRuleProductIds}
+                      placeholder="Type product name to search or select..."
                       required
-                    >
-                      <option value="">Select a Catalog Product...</option>
-                      {catalogProducts.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} {p.category_name ? `(${p.category_name})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   <div>
@@ -788,66 +900,82 @@ ElitePassBD Digital Support: 01355667788`;
                   </div>
                 </div>
 
-                {/* Main Split: Textarea + Live "Send Anywhere" Preview */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Left: Input Textarea */}
-                  <div className="space-y-1">
+                {/* Main Split: Rich Editor + Live Customer Preview */}
+                <div className="">
+                  {/* Left: Input Editor */}
+                  <div className="space-y-1.5 flex flex-col">
                     <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                      <span>Rules Text (Type or Paste here) *</span>
-                      <span className="text-[11px] font-normal text-slate-400">
-                        {modalForm.rules_text.split('\n').length} lines • {modalForm.rules_text.length} chars
+                      <span className="flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Rules Content (Type or Paste here) *</span>
                       </span>
+
+                      {/* Mode Switcher: Rich Text vs Plain / Code */}
+                      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10.5px]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editorMode === 'plain' && textareaRef.current) {
+                              const rawVal = textareaRef.current.value;
+                              setModalForm((prev) => ({ ...prev, rules_text: rawVal }));
+                            }
+                            setEditorMode('rich');
+                          }}
+                          className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${editorMode === 'rich'
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                          🎨 Rich Text
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editorMode === 'rich') {
+                              const richVal = editorRef.current?.value;
+                              if (typeof richVal === 'string') {
+                                setModalForm((prev) => ({ ...prev, rules_text: richVal }));
+                              }
+                            }
+                            setEditorMode('plain');
+                          }}
+                          className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${editorMode === 'plain'
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                          📝 Plain / HTML
+                        </button>
+                      </div>
                     </div>
-                    <textarea
-                      ref={textareaRef}
-                      rows="14"
-                      value={modalForm.rules_text}
-                      onChange={(e) => setModalForm({ ...modalForm, rules_text: e.target.value })}
-                      placeholder="Paste your rules here exactly as you want to send them to customers..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-pre-wrap transition-colors shadow-inner"
-                      required
-                    />
-                    <p className="text-[11px] text-slate-400">
-                      💡 Tip: Every line break, emoji, indent and symbol will be preserved exactly as typed.
+
+                    <div className="flex-1 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+                      {editorMode === 'rich' ? (
+                        <JoditEditor
+                          editorRef={(instance) => {
+                            editorRef.current = instance;
+                          }}
+                          value={modalForm.rules_text || ''}
+                          config={joditConfig}
+                          onBlur={(newContent) => setModalForm((prev) => ({ ...prev, rules_text: newContent }))}
+                          className="w-full text-slate-800 jodit-editor-custom"
+                        />
+                      ) : (
+                        <textarea
+                          ref={textareaRef}
+                          rows="14"
+                          value={modalForm.rules_text}
+                          onChange={(e) => setModalForm({ ...modalForm, rules_text: e.target.value })}
+                          placeholder="Paste or write your rules here (supports raw HTML and plain text)..."
+                          className="w-full bg-slate-50 p-3 text-xs font-mono text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-pre-wrap transition-colors resize-y h-full min-h-[260px]"
+                          required
+                        />
+                      )}
+                    </div>
+
+                    <p className="text-[11px] text-blue-700 bg-blue-50/70 border border-blue-200/70 rounded-lg p-2 font-medium">
+                      💡 <strong>Formatting Preservation:</strong> Rich Text মোডে যেকোনো ওয়েবসাইট, Word বা Google Docs থেকে বোল্ড, কালার, লিংক ও বুলেট পয়েন্ট সহ কপি-পেস্ট করলেই টেক্সট এর আসল ডিজাইন ও ফরম্যাটিং অক্ষুণ্ণ থাকবে।
                     </p>
-                  </div>
-
-                  {/* Right: Live Preview Box (How it looks when sent) */}
-                  <div className="space-y-1 flex flex-col">
-                    <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                      <span className="flex items-center gap-1 text-emerald-700">
-                        <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                        Live Customer Message Preview
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyText(modalForm.rules_text)}
-                        className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                        title="Test copy to clipboard"
-                      >
-                        <Copy className="w-3 h-3" />
-                        <span>Test Copy</span>
-                      </button>
-                    </div>
-
-                    <div className="flex-1 bg-gradient-to-b from-[#e5ddd5]/40 to-[#ece5dd]/60 border border-slate-200 rounded-xl p-3.5 flex flex-col justify-between overflow-hidden shadow-inner">
-                      {/* WhatsApp / Messenger Chat bubble */}
-                      <div className="bg-white rounded-2xl rounded-tl-xs p-3.5 shadow-sm border border-slate-200/60 max-h-[310px] overflow-y-auto whitespace-pre-wrap font-sans text-xs text-slate-800 leading-relaxed select-all">
-                        {modalForm.rules_text || (
-                          <span className="text-slate-400 italic">
-                            Your message preview will appear here in real-time...
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-2 pt-2 border-t border-slate-200/50 flex items-center justify-between text-[10.5px] text-slate-500">
-                        <span className="flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          Ready for WhatsApp & Messenger
-                        </span>
-                        <span>Delivered ✓✓</span>
-                      </div>
-                    </div>
                   </div>
                 </div>
 

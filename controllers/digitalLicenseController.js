@@ -10,7 +10,7 @@ async function ensureTables() {
         product_id INT DEFAULT NULL,
         product_name VARCHAR(255) NOT NULL,
         account_email VARCHAR(255) NOT NULL,
-        account_password VARCHAR(255) NOT NULL,
+        account_password VARCHAR(255) DEFAULT '',
         recovery_email VARCHAR(255) DEFAULT NULL,
         two_factor_status ENUM('Enabled', 'Disabled') DEFAULT 'Enabled',
         two_factor_key TEXT DEFAULT NULL,
@@ -57,6 +57,12 @@ async function ensureTables() {
       await db.query(`ALTER TABLE digital_license_slots ADD COLUMN order_id INT DEFAULT NULL AFTER slot_number`);
     } catch (e) {
       // Column already exists
+    }
+
+    try {
+      await db.query(`ALTER TABLE digital_license_accounts MODIFY COLUMN account_password VARCHAR(255) DEFAULT ''`);
+    } catch (e) {
+      // Ignore if column already modified or fails
     }
 
     // Check if initial sample data should be seeded
@@ -782,7 +788,7 @@ exports.lookupOrder = async (req, res) => {
 
     const [orders] = await db.query(
       `SELECT o.id, o.user_id, o.phone, o.delivery_email, o.total_amount, o.status, o.payment_status, o.created_at,
-              u.name AS user_name, u.email AS user_email, u.whatsapp_number AS user_whatsapp,
+              u.name AS user_name, u.email AS user_email, u.role AS user_role, u.whatsapp_number AS user_whatsapp,
               COALESCE(
                 (SELECT GROUP_CONCAT(COALESCE(p.name, oi.package_name) SEPARATOR ', ') 
                  FROM order_items oi 
@@ -801,10 +807,11 @@ exports.lookupOrder = async (req, res) => {
     }
 
     const order = orders[0];
+    const customerEmailResolved = order.delivery_email || (order.user_role !== 'admin' ? order.user_email : '') || '';
     res.json({
       order_id: order.id,
       customer_name: (order.user_name || '').trim() || 'Customer',
-      customer_email: (order.delivery_email || order.user_email || '').trim(),
+      customer_email: customerEmailResolved.trim(),
       customer_phone: (order.phone || order.user_whatsapp || '').trim(),
       created_at: order.created_at,
       product_summary: order.product_summary,

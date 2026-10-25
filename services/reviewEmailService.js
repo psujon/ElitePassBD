@@ -5,7 +5,7 @@ try {
   console.warn('[ReviewEmailService] node-cron module is not installed. Review email cron will be disabled until installed.');
 }
 const db = require('../config/db');
-const { sendEmail, getWhatsAppContactBlock, getEmailFooter, getWhatsAppContactText } = require('../utils/mailer');
+const { sendEmail, getWhatsAppContactBlock, getEmailFooter, getWhatsAppContactText, getBrandLogoUrl } = require('../utils/mailer');
 
 const getFrontendUrl = () => {
   const url = process.env.FRONTEND_URL;
@@ -142,7 +142,7 @@ const generateReviewEmailHtml = (userName, items, orderId) => {
               <!-- Footer -->
               <div style="background-color: #0f172a; padding: 22px 20px 20px 20px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #1e293b; line-height: 1.6;">
                 <div style="margin-bottom: 6px; text-align: center;">
-                  <img src="${process.env.EMAIL_LOGO_URL || 'cid:brand_logo'}" alt="${appName}" width="165" style="width: 165px; max-width: 100%; height: auto; display: inline-block; vertical-align: middle; border: 0; outline: none; text-decoration: none;" />
+                  <img src="${getBrandLogoUrl()}" alt="${appName}" width="165" border="0" style="width: 165px; max-width: 100%; height: auto; display: inline-block; vertical-align: middle; border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 800; color: #ffffff;" />
                 </div>
                 <div style="color: #64748b; font-size: 12px; font-weight: 500; letter-spacing: 0.2px;">Dhaka, Bangladesh</div>
               </div>

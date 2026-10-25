@@ -106,7 +106,7 @@ const escapeHtml = (str) => {
 };
 
 /**
- * Split text with inline bullets (■, •, ▪, etc.) or emojis into clean individual bullet lines
+ * Split text with inline bullets (■, •, ▪, etc.) or emojis into clean individual lines
  */
 const splitIntoBulletItems = (rawText) => {
   if (!rawText || typeof rawText !== 'string' || !rawText.trim()) return [];
@@ -120,7 +120,7 @@ const splitIntoBulletItems = (rawText) => {
 
   // 2. Split inline bullets: if line has "■ " or "• " or "▪ ", break into new lines
   text = text
-    .replace(/([।.?!\s]*)[■▪•●★►✔]\s*/g, '\n■ ')
+    .replace(/([।.?!\s]*)[■▪•●★►✔]\s*/g, '\n')
     // Split before common emojis if preceded by punctuation or whitespace
     .replace(/([।.?!\s]+)([🤝📅⏳🛡️⚠️📌👉✅❌🔒🔑👤📧])/g, '$1\n$2');
 
@@ -144,7 +144,7 @@ const splitIntoBulletItems = (rawText) => {
       continue;
     }
 
-    // Check if line starts with a bullet marker (strip it so we can render our custom bullet)
+    // Check if line starts with a bullet marker (strip it so no bullet point is shown)
     const bulletMatch = line.match(/^[■▪•●★►✔\*\-]\s*(.*)$/);
     if (bulletMatch) {
       line = bulletMatch[1].trim();
@@ -152,20 +152,48 @@ const splitIntoBulletItems = (rawText) => {
 
     if (!line) continue;
 
-    items.push({ type: 'bullet', text: line });
+    items.push({ type: 'text', text: line });
   }
 
   return items;
 };
 
 /**
- * Format plain-text or multi-line product/license rules line-by-line into clean, compact, bulleted HTML
+ * Format plain-text or multi-line product/license rules line-by-line into clean, compact HTML (without bullet points)
  */
 const formatRulesHtml = (rulesText, isDark = true) => {
   if (!rulesText || typeof rulesText !== 'string' || !rulesText.trim()) return '';
 
   const textColor = isDark ? '#cbd5e1' : '#334155';
   const borderColor = isDark ? '#334155' : '#cbd5e1';
+
+  // If rulesText already contains rich HTML markup (from rich text editor / pasted styled text), preserve it cleanly without bullet points
+  if (/<\/?[a-z][\s\S]*>/i.test(rulesText)) {
+    const cleanedHtml = rulesText
+      .replace(/<ul(\b[^>]*)>/gi, (match, attrs) => {
+        if (/style\s*=/i.test(attrs)) {
+          return `<ul${attrs.replace(/style=(["'])/i, 'style=$1list-style:none;padding-left:0;margin-left:0;')}>`;
+        }
+        return `<ul style="list-style:none;padding-left:0;margin-left:0;"${attrs}>`;
+      })
+      .replace(/<li(\b[^>]*)>/gi, (match, attrs) => {
+        if (/style\s*=/i.test(attrs)) {
+          return `<li${attrs.replace(/style=(["'])/i, 'style=$1list-style:none;margin-left:0;')}>`;
+        }
+        return `<li style="list-style:none;margin-left:0;"${attrs}>`;
+      });
+
+    return `
+      <div class="rules-box" style="background-color: ${isDark ? '#090d16' : '#f8fafc'}; border: 1px solid ${borderColor}; border-left: 3px solid #10b981; border-radius: 6px; padding: 10px 12px; margin: 8px 0; text-align: left; box-sizing: border-box; width: 100%; color: ${textColor}; line-height: 1.55; font-size: 11.5px;">
+        <div style="font-size: 9.5px; text-transform: uppercase; font-weight: 700; color: #34d399; letter-spacing: 0.5px; margin-bottom: 8px;">
+          📋 Activation Rules & Guidelines:
+        </div>
+        <div style="color: ${textColor}; font-size: 11.5px; line-height: 1.55; word-break: normal; overflow-wrap: break-word;">
+          ${cleanedHtml}
+        </div>
+      </div>
+    `;
+  }
 
   const items = splitIntoBulletItems(rulesText);
   if (items.length === 0) return '';
@@ -189,7 +217,6 @@ const formatRulesHtml = (rulesText, isDark = true) => {
     return `
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; margin: 2px 0; border-collapse: collapse;">
         <tr>
-          <td style="width: 14px; vertical-align: top; padding: 1.5px 3px 1.5px 0; color: #10b981; font-size: 9.5px; line-height: 1.45; text-align: left;">▪</td>
           <td style="vertical-align: top; padding: 1.5px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10.5px; line-height: 1.45; color: ${textColor}; word-break: normal; overflow-wrap: break-word; hyphens: none; -webkit-hyphens: none;">
             ${escapeHtml(item.text)}
           </td>
@@ -211,7 +238,7 @@ const formatRulesHtml = (rulesText, isDark = true) => {
 /**
  * Format License Key / Account Credentials intelligently:
  * - If single license code: bold prominent monospace code
- * - If multi-line credentials with rules/bullets: clean credential rows + bulleted instructions
+ * - If multi-line credentials with rules: clean credential rows + instructions (without bullet points)
  */
 const formatLicenseKeyHtml = (rawKey, isDark = true) => {
   if (!rawKey || typeof rawKey !== 'string' || !rawKey.trim()) {
@@ -236,7 +263,7 @@ const formatLicenseKeyHtml = (rawKey, isDark = true) => {
     `;
   }
 
-  // Parse lines/bullets
+  // Parse lines
   const items = splitIntoBulletItems(trimmed);
   if (items.length === 0) {
     return `<div style="font-size: 11px; color: ${textColor};">${escapeHtml(trimmed)}</div>`;
@@ -274,7 +301,6 @@ const formatLicenseKeyHtml = (rawKey, isDark = true) => {
     return `
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; margin: 2px 0; border-collapse: collapse;">
         <tr>
-          <td style="width: 14px; vertical-align: top; padding: 1.5px 3px 1.5px 0; color: #10b981; font-size: 9.5px; line-height: 1.45; text-align: left;">▪</td>
           <td style="vertical-align: top; padding: 1.5px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10.5px; line-height: 1.45; color: ${subColor}; word-break: normal; overflow-wrap: break-word; hyphens: none; -webkit-hyphens: none;">
             ${escapeHtml(item.text)}
           </td>
@@ -287,19 +313,34 @@ const formatLicenseKeyHtml = (rawKey, isDark = true) => {
 };
 
 /**
+ * Resolves the absolute URL for the brand logo in outgoing emails.
+ * Uses EMAIL_LOGO_URL if explicitly configured, otherwise defaults to the live HTTPS URL.
+ */
+const getBrandLogoUrl = () => {
+  if (process.env.EMAIL_LOGO_URL && process.env.EMAIL_LOGO_URL.trim()) {
+    return process.env.EMAIL_LOGO_URL.trim();
+  }
+  const frontend = (process.env.FRONTEND_URL || '').trim();
+  const baseUrl = (frontend && !frontend.includes('localhost') && !frontend.includes('127.0.0.1'))
+    ? frontend.replace(/\/+$/, '')
+    : 'https://elitepassbd.com';
+  return `${baseUrl}/logo_banner.png`;
+};
+
+/**
  * Reusable Standard Footer for All Emails
  */
 const getEmailFooter = (appName = (process.env.APP_NAME || 'ElitePassBD'), isDark = true) => {
   const bgColor = isDark ? '#0f172a' : '#f8fafc';
   const borderColor = isDark ? '#1e293b' : '#e2e8f0';
   const subColor = isDark ? '#64748b' : '#94a3b8';
-  const logoUrl = process.env.EMAIL_LOGO_URL || 'cid:brand_logo';
+  const logoUrl = getBrandLogoUrl();
 
   return `
     <tr>
       <td class="footer-cell" style="background-color: ${bgColor}; padding: 18px 14px; text-align: center; font-size: 11.5px; border-top: 1px solid ${borderColor}; line-height: 1.5; word-break: normal; overflow-wrap: break-word;">
         <div style="margin-bottom: 6px; text-align: center;">
-          <img src="${logoUrl}" alt="${appName}" width="150" style="width: 150px; max-width: 100%; height: auto; display: inline-block; vertical-align: middle; border: 0; outline: none; text-decoration: none;" />
+          <img src="${logoUrl}" alt="${appName}" width="150" border="0" style="width: 150px; max-width: 100%; height: auto; display: inline-block; vertical-align: middle; border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 800; color: #ffffff;" />
         </div>
         <div style="color: ${subColor}; font-size: 11.5px; font-weight: 500; letter-spacing: 0.2px;">Dhaka, Bangladesh</div>
       </td>
@@ -352,7 +393,7 @@ const sendEmailDetailed = async ({ to, subject, text, html, attachments }) => {
   try {
     // Ensure latest support WhatsApp number is loaded from settings and dynamically applied
     const injected = await injectFreshSupportWhatsApp(html, text);
-    const finalHtml = injected.html;
+    let finalHtml = injected.html;
     const finalText = injected.text;
 
     const smtpHost = process.env.SMTP_HOST;
@@ -374,6 +415,33 @@ const sendEmailDetailed = async ({ to, subject, text, html, attachments }) => {
         }
       });
 
+      const finalAttachments = Array.isArray(attachments) ? [...attachments] : [];
+
+      // Automatically attach inline brand logo if email HTML references cid:brand_logo
+      if (finalHtml && typeof finalHtml === 'string' && finalHtml.includes('cid:brand_logo')) {
+        const candidatePaths = [
+          path.join(__dirname, '../public/logo_banner.png'),
+          path.join(__dirname, '../dist/logo_banner.png'),
+          path.join(process.cwd(), 'public/logo_banner.png'),
+          path.join(process.cwd(), 'dist/logo_banner.png'),
+          path.join(__dirname, '../public/logo.png'),
+          path.join(process.cwd(), 'public/logo.png')
+        ];
+        const existingPath = candidatePaths.find(p => fs.existsSync(p));
+        if (existingPath && !finalAttachments.some(a => a.cid === 'brand_logo')) {
+          finalAttachments.push({
+            filename: 'logo_banner.png',
+            path: existingPath,
+            cid: 'brand_logo',
+            contentType: 'image/png',
+            contentDisposition: 'inline'
+          });
+        } else if (!existingPath) {
+          // If no local file found on disk, gracefully replace cid:brand_logo with public URL so it never breaks
+          finalHtml = finalHtml.replace(/cid:brand_logo/g, getBrandLogoUrl());
+        }
+      }
+
       const mailOptions = {
         from: `"${process.env.APP_NAME || 'ElitePassBD'}" <${smtpUser}>`,
         to,
@@ -381,21 +449,6 @@ const sendEmailDetailed = async ({ to, subject, text, html, attachments }) => {
         text: finalText,
         html: finalHtml
       };
-
-      const finalAttachments = Array.isArray(attachments) ? [...attachments] : [];
-
-      // Automatically attach inline brand logo if email HTML references cid:brand_logo
-      if (finalHtml && typeof finalHtml === 'string' && finalHtml.includes('cid:brand_logo')) {
-        const logoPath = path.join(__dirname, '../public/logo_banner.png');
-        if (fs.existsSync(logoPath) && !finalAttachments.some(a => a.cid === 'brand_logo')) {
-          finalAttachments.push({
-            filename: 'logo_banner.png',
-            path: logoPath,
-            cid: 'brand_logo',
-            contentDisposition: 'inline'
-          });
-        }
-      }
 
       if (finalAttachments.length > 0) {
         mailOptions.attachments = finalAttachments;
@@ -422,6 +475,7 @@ const sendEmail = async (options) => {
 module.exports = {
   sendEmail,
   sendEmailDetailed,
+  getBrandLogoUrl,
   getWhatsAppContactBlock,
   getEmailFooter,
   getWhatsAppContactText,

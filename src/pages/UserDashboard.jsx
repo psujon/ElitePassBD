@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { 
@@ -441,12 +441,12 @@ export default function UserDashboard() {
     <div className="w-full max-w-full min-w-0 min-h-[calc(100vh-64px)] flex flex-col md:flex-row bg-[#f5f7fa] text-slate-800 overflow-x-hidden">
       
       <div className="w-full md:w-56 lg:w-64 bg-[#111e35] text-slate-300 p-3.5 sm:p-4 md:p-6 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-slate-850 min-w-0 max-w-full">
-        <div className="hidden md:flex items-center space-x-2.5 px-2 mb-6 text-left">
-          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0">
+        <Link to="/" title="Go to Product Homepage" className="hidden md:flex items-center space-x-2.5 px-2 mb-6 text-left group cursor-pointer">
+          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-violet-500/20 shrink-0 group-hover:scale-105 transition-transform">
             E
           </div>
-          <span className="text-sm font-extrabold tracking-wider text-white uppercase truncate">ElitePass BD</span>
-        </div>
+          <span className="text-sm font-extrabold tracking-wider text-white uppercase truncate group-hover:text-violet-300 transition-colors">ElitePass BD</span>
+        </Link>
         
         <div className="mb-6 px-2 hidden md:block text-left">
           <span className="text-[10px] font-bold text-orange-400 bg-orange-950/45 border border-orange-900/30 px-2.5 py-0.5 rounded-full uppercase tracking-wider block w-fit">

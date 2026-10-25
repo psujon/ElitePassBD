@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import JoditEditor from 'jodit-react';
 import { api, API_BASE_URL } from '../utils/api';
@@ -409,6 +409,8 @@ export default function AdminDashboard() {
   });
   const [licenseFormSubmitting, setLicenseFormSubmitting] = useState(false);
   const [licenseFormError, setLicenseFormError] = useState('');
+  const [usageRules, setUsageRules] = useState([]);
+  const [selectedLicenseRuleId, setSelectedLicenseRuleId] = useState('');
   const [licenseSearchQuery, setLicenseSearchQuery] = useState('');
   const [licenseCurrentPage, setLicenseCurrentPage] = useState(1);
   const [licenseProductSearch, setLicenseProductSearch] = useState('');
@@ -724,7 +726,7 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [prodData, orderData, ticketData, statsData, catData, licenseData, epsData, slideData, couponData] = await Promise.all([
+      const [prodData, orderData, ticketData, statsData, catData, licenseData, epsData, slideData, couponData, rulesData] = await Promise.all([
         api.get('/products'),
         api.get('/orders'),
         api.get('/tickets'),
@@ -733,7 +735,8 @@ export default function AdminDashboard() {
         api.get('/licenses'),
         api.get('/payments/history'),
         api.get('/slides'),
-        api.get('/coupons').catch(() => [])
+        api.get('/coupons').catch(() => []),
+        api.get('/product-usage-rules').catch(() => [])
       ]);
       setProducts(prodData);
       setOrders(orderData);
@@ -744,6 +747,7 @@ export default function AdminDashboard() {
       setEpsHistory(epsData || []);
       setSlides(slideData || []);
       setCoupons(couponData || []);
+      setUsageRules(Array.isArray(rulesData) ? rulesData : (rulesData?.data || []));
     } catch (err) {
       console.error('Failed to load admin stats', err);
       toast.error('Error loading dashboard data. Are you logged in as an Admin?');
@@ -995,11 +999,19 @@ export default function AdminDashboard() {
   const totalOrders = orders.length;
   const totalProducts = products.length;
 
-  const pendingOrdersCount = orders.filter(o => o.status === 'Pending').length;
-  const processingOrdersCount = orders.filter(o => o.status === 'Processing').length;
-  const shippedOrdersCount = orders.filter(o => o.status === 'Shipped').length;
-  const completedOrdersCount = orders.filter(o => o.status === 'Delivered').length;
-  const cancelledOrdersCount = orders.filter(o => o.status === 'Cancelled').length;
+  const pendingOrdersCount = orders.filter(o => {
+    const p = String(o.payment_status || '').toLowerCase();
+    const s = String(o.status || '').toLowerCase();
+    return p === 'pending' || s === 'pending';
+  }).length;
+  const processingOrdersCount = orders.filter(o => String(o.status || '').toLowerCase() === 'processing').length;
+  const shippedOrdersCount = orders.filter(o => String(o.status || '').toLowerCase() === 'shipped').length;
+  const completedOrdersCount = orders.filter(o => String(o.status || '').toLowerCase() === 'delivered').length;
+  const cancelledOrdersCount = orders.filter(o => {
+    const p = String(o.payment_status || '').toLowerCase();
+    const s = String(o.status || '').toLowerCase();
+    return s === 'cancelled' || p === 'cancelled';
+  }).length;
 
   const getSafeItemsArray = (items) => {
     if (!items) return [];
@@ -1021,7 +1033,7 @@ export default function AdminDashboard() {
         const oStatus = String(ord.status || '').toLowerCase();
         const target = dashOrderStatus.toLowerCase();
         if (target === 'paid' && pStatus !== 'paid') return false;
-        if (target === 'pending' && (pStatus === 'paid' || oStatus === 'delivered' || oStatus === 'cancelled')) return false;
+        if (target === 'pending' && pStatus !== 'pending' && oStatus !== 'pending') return false;
         if (target === 'delivered' && oStatus !== 'delivered') return false;
         if (target === 'processing' && oStatus !== 'processing') return false;
         if (target === 'cancelled' && (oStatus !== 'cancelled' && pStatus !== 'cancelled')) return false;
@@ -1088,7 +1100,15 @@ export default function AdminDashboard() {
     .filter((ord) => {
       if (orderTabStatus !== 'all') {
         const oStatus = String(ord.status || '').toLowerCase();
-        if (oStatus !== orderTabStatus.toLowerCase()) return false;
+        const pStatus = String(ord.payment_status || '').toLowerCase();
+        const target = orderTabStatus.toLowerCase();
+        if (target === 'pending') {
+          if (oStatus !== 'pending' && pStatus !== 'pending') return false;
+        } else if (target === 'cancelled') {
+          if (oStatus !== 'cancelled' && pStatus !== 'cancelled') return false;
+        } else if (oStatus !== target) {
+          return false;
+        }
       }
       if (orderTabPayment !== 'all') {
         const pStatus = String(ord.payment_status || '').toLowerCase();
@@ -1609,8 +1629,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleOpenLicenseModal = () => {
+  const handleOpenLicenseModal = async () => {
     setEditingLicense(null);
+    setSelectedLicenseRuleId('');
     setLicenseForm({
       product_id: '',
       activation_option: '',
@@ -1620,10 +1641,20 @@ export default function AdminDashboard() {
     });
     setLicenseFormError('');
     setShowLicenseModal(true);
+    if (!usageRules || usageRules.length === 0) {
+      try {
+        const rData = await api.get('/product-usage-rules');
+        setUsageRules(Array.isArray(rData) ? rData : (rData?.data || []));
+      } catch (err) {
+        // ignore
+      }
+    }
   };
 
-  const handleEditLicense = (license) => {
+  const handleEditLicense = async (license) => {
     setEditingLicense(license);
+    const existingRule = (usageRules || []).find(r => r.rules_text && r.rules_text.trim() === (license.rules || '').trim());
+    setSelectedLicenseRuleId(existingRule ? String(existingRule.id) : (license.rules ? '__custom__' : ''));
     setLicenseForm({
       product_id: license.product_id,
       activation_option: license.activation_option || '',
@@ -1633,6 +1664,17 @@ export default function AdminDashboard() {
     });
     setLicenseFormError('');
     setShowLicenseModal(true);
+    if (!usageRules || usageRules.length === 0) {
+      try {
+        const rData = await api.get('/product-usage-rules');
+        const list = Array.isArray(rData) ? rData : (rData?.data || []);
+        setUsageRules(list);
+        const match = list.find(r => r.rules_text && r.rules_text.trim() === (license.rules || '').trim());
+        if (match) setSelectedLicenseRuleId(String(match.id));
+      } catch (err) {
+        // ignore
+      }
+    }
   };
 
   const handleLicenseSubmit = async (e) => {
@@ -1956,8 +1998,9 @@ export default function AdminDashboard() {
           {/* Brand Header */}
           <div className={`p-4 flex items-center border-b border-slate-800/80 shrink-0 ${sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4 sm:px-5'
             }`}>
-            <div
-              onClick={() => setActiveTab('dashboard')}
+            <Link
+              to="/"
+              title="Go to Product Homepage"
               className="flex items-center space-x-3 min-w-0 cursor-pointer group"
             >
               <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 border border-white/20 shadow-md group-hover:scale-105 transition-transform">
@@ -1965,13 +2008,13 @@ export default function AdminDashboard() {
               </div>
               {!sidebarCollapsed && (
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-base font-black text-white tracking-tight leading-tight flex items-center gap-1 truncate">
+                  <h2 className="text-base font-black text-white tracking-tight leading-tight flex items-center gap-1 truncate group-hover:text-blue-400 transition-colors">
                     <span>ElitePass</span>
                     <span className="text-blue-500">BD</span>
                   </h2>
                 </div>
               )}
-            </div>
+            </Link>
             {!sidebarCollapsed && (
               <button
                 onClick={() => setMobileSidebarOpen(false)}
@@ -2085,35 +2128,6 @@ export default function AdminDashboard() {
               <p className="text-xs text-slate-500 font-medium truncate hidden sm:block">
                 {currentTabMeta.subtitle}
               </p>
-            </div>
-          </div>
-
-          {/* Search Bar in Navbar */}
-          <div className="hidden lg:flex items-center flex-1 max-w-md mx-4">
-            <div className="relative w-full">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                id="admin-global-search"
-                type="text"
-                value={globalSearch}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setGlobalSearch(val);
-                  setDashOrderSearch(val);
-                  setOrderTabSearch(val);
-                  setOrderTabPage(1);
-                }}
-                placeholder="Search orders, customers, products..."
-                className="w-full pl-10 pr-16 py-2 bg-slate-50/90 hover:bg-slate-100/60 focus:bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 transition-all outline-none"
-              />
-              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 bg-white border border-slate-200 rounded shadow-2xs">
-                  Ctrl
-                </kbd>
-                <kbd className="px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 bg-white border border-slate-200 rounded shadow-2xs">
-                  K
-                </kbd>
-              </div>
             </div>
           </div>
 
@@ -2665,7 +2679,7 @@ export default function AdminDashboard() {
                           <span>Pending</span>
                           <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${dashOrderStatus === 'pending' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
                             }`}>
-                            {orders.filter(o => o.payment_status === 'Pending' || (!o.payment_status && o.status !== 'Delivered')).length}
+                            {pendingOrdersCount}
                           </span>
                         </button>
 
@@ -2679,7 +2693,7 @@ export default function AdminDashboard() {
                           <span>Delivered</span>
                           <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${dashOrderStatus === 'delivered' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
                             }`}>
-                            {orders.filter(o => o.status === 'Delivered').length}
+                            {completedOrdersCount}
                           </span>
                         </button>
 
@@ -2693,7 +2707,7 @@ export default function AdminDashboard() {
                           <span>Processing</span>
                           <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${dashOrderStatus === 'processing' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
                             }`}>
-                            {orders.filter(o => o.status === 'Processing').length}
+                            {processingOrdersCount}
                           </span>
                         </button>
 
@@ -2707,7 +2721,7 @@ export default function AdminDashboard() {
                           <span>Cancelled</span>
                           <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${dashOrderStatus === 'cancelled' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-800'
                             }`}>
-                            {orders.filter(o => o.status === 'Cancelled' || o.payment_status === 'Cancelled').length}
+                            {cancelledOrdersCount}
                           </span>
                         </button>
                       </div>
@@ -8239,12 +8253,19 @@ export default function AdminDashboard() {
                             key={prod.id}
                             className={`px-3 py-2 text-xs cursor-pointer hover:bg-violet-50 ${licenseForm.product_id == prod.id ? 'bg-violet-100 text-violet-700 font-bold' : 'text-slate-700'}`}
                             onClick={() => {
-                              setLicenseForm({
-                                ...licenseForm,
+                              const matchingRule = (usageRules || []).find(r => String(r.product_id) === String(prod.id) && r.is_active != 0);
+                              setLicenseForm(prev => ({
+                                ...prev,
                                 product_id: prod.id,
                                 activation_option: '',
-                                package_option: ''
-                              });
+                                package_option: '',
+                                rules: matchingRule ? matchingRule.rules_text : prev.rules
+                              }));
+                              if (matchingRule) {
+                                setSelectedLicenseRuleId(String(matchingRule.id));
+                              } else if (!licenseForm.rules) {
+                                setSelectedLicenseRuleId('');
+                              }
                               setLicenseProductSearch('');
                               setShowProductDropdown(false);
                             }}
@@ -8309,16 +8330,96 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                  License Rules / Instructions (Optional)
-                </label>
-                <textarea
-                  rows="2"
-                  value={licenseForm.rules}
-                  onChange={(e) => setLicenseForm({ ...licenseForm, rules: e.target.value })}
-                  placeholder="e.g. Do not change password. Valid for 1 device. Contact support if locked."
-                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider">
+                    License Rules / Instructions (Optional)
+                  </label>
+                  {licenseForm.rules && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedLicenseRuleId('');
+                        setLicenseForm(prev => ({ ...prev, rules: '' }));
+                      }}
+                      className="text-xxs text-slate-400 hover:text-red-500 font-medium transition-colors cursor-pointer"
+                    >
+                      Clear Rules
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <select
+                    value={selectedLicenseRuleId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedLicenseRuleId(val);
+                      if (!val) {
+                        setLicenseForm(prev => ({ ...prev, rules: '' }));
+                      } else if (val === '__custom__') {
+                        // Allow custom typing without changing existing text
+                      } else {
+                        const rule = (usageRules || []).find(r => String(r.id) === String(val));
+                        if (rule) {
+                          setLicenseForm(prev => ({ ...prev, rules: rule.rules_text }));
+                        }
+                      }
+                    }}
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer"
+                  >
+                    <option value="">-- Select Product Usage Rules --</option>
+                    {(() => {
+                      const currentProdId = String(licenseForm.product_id || '');
+                      const matchingRules = (usageRules || []).filter(r => currentProdId && String(r.product_id) === currentProdId);
+                      const otherRules = (usageRules || []).filter(r => !currentProdId || String(r.product_id) !== currentProdId);
+                      const selectedProdName = products.find(p => String(p.id) === currentProdId)?.name;
+
+                      return (
+                        <>
+                          {matchingRules.length > 0 && (
+                            <optgroup label={`Rules for ${selectedProdName || 'Selected Product'}`}>
+                              {matchingRules.map(r => (
+                                <option key={r.id} value={String(r.id)}>
+                                  {r.title || 'Standard Rules'} {r.is_active ? '' : '(Inactive)'}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {otherRules.length > 0 && (
+                            <optgroup label={matchingRules.length > 0 ? "Other Product Rules" : "All Product Rules"}>
+                              {otherRules.map(r => (
+                                <option key={r.id} value={String(r.id)}>
+                                  {r.product_name ? `[${r.product_name}] ` : ''}{r.title || 'Usage Rule'}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          <option value="__custom__">Custom / Manual Rules (Type below)</option>
+                        </>
+                      );
+                    })()}
+                  </select>
+
+                  <textarea
+                    rows="3"
+                    value={licenseForm.rules}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLicenseForm(prev => ({ ...prev, rules: val }));
+                      const currentRule = (usageRules || []).find(r => String(r.id) === String(selectedLicenseRuleId));
+                      if (currentRule && currentRule.rules_text.trim() !== val.trim()) {
+                        setSelectedLicenseRuleId('__custom__');
+                      }
+                    }}
+                    placeholder="e.g. Do not change password. Valid for 1 device. Contact support if locked."
+                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 font-sans"
+                  />
+                  {selectedLicenseRuleId && selectedLicenseRuleId !== '__custom__' && (
+                    <div className="flex items-center text-xxs text-emerald-600 font-medium space-x-1">
+                      <span>✓ Pre-filled from Product Usage Rules. You can edit above if needed.</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

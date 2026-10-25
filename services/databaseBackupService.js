@@ -267,7 +267,7 @@ const recordBackupRun = async ({ status, size, tables, rows }) => {
 /**
  * Build professional email HTML for backup
  */
-const buildBackupEmailHtml = ({ dbName, tableCount, totalRows, formattedSize, generatedAt, filename, isManualTest }) => {
+const buildBackupEmailHtml = ({ dbName, tableCount, totalRows, formattedSize, generatedAt, filename, recipient, isManualTest }) => {
   return `
 <!DOCTYPE html>
 <html lang="en">

@@ -33,12 +33,12 @@ const processSubscriptionStatuses = async (pool) => {
       console.warn('[SubscriptionCronService] Repair warning:', repairErr.message);
     }
 
-    // 1. Mark past expiries as 'Expired' (unless already Cancelled or Renewed)
+    // 1. Mark past expiries as 'Expired' (unless already Cancelled, Renewed, or Not Renewed)
     await pool.query(`
       UPDATE subscriptions
       SET status = 'Expired'
       WHERE expiry_date < CURDATE()
-        AND status NOT IN ('Expired', 'Cancelled')
+        AND status NOT IN ('Expired', 'Cancelled', 'Not Renewed')
     `);
 
     // 2. Mark expiries within 3 days as 'Expiring Soon'
@@ -47,7 +47,7 @@ const processSubscriptionStatuses = async (pool) => {
       SET status = 'Expiring Soon'
       WHERE expiry_date >= CURDATE()
         AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY)
-        AND status NOT IN ('Expiring Soon', 'Cancelled')
+        AND status NOT IN ('Expiring Soon', 'Cancelled', 'Not Renewed')
     `);
   } catch (err) {
     console.error('[SubscriptionCronService] Error updating statuses:', err.message);

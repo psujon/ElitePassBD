@@ -1,8 +1,24 @@
 const db = require('../config/db');
 
+let vendorColsEnsured = false;
+async function ensureVendorColumns() {
+  if (vendorColsEnsured) return;
+  try {
+    const [cols] = await db.query("SHOW COLUMNS FROM vendors LIKE 'website'");
+    if (cols.length === 0) {
+      await db.query("ALTER TABLE vendors ADD COLUMN website VARCHAR(255) DEFAULT NULL AFTER company_name");
+      console.log("Added column 'website' to 'vendors' table.");
+    }
+    vendorColsEnsured = true;
+  } catch (err) {
+    console.warn("ensureVendorColumns warning:", err.message);
+  }
+}
+
 // Get all vendors with optional search, status filtering, and pagination/stats
 exports.getAllVendors = async (req, res) => {
   try {
+    await ensureVendorColumns();
     const { search, status, category } = req.query;
 
     let query = `
@@ -24,8 +40,8 @@ exports.getAllVendors = async (req, res) => {
 
     if (search && search.trim() !== '') {
       const searchTerm = `%${search.trim()}%`;
-      query += ` AND (v.name LIKE ? OR v.company_name LIKE ? OR v.phone LIKE ? OR v.whatsapp LIKE ? OR v.telegram LIKE ? OR v.email LIKE ? OR v.notes LIKE ?)`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      query += ` AND (v.name LIKE ? OR v.company_name LIKE ? OR v.website LIKE ? OR v.phone LIKE ? OR v.whatsapp LIKE ? OR v.telegram LIKE ? OR v.email LIKE ? OR v.notes LIKE ?)`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     query += ` ORDER BY v.id DESC`;
@@ -53,6 +69,7 @@ exports.getAllVendors = async (req, res) => {
 exports.getVendorById = async (req, res) => {
   const { id } = req.params;
   try {
+    await ensureVendorColumns();
     const [vendors] = await db.query('SELECT * FROM vendors WHERE id = ?', [id]);
     if (vendors.length === 0) {
       return res.status(404).json({ message: 'Vendor not found.' });
@@ -70,9 +87,12 @@ exports.getVendorById = async (req, res) => {
 
 // Create a new vendor
 exports.createVendor = async (req, res) => {
+  await ensureVendorColumns();
   const {
     name,
     company_name,
+    website,
+    vendor_website,
     phone,
     whatsapp,
     telegram,
@@ -91,15 +111,17 @@ exports.createVendor = async (req, res) => {
 
   try {
     const cleanWhatsapp = whatsapp ? whatsapp.replace(/[^0-9]/g, '') : (phone ? phone.replace(/[^0-9]/g, '') : null);
+    const finalWebsite = (website || vendor_website || '').trim() || null;
 
     const [result] = await db.query(
       `INSERT INTO vendors (
-        name, company_name, phone, whatsapp, telegram, email, address,
+        name, company_name, website, phone, whatsapp, telegram, email, address,
         payment_details, category, status, balance, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name.trim(),
         company_name ? company_name.trim() : null,
+        finalWebsite,
         phone ? phone.trim() : null,
         cleanWhatsapp,
         telegram ? telegram.trim() : null,
@@ -125,10 +147,13 @@ exports.createVendor = async (req, res) => {
 
 // Update an existing vendor
 exports.updateVendor = async (req, res) => {
+  await ensureVendorColumns();
   const { id } = req.params;
   const {
     name,
     company_name,
+    website,
+    vendor_website,
     phone,
     whatsapp,
     telegram,
@@ -147,11 +172,15 @@ exports.updateVendor = async (req, res) => {
 
   try {
     const cleanWhatsapp = whatsapp ? whatsapp.replace(/[^0-9]/g, '') : (phone ? phone.replace(/[^0-9]/g, '') : null);
+    const finalWebsite = (website !== undefined || vendor_website !== undefined)
+      ? ((website || vendor_website || '').trim() || null)
+      : null;
 
     const [result] = await db.query(
       `UPDATE vendors SET
         name = ?,
         company_name = ?,
+        website = ?,
         phone = ?,
         whatsapp = ?,
         telegram = ?,
@@ -166,6 +195,7 @@ exports.updateVendor = async (req, res) => {
       [
         name.trim(),
         company_name ? company_name.trim() : null,
+        finalWebsite,
         phone ? phone.trim() : null,
         cleanWhatsapp,
         telegram ? telegram.trim() : null,

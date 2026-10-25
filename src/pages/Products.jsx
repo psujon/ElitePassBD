@@ -266,16 +266,16 @@ export default function Products() {
                       className="bg-white border border-slate-200/80 rounded-3xl overflow-hidden flex flex-col h-full shadow-xs hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 group cursor-pointer text-left relative"
                     >
                       <div className="relative w-full aspect-square bg-gradient-to-br from-purple-50/70 via-indigo-50/50 to-blue-50/60 flex items-center justify-center overflow-hidden border-b border-slate-100">
-                        <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
+                        <div className="absolute top-1.5 sm:top-2 left-1.5 sm:left-2 right-1.5 sm:right-2 flex items-center justify-between gap-1 z-10 pointer-events-none">
                           {hasDiscount ? (
-                            <span className="bg-red-600 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-md">
+                            <span className="bg-red-600 text-white font-black text-[8px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full shadow-md whitespace-nowrap shrink-0 leading-none flex items-center">
                               -{discountPercent}% OFF
                             </span>
                           ) : <div></div>}
 
                           {(prod.is_instant === 1 || prod.activation_process === 'Instant') && (
-                            <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5 border border-amber-300/80">
-                              ⚡ Instant
+                            <span className="bg-amber-400 text-slate-950 font-black text-[7.5px] sm:text-[9px] px-1.5 sm:px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5 border border-amber-300/80 whitespace-nowrap shrink-0 leading-none">
+                              ⚡ Instant<span className="hidden min-[360px]:inline"> Delivery</span>
                             </span>
                           )}
                         </div>

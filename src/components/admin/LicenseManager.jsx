@@ -40,7 +40,9 @@ import {
   Store,
   Phone,
   MessageCircle,
-  ScrollText
+  ScrollText,
+  Globe,
+  Package
 } from 'lucide-react';
 
 export default function LicenseManager() {
@@ -49,6 +51,9 @@ export default function LicenseManager() {
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [vendorList, setVendorList] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState('all');
+  const [headerProductSearch, setHeaderProductSearch] = useState('');
+  const [headerProductDropdownOpen, setHeaderProductDropdownOpen] = useState(false);
+  const headerProductRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedAccountId, setSelectedAccountId] = useState(null);
@@ -191,6 +196,36 @@ export default function LicenseManager() {
 
     return list;
   }, [catalogProducts, accounts]);
+
+  // Search filter for top Selected Product field
+  const filteredHeaderProductOptions = useMemo(() => {
+    const q = (headerProductSearch || '').trim().toLowerCase();
+    if (!q || (selectedProduct !== 'all' && q === selectedProduct.toLowerCase())) {
+      return productOptions;
+    }
+    return productOptions.filter(item =>
+      (item.name || '').toLowerCase().includes(q) ||
+      (item.category || '').toLowerCase().includes(q)
+    );
+  }, [productOptions, headerProductSearch, selectedProduct]);
+
+  const handleSelectHeaderProduct = (productName) => {
+    setSelectedProduct(productName);
+    setHeaderProductSearch(productName === 'all' ? '' : productName);
+    setHeaderProductDropdownOpen(false);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (headerProductRef.current && !headerProductRef.current.contains(e.target)) {
+        setHeaderProductDropdownOpen(false);
+        setHeaderProductSearch(selectedProduct === 'all' ? '' : selectedProduct);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [selectedProduct]);
 
   const filteredModalProductOptions = useMemo(() => {
     const q = (accountProductSearch || '').trim().toLowerCase();
@@ -696,28 +731,185 @@ export default function LicenseManager() {
     <div className="space-y-4 animate-fade-in text-left min-w-0 w-full max-w-full pb-10">
       {/* Header & Subtitle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-2xs">
-        {/* 1. Products Combo List */}
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 rounded-xl p-1.5 px-3">
-          <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 whitespace-nowrap">
-            Selected Product
+        {/* 1. Products Combo List - Type & Search */}
+        <div className="flex flex-1 flex-wrap sm:flex-nowrap items-center gap-2.5 bg-slate-50 border border-slate-200/90 rounded-xl p-1.5 px-3 w-full max-w-4xl">
+          <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 whitespace-nowrap flex items-center gap-1.5 shrink-0">
+            <span>Selected Product</span>
           </label>
-          <div className="relative">
-            <select
-              value={selectedProduct}
-              onChange={(e) => {
-                setSelectedProduct(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="appearance-none bg-white border border-slate-200 rounded-lg px-3 py-1.5 pr-8 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs cursor-pointer min-w-[180px]"
-            >
-              <option value="all">🌐 All Products ({accounts.length})</option>
-              {productOptions.map((item) => (
-                <option key={item.name} value={item.name}>
-                  📦 {item.name} {item.count > 0 ? `(${item.count})` : ''}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div ref={headerProductRef} className="relative flex-1 min-w-[260px] sm:min-w-[420px] md:min-w-[560px] w-full">
+            <div className="relative flex items-center w-full">
+              {/* Left icon */}
+              <div className="absolute left-2.5 pointer-events-none flex items-center text-slate-400">
+                {selectedProduct === 'all' && !headerProductDropdownOpen ? (
+                  <Globe className="w-3.5 h-3.5 text-blue-600" />
+                ) : (
+                  <Search className="w-3.5 h-3.5 text-slate-400" />
+                )}
+              </div>
+
+              <input
+                type="text"
+                title={
+                  headerProductDropdownOpen
+                    ? headerProductSearch
+                    : selectedProduct === 'all'
+                    ? `All Products (${accounts.length})`
+                    : selectedProduct
+                }
+                value={
+                  headerProductDropdownOpen
+                    ? headerProductSearch
+                    : selectedProduct === 'all'
+                    ? `All Products (${accounts.length})`
+                    : selectedProduct
+                }
+                onChange={(e) => {
+                  setHeaderProductSearch(e.target.value);
+                  if (!headerProductDropdownOpen) setHeaderProductDropdownOpen(true);
+                }}
+                onFocus={(e) => {
+                  setHeaderProductDropdownOpen(true);
+                  if (selectedProduct === 'all') {
+                    setHeaderProductSearch('');
+                  } else {
+                    setHeaderProductSearch(selectedProduct);
+                    e.target.select();
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (headerProductSearch.trim().toLowerCase() === 'all') {
+                      handleSelectHeaderProduct('all');
+                    } else if (filteredHeaderProductOptions.length > 0) {
+                      handleSelectHeaderProduct(filteredHeaderProductOptions[0].name);
+                    }
+                  } else if (e.key === 'Escape') {
+                    setHeaderProductDropdownOpen(false);
+                    setHeaderProductSearch(selectedProduct === 'all' ? '' : selectedProduct);
+                  }
+                }}
+                placeholder={
+                  selectedProduct === 'all'
+                    ? `All Products (${accounts.length})`
+                    : 'Type product name...'
+                }
+                className="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-16 py-2 text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-2xs"
+              />
+
+              {/* Action Buttons inside Input: Clear + Toggle Chevron */}
+              <div className="absolute right-1.5 flex items-center gap-0.5">
+                {selectedProduct !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectHeaderProduct('all');
+                    }}
+                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                    title="Clear filter / Show all products"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!headerProductDropdownOpen) {
+                      setHeaderProductSearch(selectedProduct === 'all' ? '' : selectedProduct);
+                    }
+                    setHeaderProductDropdownOpen(prev => !prev);
+                  }}
+                  className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors cursor-pointer"
+                  title="Toggle product dropdown"
+                >
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                      headerProductDropdownOpen ? 'rotate-180 text-blue-600' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Dropdown Menu */}
+            {headerProductDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-full min-w-full sm:min-w-[480px] md:min-w-[620px] max-w-[95vw] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden py-1 divide-y divide-slate-100">
+                <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between bg-slate-50/70">
+                  <span>Filter by Product</span>
+                  <span className="text-[9.5px] font-normal text-slate-400">
+                    {filteredHeaderProductOptions.length} available
+                  </span>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto custom-scrollbar divide-y divide-slate-50">
+                  {/* All Products Option */}
+                  <div
+                    onClick={() => handleSelectHeaderProduct('all')}
+                    className={`px-3 py-2.5 text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                      selectedProduct === 'all'
+                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <span>All Products</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-bold">
+                        {accounts.length}
+                      </span>
+                      {selectedProduct === 'all' && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                    </div>
+                  </div>
+
+                  {/* Individual Products */}
+                  {filteredHeaderProductOptions.map((item) => {
+                    const isSelected = selectedProduct === item.name;
+                    return (
+                      <div
+                        key={item.name}
+                        onClick={() => handleSelectHeaderProduct(item.name)}
+                        className={`px-3 py-2.5 text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-blue-50 text-blue-700 font-bold'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex flex-col min-w-0 flex-1 pr-3">
+                          <div className="flex items-center gap-1.5">
+                            <Package className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="font-bold text-slate-800 text-[12px] leading-snug break-words" title={item.name}>
+                              {item.name}
+                            </span>
+                          </div>
+                          {item.category && (
+                            <span className="text-[9.5px] text-slate-400 font-medium pl-5 mt-0.5">
+                              {item.category}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                          {item.count > 0 && (
+                            <span className="text-[10px] bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded font-bold">
+                              {item.count} {item.count === 1 ? 'acc' : 'accs'}
+                            </span>
+                          )}
+                          {isSelected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {filteredHeaderProductOptions.length === 0 && (
+                    <div className="px-3 py-4 text-xs text-slate-400 text-center italic">
+                      No products found matching "{headerProductSearch}"
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1096,30 +1288,38 @@ export default function LicenseManager() {
                     <span className="text-slate-500 font-medium">Password</span>
                     <div className="flex items-center gap-1 font-mono text-slate-800 bg-white border border-slate-200 rounded px-2 py-0.5">
                       <span>
-                        {revealedPasswords[selectedAccount.id]
-                          ? selectedAccount.account_password
-                          : '••••••••••••'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => togglePasswordReveal(selectedAccount.id)}
-                        className="text-slate-400 hover:text-slate-700 ml-1.5"
-                        title={revealedPasswords[selectedAccount.id] ? 'Hide' : 'Reveal'}
-                      >
-                        {revealedPasswords[selectedAccount.id] ? (
-                          <EyeOff className="w-3 h-3 text-blue-600" />
+                        {selectedAccount.account_password ? (
+                          revealedPasswords[selectedAccount.id]
+                            ? selectedAccount.account_password
+                            : '••••••••••••'
                         ) : (
-                          <Eye className="w-3 h-3" />
+                          <span className="text-slate-400 font-sans text-xs italic">Not set</span>
                         )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(selectedAccount.account_password, 'Password')}
-                        className="text-slate-400 hover:text-slate-700"
-                        title="Copy Password"
-                      >
-                        <Copy className="w-3 h-3" />
-                      </button>
+                      </span>
+                      {selectedAccount.account_password ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordReveal(selectedAccount.id)}
+                            className="text-slate-400 hover:text-slate-700 ml-1.5"
+                            title={revealedPasswords[selectedAccount.id] ? 'Hide' : 'Reveal'}
+                          >
+                            {revealedPasswords[selectedAccount.id] ? (
+                              <EyeOff className="w-3 h-3 text-blue-600" />
+                            ) : (
+                              <Eye className="w-3 h-3" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(selectedAccount.account_password, 'Password')}
+                            className="text-slate-400 hover:text-slate-700"
+                            title="Copy Password"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </>
+                      ) : null}
                     </div>
                   </div>
 
@@ -1560,30 +1760,30 @@ export default function LicenseManager() {
 
                       {/* Dropdown Menu */}
                       {accountProductDropdownOpen && (
-                        <div className="absolute left-0 top-full mt-1 w-full min-w-[280px] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden py-1">
+                        <div className="absolute left-0 top-full mt-1 w-full min-w-full sm:min-w-[420px] md:min-w-[500px] max-w-[95vw] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden py-1">
                           <div className="px-3 py-1.5 text-[9.5px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
                             <span>Catalog Products ({filteredModalProductOptions.length})</span>
                             <span className="text-[9px] text-slate-400 font-normal">Type to filter</span>
                           </div>
-                          <div className="max-h-56 overflow-y-auto custom-scrollbar divide-y divide-slate-50">
+                          <div className="max-h-60 overflow-y-auto custom-scrollbar divide-y divide-slate-50">
                             {filteredModalProductOptions.map((item) => {
                               const isSelected = accountForm.product_name?.toLowerCase() === item.name.toLowerCase();
                               return (
                                 <div
                                   key={item.name}
                                   onClick={() => handleSelectAccountProduct(item)}
-                                  className={`px-3 py-2 text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                                  className={`px-3 py-2.5 text-xs flex items-center justify-between cursor-pointer transition-colors ${
                                     isSelected
                                       ? 'bg-blue-50 text-blue-700 font-bold'
                                       : 'text-slate-700 hover:bg-slate-50'
                                   }`}
                                 >
-                                  <div className="flex flex-col min-w-0 pr-2">
-                                    <span className="truncate font-bold text-slate-800 text-[11.5px]" title={item.name}>
+                                  <div className="flex flex-col min-w-0 flex-1 pr-3">
+                                    <span className="font-bold text-slate-800 text-[12px] leading-snug break-words" title={item.name}>
                                       {item.name}
                                     </span>
                                     {item.category && (
-                                      <span className="text-[9.5px] text-slate-400 font-medium">
+                                      <span className="text-[9.5px] text-slate-400 font-medium mt-0.5">
                                         {item.category}
                                       </span>
                                     )}
@@ -1676,7 +1876,7 @@ export default function LicenseManager() {
                     {/* Col 2: Password with Reveal */}
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Account Password <span className="text-rose-500">*</span>
+                        Account Password
                       </label>
                       <div className="relative">
                         <input
@@ -1685,7 +1885,6 @@ export default function LicenseManager() {
                           onChange={(e) => setAccountForm({ ...accountForm, account_password: e.target.value })}
                           placeholder="Password"
                           className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono transition-colors"
-                          required
                         />
                         <button
                           type="button"

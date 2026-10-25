@@ -150,7 +150,7 @@ const syncWebsiteOrderToSubscriptions = async (orderId, connection = null) => {
     // 1. Fetch order details
     const [orders] = await conn.query(`
       SELECT o.id, o.phone, o.delivery_email, o.created_at, o.completed_at,
-             u.name AS user_name, u.email AS user_email
+             u.name AS user_name, u.email AS user_email, u.role AS user_role
       FROM orders o
       JOIN users u ON o.user_id = u.id
       WHERE o.id = ?
@@ -161,7 +161,8 @@ const syncWebsiteOrderToSubscriptions = async (orderId, connection = null) => {
 
     const customerName = ord.user_name || 'Website Customer';
     const customerPhone = ord.phone || '';
-    const customerEmail = ord.delivery_email || ord.user_email || null;
+    // Never fall back to admin email if customer has no email
+    const customerEmail = ord.delivery_email || (ord.user_role !== 'admin' ? ord.user_email : null) || null;
     const purchaseDate = ord.created_at ? new Date(ord.created_at) : new Date();
 
     // 2. Fetch order items
@@ -226,9 +227,9 @@ const syncWebsiteOrderToSubscriptions = async (orderId, connection = null) => {
         const subId = subRes.insertId;
 
         await conn.query(`
-          INSERT INTO subscription_renewals (subscription_id, start_date, end_date, validity_days, amount, status, notes)
-          VALUES (?, ?, ?, ?, ?, 'Current', 'Initial purchase (Website Order)')
-        `, [subId, purchaseDateStr, expiryDateStr, validityDays, parseFloat(item.price) || 0]);
+          INSERT INTO subscription_renewals (subscription_id, start_date, end_date, validity_days, amount, status, notes, account_given)
+          VALUES (?, ?, ?, ?, ?, 'Current', 'Initial purchase (Website Order)', ?)
+        `, [subId, purchaseDateStr, expiryDateStr, validityDays, parseFloat(item.price) || 0, accountGiven || null]);
 
         console.log(`[OrderSubscriptionSync] Created subscription #${subId} for Order #${orderId} (${item.product_name} - ${pkgPlan}): validity ${validityDays} days, Expiry: ${expiryDateStr}`);
       } else {
@@ -244,9 +245,9 @@ const syncWebsiteOrderToSubscriptions = async (orderId, connection = null) => {
 
           await conn.query(`
             UPDATE subscription_renewals
-            SET validity_days = ?, end_date = ?
+            SET validity_days = ?, end_date = ?, account_given = IFNULL(account_given, ?)
             WHERE subscription_id = ? AND status = 'Current'
-          `, [validityDays, expiryDateStr, sub.id]);
+          `, [validityDays, expiryDateStr, accountGiven || null, sub.id]);
 
           console.log(`[OrderSubscriptionSync] Repaired subscription #${sub.id} for Order #${orderId}: updated validity to ${validityDays} days, Expiry: ${expiryDateStr}`);
         }

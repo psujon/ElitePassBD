@@ -16,23 +16,27 @@ const getDashboardStats = async (pool, product = null) => {
     prodParams
   );
   const [[expiringTodayRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date = CURDATE() AND status NOT IN ('Cancelled')${prodClause}`,
+    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date = CURDATE() AND status NOT IN ('Cancelled', 'Not Renewed')${prodClause}`,
     prodParams
   );
   const [[within3DaysRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY) AND status NOT IN ('Cancelled')${prodClause}`,
+    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY) AND status NOT IN ('Cancelled', 'Not Renewed')${prodClause}`,
     prodParams
   );
   const [[within7DaysRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status NOT IN ('Cancelled')${prodClause}`,
+    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status NOT IN ('Cancelled', 'Not Renewed')${prodClause}`,
     prodParams
   );
   const [[expiredRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE (status = 'Expired' OR (expiry_date < CURDATE() AND status != 'Cancelled'))${prodClause}`,
+    `SELECT COUNT(*) as count FROM subscriptions WHERE (status = 'Expired' OR (expiry_date < CURDATE() AND status NOT IN ('Cancelled', 'Not Renewed')))${prodClause}`,
     prodParams
   );
   const [[renewedRes]] = await pool.query(
     `SELECT COUNT(*) as count FROM subscriptions WHERE (status = 'Renewed' OR id IN (SELECT DISTINCT subscription_id FROM subscription_renewals WHERE status = 'Previous'))${prodClause}`,
+    prodParams
+  );
+  const [[notRenewedRes]] = await pool.query(
+    `SELECT COUNT(*) as count FROM subscriptions WHERE status = 'Not Renewed'${prodClause}`,
     prodParams
   );
   const [[totalCustomersRes]] = await pool.query(
@@ -55,6 +59,7 @@ const getDashboardStats = async (pool, product = null) => {
     within7Days: within7DaysRes ? within7DaysRes.count : 0,
     expired: expiredRes ? expiredRes.count : 0,
     renewed: renewedRes ? renewedRes.count : 0,
+    notRenewed: notRenewedRes ? notRenewedRes.count : 0,
     totalCustomers: totalCustomersRes ? totalCustomersRes.count : 0,
     totalSubscriptions: totalSubscriptionsRes ? totalSubscriptionsRes.count : 0
   };
@@ -63,6 +68,7 @@ const getDashboardStats = async (pool, product = null) => {
 exports.getAllSubscriptions = async (req, res) => {
   try {
     const pool = db.getPool();
+    await ensureSubscriptionColumns(pool);
     await processSubscriptionStatuses(pool);
 
     const { search, product, status, source, expiryFilter } = req.query;
@@ -144,8 +150,15 @@ exports.getAllSubscriptions = async (req, res) => {
     }
 
     if (status && status.trim() && status !== 'All Status') {
-      query += ` AND s.status = ?`;
-      params.push(status.trim());
+      const sTrim = status.trim();
+      if (sTrim === 'Expired' || sTrim === 'Expired Only') {
+        query += ` AND (s.status = 'Expired' OR (s.expiry_date < CURDATE() AND s.status NOT IN ('Cancelled', 'Not Renewed')))`;
+      } else if (sTrim === 'Expired & Not Renewed') {
+        query += ` AND s.status IN ('Expired', 'Not Renewed')`;
+      } else {
+        query += ` AND s.status = ?`;
+        params.push(sTrim);
+      }
     }
 
     if (source && source.trim() && source !== 'All Sources') {
@@ -153,19 +166,33 @@ exports.getAllSubscriptions = async (req, res) => {
       params.push(source.trim());
     }
 
-    if (expiryFilter) {
+    if (expiryFilter && expiryFilter !== 'All Dates') {
+      const isExplicitStatus = Boolean(status && status !== 'All Status');
+      const excludeClause = isExplicitStatus ? '' : ` AND s.status NOT IN ('Cancelled', 'Not Renewed')`;
+
       if (expiryFilter === 'today') {
-        query += ` AND s.expiry_date = CURDATE()`;
+        query += ` AND s.expiry_date = CURDATE()${excludeClause}`;
       } else if (expiryFilter === '3days') {
-        query += ` AND s.expiry_date >= CURDATE() AND s.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY)`;
+        query += ` AND s.expiry_date >= CURDATE() AND s.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY)${excludeClause}`;
       } else if (expiryFilter === '7days') {
-        query += ` AND s.expiry_date >= CURDATE() AND s.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)`;
+        query += ` AND s.expiry_date >= CURDATE() AND s.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)${excludeClause}`;
       } else if (expiryFilter === 'expired') {
-        query += ` AND (s.expiry_date < CURDATE() OR s.status = 'Expired')`;
+        query += ` AND (s.expiry_date < CURDATE() OR s.status = 'Expired') AND s.status NOT IN ('Cancelled', 'Not Renewed')`;
       }
     }
 
-    query += ` ORDER BY s.id DESC`;
+    query += ` ORDER BY 
+      CASE s.status
+        WHEN 'Expired' THEN 1
+        WHEN 'Not Renewed' THEN 2
+        WHEN 'Expiring Soon' THEN 3
+        WHEN 'Active' THEN 4
+        WHEN 'Renewed' THEN 5
+        WHEN 'Cancelled' THEN 6
+        ELSE 7
+      END ASC,
+      s.expiry_date DESC,
+      s.id DESC`;
 
     const [rows] = await pool.query(query, params);
 
@@ -202,19 +229,113 @@ exports.getAllSubscriptions = async (req, res) => {
   }
 };
 
+let subColsEnsured = false;
+async function ensureSubscriptionColumns(pool) {
+  if (subColsEnsured) return;
+  try {
+    const [cCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'customer_notes'");
+    if (cCols.length === 0) {
+      await pool.query("ALTER TABLE subscriptions ADD COLUMN customer_notes TEXT DEFAULT NULL AFTER notes");
+    }
+    const [aCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'admin_notes'");
+    if (aCols.length === 0) {
+      await pool.query("ALTER TABLE subscriptions ADD COLUMN admin_notes TEXT DEFAULT NULL AFTER customer_notes");
+    }
+    const [lrCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'license_rules'");
+    if (lrCols.length === 0) {
+      await pool.query("ALTER TABLE subscriptions ADD COLUMN license_rules LONGTEXT DEFAULT NULL AFTER account_given");
+    }
+    const [rcCols] = await pool.query("SHOW COLUMNS FROM subscription_renewals LIKE 'customer_notes'");
+    if (rcCols.length === 0) {
+      await pool.query("ALTER TABLE subscription_renewals ADD COLUMN customer_notes TEXT DEFAULT NULL AFTER notes");
+    }
+    const [raCols] = await pool.query("SHOW COLUMNS FROM subscription_renewals LIKE 'admin_notes'");
+    if (raCols.length === 0) {
+      await pool.query("ALTER TABLE subscription_renewals ADD COLUMN admin_notes TEXT DEFAULT NULL AFTER customer_notes");
+    }
+    const [daCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'digital_account_id'");
+    if (daCols.length === 0) {
+      await pool.query("ALTER TABLE subscriptions ADD COLUMN digital_account_id INT DEFAULT NULL");
+    }
+    const [dsCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'digital_slot_id'");
+    if (dsCols.length === 0) {
+      await pool.query("ALTER TABLE subscriptions ADD COLUMN digital_slot_id INT DEFAULT NULL");
+    }
+    const [vCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'vendor_id'");
+    if (vCols.length === 0) {
+      await pool.query("ALTER TABLE subscriptions ADD COLUMN vendor_id INT DEFAULT NULL");
+    }
+    const [vpCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'vendor_price'");
+    if (vpCols.length === 0) {
+      await pool.query("ALTER TABLE subscriptions ADD COLUMN vendor_price DECIMAL(10, 2) DEFAULT 0.00");
+    }
+    const [daRenCols] = await pool.query("SHOW COLUMNS FROM subscription_renewals LIKE 'digital_account_id'");
+    if (daRenCols.length === 0) {
+      await pool.query("ALTER TABLE subscription_renewals ADD COLUMN digital_account_id INT DEFAULT NULL");
+    }
+    const [dsRenCols] = await pool.query("SHOW COLUMNS FROM subscription_renewals LIKE 'digital_slot_id'");
+    if (dsRenCols.length === 0) {
+      await pool.query("ALTER TABLE subscription_renewals ADD COLUMN digital_slot_id INT DEFAULT NULL");
+    }
+    const [accRenCols] = await pool.query("SHOW COLUMNS FROM subscription_renewals LIKE 'account_given'");
+    if (accRenCols.length === 0) {
+      await pool.query("ALTER TABLE subscription_renewals ADD COLUMN account_given LONGTEXT DEFAULT NULL AFTER amount");
+    }
+
+    // Backfill any existing subscription_renewals that have empty account_given or missing slot info
+    try {
+      await pool.query(`
+        UPDATE subscription_renewals r
+        JOIN subscriptions s ON r.subscription_id = s.id
+        SET r.account_given = s.account_given
+        WHERE (r.account_given IS NULL OR r.account_given = '')
+          AND (s.account_given IS NOT NULL AND s.account_given != '')
+      `);
+      await pool.query(`
+        UPDATE subscription_renewals r
+        JOIN subscriptions s ON r.subscription_id = s.id
+        SET r.digital_account_id = COALESCE(r.digital_account_id, s.digital_account_id),
+            r.digital_slot_id = COALESCE(r.digital_slot_id, s.digital_slot_id)
+        WHERE r.digital_account_id IS NULL AND s.digital_account_id IS NOT NULL
+      `);
+    } catch (backfillErr) {
+      // non-blocking backfill
+    }
+
+    try {
+      await pool.query("ALTER TABLE order_items MODIFY COLUMN selected_activation TEXT DEFAULT NULL");
+    } catch (e) {
+      // ignore
+    }
+    try {
+      await pool.query("ALTER TABLE subscriptions MODIFY COLUMN status ENUM('Active', 'Expiring Soon', 'Expired', 'Renewed', 'Cancelled', 'Not Renewed') DEFAULT 'Active'");
+    } catch (e) {
+      // ignore
+    }
+    subColsEnsured = true;
+  } catch (err) {
+    console.warn("ensureSubscriptionColumns error:", err.message);
+  }
+}
+
 exports.getSubscriptionById = async (req, res) => {
   const { id } = req.params;
   try {
     const pool = db.getPool();
+    await ensureSubscriptionColumns(pool);
 
     let subs = [];
     try {
       const [resSubs] = await pool.query(`
         SELECT s.*, o.created_at AS order_created_at,
-               v.name AS vendor_name, v.company_name AS vendor_company, v.phone AS vendor_phone
+               v.name AS vendor_name, v.company_name AS vendor_company, v.phone AS vendor_phone,
+               dla.product_name AS digital_account_product, dla.account_email AS digital_account_email,
+               dls.slot_number AS digital_slot_number
         FROM subscriptions s
         LEFT JOIN orders o ON s.order_id = o.id
         LEFT JOIN vendors v ON s.vendor_id = v.id
+        LEFT JOIN digital_license_accounts dla ON s.digital_account_id = dla.id
+        LEFT JOIN digital_license_slots dls ON s.digital_slot_id = dls.id
         WHERE s.id = ?
       `, [id]);
       subs = resSubs;
@@ -232,8 +353,34 @@ exports.getSubscriptionById = async (req, res) => {
 
     let renewals = [];
     try {
-      const [r] = await pool.query('SELECT * FROM subscription_renewals WHERE subscription_id = ? ORDER BY id DESC', [id]);
-      renewals = r || [];
+      const [r] = await pool.query(`
+        SELECT r.*,
+               dla.product_name AS digital_account_product,
+               dla.account_email AS digital_account_email,
+               dls.slot_number AS digital_slot_number
+        FROM subscription_renewals r
+        LEFT JOIN digital_license_accounts dla ON r.digital_account_id = dla.id
+        LEFT JOIN digital_license_slots dls ON r.digital_slot_id = dls.id
+        WHERE r.subscription_id = ?
+        ORDER BY r.id DESC
+      `, [id]);
+
+      renewals = (r || []).map(row => {
+        const isCurrentOrOnly = row.status === 'Current' || (r && r.length === 1);
+        const accGiven = (row.account_given && row.account_given.trim())
+          ? row.account_given
+          : (isCurrentOrOnly ? (sub.account_given || '') : '');
+        const digEmail = row.digital_account_email || (isCurrentOrOnly ? (sub.digital_account_email || '') : '');
+        const digSlot = row.digital_slot_number || (isCurrentOrOnly ? (sub.digital_slot_number || null) : null);
+        const digProd = row.digital_account_product || (isCurrentOrOnly ? (sub.digital_account_product || '') : '');
+        return {
+          ...row,
+          account_given: accGiven,
+          digital_account_email: digEmail,
+          digital_slot_number: digSlot,
+          digital_account_product: digProd
+        };
+      });
     } catch (renErr) {
       console.warn('Renewals table query skipped:', renErr.message);
     }
@@ -273,12 +420,14 @@ const sendSubscriptionLicenseEmail = async ({
   validityDays,
   expiryDate,
   orderId,
-  notes
+  customerNotes
 }) => {
   if (!email || !email.trim()) return false;
 
   const appName = process.env.APP_NAME || 'ElitePassBD';
-  const subject = `Your License Key & Access Details - ${productName} - ${appName}`;
+  const subject = licenseKey
+    ? `Your License Key & Access Details - ${productName} - ${appName}`
+    : `Your Subscription Details & Usage Rules - ${productName} - ${appName}`;
 
   const html = `
     <!DOCTYPE html>
@@ -337,6 +486,7 @@ const sendSubscriptionLicenseEmail = async ({
                   Your subscription has been successfully created. Your official digital license key / account credentials and plan details are below:
                 </p>
 
+                ${licenseKey ? `
                 <!-- License Key Box -->
                 <div class="key-box" style="margin: 10px 0; background-color: #0f172a; border: 1.5px dashed #10b981; border-radius: 6px; padding: 8px 10px; text-align: left; box-sizing: border-box; width: 100%;">
                   <div style="font-size: 9.5px; text-transform: uppercase; color: #34d399; font-weight: 700; letter-spacing: 0.6px; margin-bottom: 4px;">
@@ -345,7 +495,7 @@ const sendSubscriptionLicenseEmail = async ({
                   <div style="background-color: #1e293b; padding: 8px 10px; border-radius: 4px; display: block; width: 100%; box-sizing: border-box; border: 1px solid #334155; text-align: left;">
                     ${formatLicenseKeyHtml(licenseKey, true)}
                   </div>
-                </div>
+                </div>` : ''}
 
                 <!-- Details Table -->
                 <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 14px; box-sizing: border-box; width: 100%;">
@@ -378,11 +528,11 @@ const sendSubscriptionLicenseEmail = async ({
                   </table>
                 </div>
 
-                ${notes ? `
-                <!-- Notes Box -->
+                ${customerNotes ? `
+                <!-- Customer Notes Box -->
                 <div style="background-color: #0f172a; border: 1px solid #334155; border-left: 3px solid #10b981; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 11.5px; color: #cbd5e1; word-break: normal; overflow-wrap: break-word; box-sizing: border-box; width: 100%;">
-                  <div style="font-weight: 700; color: #34d399; margin-bottom: 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">Subscription Notes:</div>
-                  <div style="line-height: 1.5; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word;">${notes}</div>
+                  <div style="font-weight: 700; color: #34d399; margin-bottom: 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">Customer Notes / Instructions:</div>
+                  <div style="line-height: 1.5; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word; white-space: pre-wrap;">${customerNotes}</div>
                 </div>` : ''}
 
                 ${rules ? formatRulesHtml(rules, true) : ''}
@@ -401,7 +551,7 @@ const sendSubscriptionLicenseEmail = async ({
     </html>
   `;
 
-  const text = `Hello ${customerName},\n\nYour subscription for ${productName} (${packagePlan}) has been activated.\n\nLicense Key / Credentials: ${licenseKey}\nExpiry Date: ${expiryDate}\n${notes ? `\nNotes: ${notes}\n` : ''}${rules ? `\nRules: ${rules}\n` : ''}${getWhatsAppContactText()}`;
+  const text = `Hello ${customerName || 'Valued Customer'},\n\nYour subscription for ${productName} (${packagePlan}) has been activated.\n\n${licenseKey ? `License Key / Credentials: ${licenseKey}\n` : ''}Expiry Date: ${expiryDate}\n${customerNotes ? `\nCustomer Notes:\n${customerNotes}\n` : ''}${rules ? `\nProduct Usage Rules:\n${rules}\n` : ''}${getWhatsAppContactText()}`;
 
   return await sendEmail({
     to: email.trim(),
@@ -427,7 +577,7 @@ const sendSubscriptionRenewalEmail = async ({
   amount,
   orderId,
   subscriptionId,
-  notes
+  customerNotes
 }) => {
   if (!email || !email.trim()) return false;
 
@@ -513,6 +663,13 @@ const sendSubscriptionRenewalEmail = async ({
                   </div>
                 </div>` : ''}
 
+                ${customerNotes ? `
+                <!-- Customer Notes Box -->
+                <div style="background-color: #0f172a; border: 1px solid #334155; border-left: 3px solid #10b981; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 11.5px; color: #cbd5e1; word-break: normal; overflow-wrap: break-word; box-sizing: border-box; width: 100%;">
+                  <div style="font-weight: 700; color: #34d399; margin-bottom: 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">Renewal Notes / Instructions:</div>
+                  <div style="line-height: 1.5; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word; white-space: pre-wrap;">${customerNotes}</div>
+                </div>` : ''}
+
                 <!-- Details Table -->
                 <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 14px; box-sizing: border-box; width: 100%;">
                   <table style="width: 100%; font-size: 12px; color: #cbd5e1; border-collapse: collapse;">
@@ -554,13 +711,6 @@ const sendSubscriptionRenewalEmail = async ({
                   </table>
                 </div>
 
-                ${notes ? `
-                <!-- Notes Box -->
-                <div style="background-color: #0f172a; border: 1px solid #334155; border-left: 3px solid #10b981; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 11.5px; color: #cbd5e1; word-break: normal; overflow-wrap: break-word; box-sizing: border-box; width: 100%;">
-                  <div style="font-weight: 700; color: #34d399; margin-bottom: 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">Renewal Notes:</div>
-                  <div style="line-height: 1.5; color: #ffffff; font-size: 12px; word-break: normal; overflow-wrap: break-word;">${notes}</div>
-                </div>` : ''}
-
                 ${rules ? formatRulesHtml(rules, true) : ''}
 
                 <!-- WhatsApp Support Contact Box -->
@@ -577,7 +727,7 @@ const sendSubscriptionRenewalEmail = async ({
     </html>
   `;
 
-  const text = `Hello ${customerName || 'Valued Customer'},\n\nYour subscription for ${productName} (${packagePlan}) has been renewed.\n\nRenewal Date: ${formattedDate}\nValidity: ${validityDays} Days\nNew Expiry Date: ${formattedExpiry}\n${notes ? `\nNotes: ${notes}\n` : ''}${licenseKey ? `License Key / Credentials: ${licenseKey}\n` : ''}${rules ? `Rules: ${rules}\n` : ''}${getWhatsAppContactText()}`;
+  const text = `Hello ${customerName || 'Valued Customer'},\n\nYour subscription for ${productName} (${packagePlan}) has been renewed.\n\nRenewal Date: ${formattedDate}\nValidity: ${validityDays} Days\nNew Expiry Date: ${formattedExpiry}\n${licenseKey ? `License Key / Credentials: ${licenseKey}\n` : ''}${customerNotes ? `Renewal Notes: ${customerNotes}\n` : ''}${rules ? `Rules: ${rules}\n` : ''}${getWhatsAppContactText()}`;
 
   return await sendEmail({
     to: email.trim(),
@@ -604,10 +754,13 @@ exports.createSubscription = async (req, res) => {
     selling_price,
     payment_status,
     notes,
+    customer_notes,
+    admin_notes,
     order_id,
     vendor_id,
     vendor_price,
-    digital_account_id
+    digital_account_id,
+    send_email
   } = req.body;
 
   if (!customer_name || !whatsapp_number || !product_name || !package_plan) {
@@ -615,13 +768,14 @@ exports.createSubscription = async (req, res) => {
   }
 
   const pool = db.getPool();
+  await ensureSubscriptionColumns(pool);
   const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
 
     let finalAccountGiven = account_given || '';
-    let finalRules = license_rules || '';
+    let finalRules = (license_rules && license_rules.trim()) ? license_rules.trim() : '';
 
     // If a pre-loaded license was selected, fetch it and verify it's available
     if (license_id) {
@@ -631,23 +785,9 @@ exports.createSubscription = async (req, res) => {
       );
       if (licRows.length > 0) {
         finalAccountGiven = licRows[0].license_key;
-        if (licRows[0].rules) {
+        if (!finalRules && licRows[0].rules) {
           finalRules = licRows[0].rules;
         }
-      }
-    } else if (digital_account_id && !finalAccountGiven) {
-      // If a digital license manager account was selected and account_given is empty, auto-populate credentials
-      const [dlaRows] = await connection.query(
-        'SELECT account_email, account_password, two_factor_key FROM digital_license_accounts WHERE id = ?',
-        [parseInt(digital_account_id, 10)]
-      );
-      if (dlaRows.length > 0) {
-        const dAcc = dlaRows[0];
-        const parts = [`Email: ${dAcc.account_email}`, `Password: ${dAcc.account_password}`];
-        if (dAcc.two_factor_key && dAcc.two_factor_key.trim()) {
-          parts.push(`2FA: ${dAcc.two_factor_key.trim()}`);
-        }
-        finalAccountGiven = parts.join(' | ');
       }
     }
 
@@ -677,6 +817,8 @@ exports.createSubscription = async (req, res) => {
       }
     }
 
+    const cleanEmail = (email && typeof email === 'string' && email.trim()) ? email.trim() : null;
+
     let finalOrderId = order_id || null;
     let orderItemId = null;
 
@@ -686,8 +828,8 @@ exports.createSubscription = async (req, res) => {
         let userId = null;
 
         // 1. Find or create user
-        if (email && email.trim()) {
-          const [userCheck] = await connection.query('SELECT id FROM users WHERE email = ?', [email.trim()]);
+        if (cleanEmail) {
+          const [userCheck] = await connection.query('SELECT id FROM users WHERE email = ?', [cleanEmail]);
           if (userCheck.length > 0) {
             userId = userCheck[0].id;
           } else {
@@ -696,14 +838,30 @@ exports.createSubscription = async (req, res) => {
             const hashedPassword = await bcrypt.hash(randomPassword, 10);
             const [newUserRes] = await connection.query(
               'INSERT INTO users (name, email, password, role, whatsapp_number) VALUES (?, ?, ?, "user", ?)',
-              [customer_name, email.trim(), hashedPassword, whatsapp_number]
+              [customer_name, cleanEmail, hashedPassword, whatsapp_number]
             );
             userId = newUserRes.insertId;
           }
         } else {
-          // Fallback to Admin User or system user
-          const [adminCheck] = await connection.query('SELECT id FROM users WHERE role = "admin" LIMIT 1');
-          userId = adminCheck.length > 0 ? adminCheck[0].id : 1;
+          // If no customer email provided, check if a non-admin user exists with this phone number
+          let phoneUserId = null;
+          if (whatsapp_number && whatsapp_number.trim()) {
+            const [phoneCheck] = await connection.query(
+              'SELECT id FROM users WHERE whatsapp_number = ? AND role != "admin" LIMIT 1',
+              [whatsapp_number.trim()]
+            );
+            if (phoneCheck.length > 0) {
+              phoneUserId = phoneCheck[0].id;
+            }
+          }
+
+          if (phoneUserId) {
+            userId = phoneUserId;
+          } else {
+            // Fallback to Admin User for orders.user_id FK constraint only (delivery_email remains null)
+            const [adminCheck] = await connection.query('SELECT id FROM users WHERE role = "admin" LIMIT 1');
+            userId = adminCheck.length > 0 ? adminCheck[0].id : 1;
+          }
         }
 
         // 2. Find product_id
@@ -728,14 +886,15 @@ exports.createSubscription = async (req, res) => {
           whatsapp_number,
           customer_source || 'Manual Order',
           payment_status || 'Paid',
-          email || null,
-          notes || null,
+          cleanEmail,
+          customer_notes ? customer_notes.trim() : null,
           ordStatus
         ]);
 
         finalOrderId = ordRes.insertId;
 
         // 4. Create Order Item
+        const safeActivation = finalAccountGiven ? String(finalAccountGiven).slice(0, 250) : null;
         const [ordItemRes] = await connection.query(`
           INSERT INTO order_items (order_id, product_id, quantity, price, package_name, selected_activation)
           VALUES (?, ?, 1, ?, ?, ?)
@@ -744,7 +903,7 @@ exports.createSubscription = async (req, res) => {
           productId,
           parseFloat(selling_price) || 0,
           package_plan,
-          finalAccountGiven || null
+          safeActivation
         ]);
         orderItemId = ordItemRes.insertId;
       } catch (ordErr) {
@@ -760,17 +919,21 @@ exports.createSubscription = async (req, res) => {
       );
     }
 
+    const finalAdminNotes = admin_notes ? admin_notes.trim() : (notes ? notes.trim() : null);
+    const finalCustomerNotes = customer_notes ? customer_notes.trim() : null;
+
     const [subResult] = await connection.query(`
       INSERT INTO subscriptions (
         customer_name, whatsapp_number, email, product_name, package_plan,
         customer_source, purchase_date, validity_days, expiry_date, account_given,
-        selling_price, payment_status, status, notes, order_id, vendor_id, vendor_price,
-        digital_account_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        license_rules,
+        selling_price, payment_status, status, notes, customer_notes, admin_notes,
+        order_id, vendor_id, vendor_price, digital_account_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       customer_name,
       whatsapp_number,
-      email || null,
+      cleanEmail,
       product_name,
       package_plan,
       customer_source || 'Manual',
@@ -778,10 +941,13 @@ exports.createSubscription = async (req, res) => {
       vDays,
       formattedEDate,
       finalAccountGiven || null,
+      finalRules || null,
       parseFloat(selling_price) || 0,
       payment_status || 'Paid',
       initialStatus,
-      notes || null,
+      finalAdminNotes,
+      finalCustomerNotes,
+      finalAdminNotes,
       finalOrderId,
       vendor_id ? parseInt(vendor_id, 10) : null,
       vendor_price !== undefined && vendor_price !== null && vendor_price !== '' ? parseFloat(vendor_price) : 0.00,
@@ -808,7 +974,7 @@ exports.createSubscription = async (req, res) => {
         assignedSlotId = slot.id;
         assignedSlotNumber = slot.slot_number;
         const slotNotes = `Assigned via Subscription #${subscriptionId}${finalOrderId ? ` (Order #${finalOrderId})` : ''}`;
-        const assignedRecipient = (email && email.trim()) ? email.trim() : (whatsapp_number ? whatsapp_number.trim() : customer_name.trim());
+        const assignedRecipient = cleanEmail || (whatsapp_number ? whatsapp_number.trim() : customer_name.trim());
 
         await connection.query(`
           UPDATE digital_license_slots SET
@@ -841,31 +1007,58 @@ exports.createSubscription = async (req, res) => {
     }
 
     // Add initial record in subscription_renewals
-    await connection.query(`
-      INSERT INTO subscription_renewals (subscription_id, start_date, end_date, validity_days, amount, status, notes)
-      VALUES (?, ?, ?, ?, ?, 'Current', 'Initial purchase')
-    `, [
-      subscriptionId,
-      formattedPDate,
-      formattedEDate,
-      vDays,
-      parseFloat(selling_price) || 0
-    ]);
+    try {
+      await connection.query(`
+        INSERT INTO subscription_renewals (
+          subscription_id, start_date, end_date, validity_days, amount, status, notes,
+          customer_notes, admin_notes, license_rules, account_given, digital_account_id, digital_slot_id
+        )
+        VALUES (?, ?, ?, ?, ?, 'Current', ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        subscriptionId,
+        formattedPDate,
+        formattedEDate,
+        vDays,
+        parseFloat(selling_price) || 0,
+        finalAdminNotes || 'Initial purchase',
+        finalCustomerNotes,
+        finalAdminNotes,
+        finalRules || null,
+        finalAccountGiven || null,
+        parsedAccId || null,
+        assignedSlotId || null
+      ]);
+    } catch (renErr) {
+      console.warn('Initial subscription_renewals insert fallback:', renErr.message);
+      await connection.query(`
+        INSERT INTO subscription_renewals (subscription_id, start_date, end_date, validity_days, amount, status, notes, account_given)
+        VALUES (?, ?, ?, ?, ?, 'Current', 'Initial purchase', ?)
+      `, [
+        subscriptionId,
+        formattedPDate,
+        formattedEDate,
+        vDays,
+        parseFloat(selling_price) || 0,
+        finalAccountGiven || null
+      ]);
+    }
 
     await connection.commit();
 
-    // Trigger Purchase Confirmation Email to customer's email address if order created
-    if (finalOrderId) {
+    // Trigger Purchase Confirmation Email to customer's email address ONLY if provided and send_email is enabled
+    const shouldSendEmail = (send_email === undefined || send_email === null || send_email === true || send_email === 'true' || send_email === 1 || send_email === '1');
+
+    if (finalOrderId && shouldSendEmail && cleanEmail) {
       const { sendPurchaseConfirmationEmail } = require('../services/purchaseEmailService');
       sendPurchaseConfirmationEmail(finalOrderId).catch(emailErr => {
         console.error('Failed to send purchase email for manual subscription order:', emailErr.message);
       });
     }
 
-    // Trigger License Details Email if customer email provided and license key / account credentials present
-    if (email && email.trim() && finalAccountGiven) {
+    // Trigger License Details Email if send_email is enabled, customer email provided, and license key / account credentials OR rules present
+    if (shouldSendEmail && cleanEmail && (finalAccountGiven || finalRules)) {
       sendSubscriptionLicenseEmail({
-        email: email.trim(),
+        email: cleanEmail,
         customerName: customer_name,
         productName: product_name,
         packagePlan: package_plan,
@@ -875,7 +1068,7 @@ exports.createSubscription = async (req, res) => {
         validityDays: vDays,
         expiryDate: formattedEDate,
         orderId: finalOrderId,
-        notes: notes || null
+        customerNotes: finalCustomerNotes
       }).catch(mailErr => {
         console.error('Failed to send subscription license email:', mailErr.message);
       });
@@ -908,10 +1101,13 @@ exports.updateSubscription = async (req, res) => {
     validity_days,
     expiry_date,
     account_given,
+    license_rules,
     selling_price,
     payment_status,
     status,
     notes,
+    customer_notes,
+    admin_notes,
     order_id,
     vendor_id,
     vendor_price,
@@ -998,6 +1194,7 @@ exports.updateSubscription = async (req, res) => {
         validity_days = COALESCE(?, validity_days),
         expiry_date = COALESCE(?, expiry_date),
         account_given = ?,
+        license_rules = COALESCE(?, license_rules),
         selling_price = COALESCE(?, selling_price),
         payment_status = COALESCE(?, payment_status),
         status = COALESCE(?, status),
@@ -1005,6 +1202,8 @@ exports.updateSubscription = async (req, res) => {
         vendor_id = ?,
         vendor_price = COALESCE(?, vendor_price),
         notes = ?,
+        customer_notes = ?,
+        admin_notes = ?,
         digital_account_id = ?,
         digital_slot_id = ?
       WHERE id = ?
@@ -1019,17 +1218,35 @@ exports.updateSubscription = async (req, res) => {
       validity_days ? parseInt(validity_days) : undefined,
       eDate,
       account_given !== undefined ? account_given : null,
+      license_rules !== undefined ? (license_rules ? license_rules.trim() : null) : undefined,
       selling_price !== undefined ? parseFloat(selling_price) : undefined,
       payment_status,
       status,
       order_id !== undefined ? (order_id ? parseInt(order_id, 10) : null) : undefined,
       vendor_id !== undefined ? (vendor_id ? parseInt(vendor_id, 10) : null) : null,
       vendor_price !== undefined && vendor_price !== '' ? parseFloat(vendor_price) : undefined,
-      notes !== undefined ? notes : null,
+      admin_notes !== undefined ? admin_notes : (notes !== undefined ? notes : null),
+      customer_notes !== undefined ? customer_notes : null,
+      admin_notes !== undefined ? admin_notes : (notes !== undefined ? notes : null),
       digital_account_id !== undefined ? (digital_account_id ? parseInt(digital_account_id, 10) : null) : currSub.digital_account_id,
       newSlotId,
       id
     ]);
+
+    // Sync account_given and digital slot info to Current renewal record
+    try {
+      const finalAcc = account_given !== undefined ? account_given : currSub.account_given;
+      const finalDigitalAcc = digital_account_id !== undefined ? (digital_account_id ? parseInt(digital_account_id, 10) : null) : currSub.digital_account_id;
+      await pool.query(`
+        UPDATE subscription_renewals
+        SET account_given = ?,
+            digital_account_id = ?,
+            digital_slot_id = ?
+        WHERE subscription_id = ? AND status = 'Current'
+      `, [finalAcc, finalDigitalAcc, newSlotId, id]);
+    } catch (renUpErr) {
+      console.warn('Could not sync update to Current renewal:', renUpErr.message);
+    }
 
     res.json({ message: 'Subscription updated successfully!' });
   } catch (err) {
@@ -1046,6 +1263,8 @@ exports.renewSubscription = async (req, res) => {
     new_expiry_date,
     payment_amount,
     notes,
+    customer_notes,
+    admin_notes,
     package_plan,
     license_id,
     account_given,
@@ -1054,6 +1273,7 @@ exports.renewSubscription = async (req, res) => {
   } = req.body;
 
   const pool = db.getPool();
+  await ensureSubscriptionColumns(pool);
   const connection = await pool.getConnection();
 
   try {
@@ -1115,19 +1335,33 @@ exports.renewSubscription = async (req, res) => {
       ? customer_email.trim()
       : (sub.email || '').trim();
 
+    const finalCustomerNotes = customer_notes !== undefined ? (customer_notes ? customer_notes.trim() : null) : null;
+    const finalAdminNotes = admin_notes !== undefined 
+      ? (admin_notes ? admin_notes.trim() : null) 
+      : (notes ? notes.trim() : null);
+
     // Try logging into subscription_renewals if table exists
     try {
       await connection.query('UPDATE subscription_renewals SET status = "Previous" WHERE subscription_id = ?', [id]);
       await connection.query(`
-        INSERT INTO subscription_renewals (subscription_id, start_date, end_date, validity_days, amount, status, notes)
-        VALUES (?, ?, ?, ?, ?, 'Current', ?)
+        INSERT INTO subscription_renewals (
+          subscription_id, start_date, end_date, validity_days, amount, status, notes,
+          customer_notes, admin_notes, license_rules, account_given, digital_account_id, digital_slot_id
+        )
+        VALUES (?, ?, ?, ?, ?, 'Current', ?, ?, ?, ?, ?, ?, ?)
       `, [
         id,
         formattedRDate,
         formattedEDate,
         vDays,
         amount,
-        notes || 'Subscription renewed'
+        finalAdminNotes || 'Subscription renewed',
+        finalCustomerNotes,
+        finalAdminNotes,
+        finalRules || null,
+        finalAccountGiven || null,
+        sub.digital_account_id || null,
+        sub.digital_slot_id || null
       ]);
     } catch (renErr) {
       console.warn('Skipping subscription_renewals log:', renErr.message);
@@ -1142,7 +1376,10 @@ exports.renewSubscription = async (req, res) => {
         selling_price = ?,
         package_plan = COALESCE(?, package_plan),
         account_given = ?,
+        license_rules = COALESCE(?, license_rules),
         email = COALESCE(?, email),
+        customer_notes = COALESCE(?, customer_notes),
+        admin_notes = COALESCE(?, admin_notes),
         payment_status = 'Paid',
         status = 'Renewed',
         updated_at = NOW()
@@ -1154,7 +1391,10 @@ exports.renewSubscription = async (req, res) => {
       amount,
       package_plan || null,
       finalAccountGiven || null,
+      finalRules || null,
       targetEmail || null,
+      finalCustomerNotes !== null ? finalCustomerNotes : null,
+      finalAdminNotes !== null ? finalAdminNotes : null,
       id
     ]);
 
@@ -1176,7 +1416,7 @@ exports.renewSubscription = async (req, res) => {
         amount: amount,
         orderId: sub.order_id,
         subscriptionId: id,
-        notes: notes || null
+        customerNotes: finalCustomerNotes
       }).then(sent => {
         console.log(`[Subscription Renewal] Confirmation email sent to ${targetEmail}:`, sent);
       }).catch(mailErr => {
@@ -1265,5 +1505,137 @@ exports.updateSettings = async (req, res) => {
   } catch (err) {
     console.error('Update settings error:', err);
     res.status(500).json({ message: 'Failed to update settings.' });
+  }
+};
+
+exports.updateSubscriptionStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ message: 'Status is required.' });
+  }
+
+  const validStatuses = ['Active', 'Expiring Soon', 'Expired', 'Renewed', 'Cancelled', 'Not Renewed'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ message: `Invalid status. Valid values are: ${validStatuses.join(', ')}` });
+  }
+
+  try {
+    const pool = db.getPool();
+    const [subCheck] = await pool.query('SELECT id, status, customer_name FROM subscriptions WHERE id = ?', [id]);
+    if (subCheck.length === 0) {
+      return res.status(404).json({ message: 'Subscription not found.' });
+    }
+
+    await pool.query('UPDATE subscriptions SET status = ? WHERE id = ?', [status, id]);
+
+    res.json({
+      message: `Subscription status updated to "${status}".`,
+      id: parseInt(id, 10),
+      status
+    });
+  } catch (err) {
+    console.error('Update subscription status error:', err);
+    res.status(500).json({ message: 'Failed to update subscription status.' });
+  }
+};
+
+exports.getNoteTemplates = async (req, res) => {
+  try {
+    const pool = db.getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS subscription_note_templates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        category VARCHAR(50) DEFAULT 'customer',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    const [rows] = await pool.query('SELECT * FROM subscription_note_templates ORDER BY id ASC');
+    res.json(rows);
+  } catch (err) {
+    console.error('Get note templates error:', err);
+    res.status(500).json({ message: 'Failed to fetch note templates.' });
+  }
+};
+
+exports.createNoteTemplate = async (req, res) => {
+  const { title, content, category } = req.body;
+  if (!title || !title.trim()) {
+    return res.status(400).json({ message: 'Template title is required.' });
+  }
+  if (!content || !content.trim()) {
+    return res.status(400).json({ message: 'Template content is required.' });
+  }
+
+  try {
+    const pool = db.getPool();
+    const [result] = await pool.query(
+      'INSERT INTO subscription_note_templates (title, content, category) VALUES (?, ?, ?)',
+      [title.trim(), content.trim(), category || 'customer']
+    );
+
+    res.status(201).json({
+      message: 'Template created successfully!',
+      template: {
+        id: result.insertId,
+        title: title.trim(),
+        content: content.trim(),
+        category: category || 'customer'
+      }
+    });
+  } catch (err) {
+    console.error('Create note template error:', err);
+    res.status(500).json({ message: 'Failed to create note template.' });
+  }
+};
+
+exports.updateNoteTemplate = async (req, res) => {
+  const { id } = req.params;
+  const { title, content, category } = req.body;
+
+  if (!title || !title.trim()) {
+    return res.status(400).json({ message: 'Template title is required.' });
+  }
+  if (!content || !content.trim()) {
+    return res.status(400).json({ message: 'Template content is required.' });
+  }
+
+  try {
+    const pool = db.getPool();
+    const [check] = await pool.query('SELECT id FROM subscription_note_templates WHERE id = ?', [id]);
+    if (check.length === 0) {
+      return res.status(404).json({ message: 'Template not found.' });
+    }
+
+    await pool.query(
+      'UPDATE subscription_note_templates SET title = ?, content = ?, category = COALESCE(?, category) WHERE id = ?',
+      [title.trim(), content.trim(), category || null, id]
+    );
+
+    res.json({ message: 'Template updated successfully!' });
+  } catch (err) {
+    console.error('Update note template error:', err);
+    res.status(500).json({ message: 'Failed to update note template.' });
+  }
+};
+
+exports.deleteNoteTemplate = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pool = db.getPool();
+    const [check] = await pool.query('SELECT id FROM subscription_note_templates WHERE id = ?', [id]);
+    if (check.length === 0) {
+      return res.status(404).json({ message: 'Template not found.' });
+    }
+
+    await pool.query('DELETE FROM subscription_note_templates WHERE id = ?', [id]);
+    res.json({ message: 'Template deleted successfully!' });
+  } catch (err) {
+    console.error('Delete note template error:', err);
+    res.status(500).json({ message: 'Failed to delete note template.' });
   }
 };

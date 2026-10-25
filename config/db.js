@@ -240,8 +240,9 @@ async function createTables() {
       account_given TEXT DEFAULT NULL,
       selling_price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
       payment_status ENUM('Paid', 'Pending', 'Failed') DEFAULT 'Paid',
-      status ENUM('Active', 'Expiring Soon', 'Expired', 'Renewed', 'Cancelled') DEFAULT 'Active',
       notes TEXT DEFAULT NULL,
+      customer_notes TEXT DEFAULT NULL,
+      admin_notes TEXT DEFAULT NULL,
       order_id INT DEFAULT NULL,
       vendor_id INT DEFAULT NULL,
       vendor_price DECIMAL(10, 2) DEFAULT 0.00,
@@ -263,6 +264,8 @@ async function createTables() {
       amount DECIMAL(10, 2) NOT NULL,
       status ENUM('Current', 'Previous') DEFAULT 'Current',
       notes TEXT DEFAULT NULL,
+      customer_notes TEXT DEFAULT NULL,
+      admin_notes TEXT DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
     );
@@ -290,11 +293,23 @@ async function createTables() {
     );
   `;
 
+  const subscriptionNoteTemplatesTable = `
+    CREATE TABLE IF NOT EXISTS subscription_note_templates (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      content TEXT NOT NULL,
+      category VARCHAR(50) DEFAULT 'customer',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+  `;
+
   const vendorsTable = `
     CREATE TABLE IF NOT EXISTS vendors (
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       company_name VARCHAR(255) DEFAULT NULL,
+      website VARCHAR(255) DEFAULT NULL,
       phone VARCHAR(50) DEFAULT NULL,
       whatsapp VARCHAR(50) DEFAULT NULL,
       telegram VARCHAR(100) DEFAULT NULL,
@@ -327,6 +342,7 @@ async function createTables() {
   await pool.query(subscriptionRenewalsTable);
   await pool.query(subscriptionRemindersTable);
   await pool.query(subscriptionSettingsTable);
+  await pool.query(subscriptionNoteTemplatesTable);
   await pool.query(vendorsTable);
 
   const defaultMarqueeItems = [
@@ -387,6 +403,39 @@ async function createTables() {
       ('admin_email', 'admin@elitepassbd.com'),
       ('admin_whatsapp', '')
   `);
+
+  try {
+    const [existingNoteTpls] = await pool.query('SELECT COUNT(*) as cnt FROM subscription_note_templates');
+    if (existingNoteTpls && existingNoteTpls[0] && existingNoteTpls[0].cnt === 0) {
+      const defaultTemplates = [
+        [
+          'লগইন ও ব্যবহার সংক্রান্ত নির্দেশনা (Login Guide)',
+          'আপনার সাবস্ক্রিপশনটি সক্রিয় করা হয়েছে। অনুগ্রহ করে আপনাকে প্রদত্ত ক্রেডেনশিয়াল (ইমেইল/পাসওয়ার্ড/লাইসেন্স) দিয়ে লগইন করুন। কোনো সমস্যা হলে আমাদের হোয়াটসঅ্যাপে সাথে সাথে যোগাযোগ করুন।'
+        ],
+        [
+          'পাসওয়ার্ড ও ইমেইল পরিবর্তন না করার সতর্কবার্তা (Do Not Change Email/Pass)',
+          'বিশেষ সতর্কবার্তা: অনুগ্রহ করে একাউন্টের পাসওয়ার্ড, ইমেইল, প্রোফাইল নাম বা কোনো সিকিউরিটি সেটিংস পরিবর্তন করবেন না। কোনো পরিবর্তন করা হলে ওয়ারেন্টি ও সার্ভিস বাতিল বলে গণ্য হবে।'
+        ],
+        [
+          'শেয়ার্ড একাউন্ট ব্যবহারের নিয়মাবলী (Single Device / Shared Rules)',
+          'এই একাউন্টটি শুধুমাত্র ১টি ডিভাইসে লগইন করে ব্যবহারের জন্য প্রযোজ্য। একই সাথে একাধিক ডিভাইসে লগইন বা ক্রেডেনশিয়াল অন্য কারো সাথে শেয়ার করা সম্পূর্ণ নিষিদ্ধ।'
+        ],
+        [
+          'ওয়ারেন্টি ও টেকনিক্যাল সাপোর্ট (Warranty & Support Policy)',
+          'সাবস্ক্রিপশনের সম্পূর্ণ মেয়াদজুড়ে আপনি আমাদের টেকনিক্যাল সাপোর্ট পাবেন। যেকোনো জটিলতায় আপনার অর্ডার নাম্বার উল্লেখ করে আমাদের সাথে যোগাযোগ করুন। ধন্যবাদ, ElitePassBD।'
+        ],
+        [
+          'রিনিউয়াল সংক্রান্ত নোটিশ ও নির্দেশনা (Renewal Notice)',
+          'আপনার সাবস্ক্রিপশন সফলভাবে রিনিউ করা হয়েছে এবং মেয়াদ বৃদ্ধি করা হয়েছে। নির্বিঘ্নে ব্যবহারের শুভকামনা রইল। যেকোনো প্রয়োজনে আমাদের সাপোর্ট টিম পাশে আছে।'
+        ]
+      ];
+      for (const [title, content] of defaultTemplates) {
+        await pool.query('INSERT INTO subscription_note_templates (title, content) VALUES (?, ?)', [title, content]);
+      }
+    }
+  } catch (seedErr) {
+    console.warn('[config/db.js] Error seeding note templates:', seedErr.message);
+  }
 
   console.log('Database tables verified/created successfully.');
 }
@@ -505,8 +554,14 @@ async function updateSchema() {
 
     const [selectedActivationCols] = await pool.query("SHOW COLUMNS FROM order_items LIKE 'selected_activation'");
     if (selectedActivationCols.length === 0) {
-      await pool.query("ALTER TABLE order_items ADD COLUMN selected_activation VARCHAR(255) DEFAULT NULL");
+      await pool.query("ALTER TABLE order_items ADD COLUMN selected_activation TEXT DEFAULT NULL");
       console.log("Added column 'selected_activation' to 'order_items' table.");
+    } else {
+      try {
+        await pool.query("ALTER TABLE order_items MODIFY COLUMN selected_activation TEXT DEFAULT NULL");
+      } catch (modActErr) {
+        // ignore
+      }
     }
 
     const [discountCols] = await pool.query("SHOW COLUMNS FROM products LIKE 'discount_percent'");
@@ -724,6 +779,10 @@ async function updateSchema() {
     } catch (e) {}
 
     try {
+      await pool.query("ALTER TABLE subscriptions MODIFY COLUMN status ENUM('Active', 'Expiring Soon', 'Expired', 'Renewed', 'Cancelled', 'Not Renewed') DEFAULT 'Active'");
+    } catch (e) {}
+
+    try {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS vendors (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -749,6 +808,12 @@ async function updateSchema() {
       if (tgCols.length === 0) {
         await pool.query("ALTER TABLE vendors ADD COLUMN telegram VARCHAR(100) DEFAULT NULL AFTER whatsapp");
         console.log("Added column 'telegram' to 'vendors' table.");
+      }
+
+      const [webCols] = await pool.query("SHOW COLUMNS FROM vendors LIKE 'website'");
+      if (webCols.length === 0) {
+        await pool.query("ALTER TABLE vendors ADD COLUMN website VARCHAR(255) DEFAULT NULL AFTER company_name");
+        console.log("Added column 'website' to 'vendors' table.");
       }
     } catch (err) {
       console.error("Error creating vendors table:", err.message);
@@ -784,8 +849,38 @@ async function updateSchema() {
         await pool.query("CREATE INDEX idx_sub_digital_acc ON subscriptions (digital_account_id)");
         console.log("Created index 'idx_sub_digital_acc' on 'subscriptions' table.");
       }
+
+      const [custNotesCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'customer_notes'");
+      if (custNotesCols.length === 0) {
+        await pool.query("ALTER TABLE subscriptions ADD COLUMN customer_notes TEXT DEFAULT NULL AFTER notes");
+        console.log("Added column 'customer_notes' to 'subscriptions' table.");
+      }
+
+      const [adminNotesCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'admin_notes'");
+      if (adminNotesCols.length === 0) {
+        await pool.query("ALTER TABLE subscriptions ADD COLUMN admin_notes TEXT DEFAULT NULL AFTER customer_notes");
+        console.log("Added column 'admin_notes' to 'subscriptions' table.");
+      }
+
+      const [renCustCols] = await pool.query("SHOW COLUMNS FROM subscription_renewals LIKE 'customer_notes'");
+      if (renCustCols.length === 0) {
+        await pool.query("ALTER TABLE subscription_renewals ADD COLUMN customer_notes TEXT DEFAULT NULL AFTER notes");
+        console.log("Added column 'customer_notes' to 'subscription_renewals' table.");
+      }
+
+      const [renAdminCols] = await pool.query("SHOW COLUMNS FROM subscription_renewals LIKE 'admin_notes'");
+      if (renAdminCols.length === 0) {
+        await pool.query("ALTER TABLE subscription_renewals ADD COLUMN admin_notes TEXT DEFAULT NULL AFTER customer_notes");
+        console.log("Added column 'admin_notes' to 'subscription_renewals' table.");
+      }
+
+      const [renAccCols] = await pool.query("SHOW COLUMNS FROM subscription_renewals LIKE 'account_given'");
+      if (renAccCols.length === 0) {
+        await pool.query("ALTER TABLE subscription_renewals ADD COLUMN account_given LONGTEXT DEFAULT NULL AFTER amount");
+        console.log("Added column 'account_given' to 'subscription_renewals' table.");
+      }
     } catch (subColErr) {
-      console.error("Error ensuring extra columns on subscriptions:", subColErr.message);
+      console.error("Error ensuring extra columns on subscriptions/renewals:", subColErr.message);
     }
 
     try {
@@ -795,7 +890,7 @@ async function updateSchema() {
           product_id INT DEFAULT NULL,
           product_name VARCHAR(255) NOT NULL,
           account_email VARCHAR(255) NOT NULL,
-          account_password VARCHAR(255) NOT NULL,
+          account_password VARCHAR(255) DEFAULT '',
           recovery_email VARCHAR(255) DEFAULT NULL,
           two_factor_status ENUM('Enabled', 'Disabled') DEFAULT 'Enabled',
           two_factor_key TEXT DEFAULT NULL,
@@ -842,6 +937,12 @@ async function updateSchema() {
       if (orderIdCols.length === 0) {
         await pool.query("ALTER TABLE digital_license_slots ADD COLUMN order_id INT DEFAULT NULL AFTER slot_number");
         console.log("Added column 'order_id' to 'digital_license_slots' table.");
+      }
+
+      try {
+        await pool.query("ALTER TABLE digital_license_accounts MODIFY COLUMN account_password VARCHAR(255) DEFAULT ''");
+      } catch (alterPassErr) {
+        // Ignore if error
       }
     } catch (digLicenseErr) {
       console.error("Error ensuring digital license tables in schema:", digLicenseErr.message);

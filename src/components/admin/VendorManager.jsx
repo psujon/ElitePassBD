@@ -30,7 +30,8 @@ import {
   Loader2,
   DollarSign,
   Users,
-  Send
+  Send,
+  Globe
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -68,6 +69,7 @@ export default function VendorManager() {
   const initialFormState = {
     name: '',
     company_name: '',
+    website: '',
     phone: '',
     whatsapp: '',
     telegram: '',
@@ -109,6 +111,7 @@ export default function VendorManager() {
         !q ||
         (v.name && v.name.toLowerCase().includes(q)) ||
         (v.company_name && v.company_name.toLowerCase().includes(q)) ||
+        (v.website && v.website.toLowerCase().includes(q)) ||
         (v.phone && v.phone.toLowerCase().includes(q)) ||
         (v.whatsapp && v.whatsapp.toLowerCase().includes(q)) ||
         (v.telegram && v.telegram.toLowerCase().includes(q)) ||
@@ -144,6 +147,7 @@ export default function VendorManager() {
     setFormData({
       name: vendor.name || '',
       company_name: vendor.company_name || '',
+      website: vendor.website || '',
       phone: vendor.phone || '',
       whatsapp: vendor.whatsapp || '',
       telegram: vendor.telegram || '',
@@ -446,9 +450,23 @@ export default function VendorManager() {
                             </div>
                             {vendor.company_name && (
                               <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                                <Building2 className="w-3 h-3 text-slate-400" />
-                                {vendor.company_name}
+                                <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span className="truncate max-w-[150px]">{vendor.company_name}</span>
                               </div>
+                            )}
+                            {vendor.website && (
+                              <a
+                                href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-[10.5px] text-purple-600 hover:text-purple-700 hover:underline font-medium mt-0.5"
+                                title={`Visit ${vendor.website}`}
+                              >
+                                <Globe className="w-3 h-3 text-purple-500 shrink-0" />
+                                <span className="truncate max-w-[130px]">{vendor.website.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                                <ExternalLink className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                              </a>
                             )}
                           </div>
                         </div>
@@ -598,9 +616,23 @@ export default function VendorManager() {
                         </h4>
                         {vendor.company_name && (
                           <p className="text-xs text-slate-500 flex items-center gap-1">
-                            <Building2 className="w-3 h-3 text-slate-400" />
-                            {vendor.company_name}
+                            <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[150px]">{vendor.company_name}</span>
                           </p>
+                        )}
+                        {vendor.website && (
+                          <a
+                            href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-[11px] text-purple-600 hover:text-purple-700 hover:underline font-medium mt-0.5"
+                            title={`Visit ${vendor.website}`}
+                          >
+                            <Globe className="w-3 h-3 text-purple-500 shrink-0" />
+                            <span className="truncate max-w-[140px]">{vendor.website.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                            <ExternalLink className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                          </a>
                         )}
                       </div>
                     </div>
@@ -899,17 +931,41 @@ export default function VendorManager() {
                   />
                 </div>
 
-                {/* 11. Payment Details (2 cols) */}
-                <div className="col-span-1 sm:col-span-2 lg:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Payment Methods & Info{' '}
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      (bKash, Nagad, Binance Pay ID, USDT, Bank)
-                    </span>
+                {/* 11. Vendor Website */}
+                <div className="col-span-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">Vendor Website</label>
+                    {formData.website && (
+                      <a
+                        href={formData.website.startsWith('http') ? formData.website : `https://${formData.website}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-purple-600 hover:underline inline-flex items-center gap-0.5 font-medium"
+                      >
+                        Visit <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="https://vendor-website.com"
+                      value={formData.website}
+                      onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                      className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-purple-500 focus:bg-white text-xs transition-colors"
+                    />
+                    <Globe className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* 12. Payment Details */}
+                <div className="col-span-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 truncate" title="Payment Methods & Info (bKash, Nagad, Binance, Bank)">
+                    Payment Methods & Info
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. bKash (Personal): 01925xxxxxx, Binance Pay ID: 12345678"
+                    placeholder="bKash, Nagad, Binance ID, USDT..."
                     value={formData.payment_details}
                     onChange={(e) => setFormData({ ...formData, payment_details: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-purple-500 focus:bg-white text-xs transition-colors"
@@ -1050,6 +1106,22 @@ export default function VendorManager() {
                   <span className="text-slate-500">Email Address</span>
                   <a href={`mailto:${viewingVendor.email}`} className="font-medium text-purple-600 hover:underline">
                     {viewingVendor.email}
+                  </a>
+                </div>
+              )}
+
+              {viewingVendor.website && (
+                <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Website</span>
+                  <a
+                    href={viewingVendor.website.startsWith('http') ? viewingVendor.website : `https://${viewingVendor.website}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-purple-600 hover:underline inline-flex items-center gap-1.5"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-purple-500" />
+                    <span className="truncate max-w-[220px]">{viewingVendor.website}</span>
+                    <ExternalLink className="w-3 h-3 text-slate-400" />
                   </a>
                 </div>
               )}

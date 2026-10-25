@@ -586,16 +586,16 @@ export default function Home() {
                           <span className="text-xs text-slate-400 font-extrabold uppercase">No Image</span>
                         )}
 
-                        <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
+                        <div className="absolute top-1.5 sm:top-2 left-1.5 sm:left-2 right-1.5 sm:right-2 flex items-center justify-between gap-1 z-10 pointer-events-none">
                           {hasDiscount ? (
-                            <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
+                            <span className="bg-red-600 text-white text-[8px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-full shadow-md whitespace-nowrap shrink-0 leading-none flex items-center">
                               -{discountPercent}% OFF
                             </span>
                           ) : <div></div>}
 
                           {(prod.is_instant === 1 || prod.activation_process === 'Instant') && (
-                            <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5 border border-amber-300/80">
-                              ⚡ Instant
+                            <span className="bg-amber-400 text-slate-950 text-[7.5px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5 border border-amber-300/80 whitespace-nowrap shrink-0 leading-none">
+                              ⚡ Instant<span className="hidden min-[360px]:inline"> Delivery</span>
                             </span>
                           )}
                         </div>
@@ -805,16 +805,16 @@ export default function Home() {
                                 <span className="text-xs text-slate-400 font-extrabold uppercase">No Image</span>
                               )}
 
-                              <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10 pointer-events-none">
+                              <div className="absolute top-1.5 sm:top-2 left-1.5 sm:left-2 right-1.5 sm:right-2 flex items-center justify-between gap-1 z-10 pointer-events-none">
                                 {hasDiscount ? (
-                                  <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
+                                  <span className="bg-red-600 text-white text-[8px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-full shadow-md whitespace-nowrap shrink-0 leading-none flex items-center">
                                     -{discountPercent}% OFF
                                   </span>
                                 ) : <div></div>}
 
                                 {(prod.is_instant === 1 || prod.activation_process === 'Instant') && (
-                                  <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5 border border-amber-300/80">
-                                    ⚡ Instant
+                                  <span className="bg-amber-400 text-slate-950 text-[7.5px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5 border border-amber-300/80 whitespace-nowrap shrink-0 leading-none">
+                                    ⚡ Instant<span className="hidden min-[360px]:inline"> Delivery</span>
                                   </span>
                                 )}
                               </div>

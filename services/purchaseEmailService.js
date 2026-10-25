@@ -349,9 +349,9 @@ const generatePurchaseEmailHtml = (order, items) => {
                   </div>
 
                   ${(order.additional_notes || order.notes) ? `
-                  <!-- Order & Subscription Notes Box -->
+                  <!-- Order Notes Box -->
                   <div style="background-color: #0f172a; border-radius: 8px; padding: 10px 12px; border: 1px solid #334155; border-left: 3px solid #10b981; margin-bottom: 16px; font-size: 11.5px; line-height: 1.5; color: #cbd5e1; word-break: normal; overflow-wrap: break-word;">
-                    <div style="color: #34d399; font-weight: 700; margin-bottom: 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">Order & Subscription Notes:</div>
+                    <div style="color: #34d399; font-weight: 700; margin-bottom: 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;">Order Notes:</div>
                     <div style="color: #ffffff; font-size: 12px; line-height: 1.5;">${order.additional_notes || order.notes}</div>
                   </div>
                   ` : ''}
@@ -392,7 +392,7 @@ const sendPurchaseConfirmationEmail = async (orderId) => {
 
     // Fetch order details
     const [orders] = await pool.query(`
-      SELECT o.*, u.name as user_name, u.email as user_email
+      SELECT o.*, u.name as user_name, u.email as user_email, u.role as user_role
       FROM orders o
       JOIN users u ON o.user_id = u.id
       WHERE o.id = ?
@@ -404,10 +404,11 @@ const sendPurchaseConfirmationEmail = async (orderId) => {
     }
 
     const order = orders[0];
-    const recipientEmail = order.delivery_email || order.user_email;
+    // Never fall back to admin user's email if customer did not provide an email
+    const recipientEmail = order.delivery_email || (order.user_role !== 'admin' ? order.user_email : null);
 
-    if (!recipientEmail) {
-      console.warn(`[PurchaseEmailService] Order #${orderId} has no email address.`);
+    if (!recipientEmail || !recipientEmail.trim()) {
+      console.warn(`[PurchaseEmailService] Order #${orderId} has no customer email address. Skipping email.`);
       return false;
     }
 
@@ -457,10 +458,26 @@ const sendPurchaseConfirmationEmail = async (orderId) => {
     });
 
     if (sent) {
-      await pool.query('UPDATE orders SET purchase_email_sent = 1 WHERE id = ?', [orderId]);
+      try {
+        await pool.query('UPDATE orders SET purchase_email_sent = 1 WHERE id = ?', [orderId]);
+      } catch (updateErr) {
+        if (updateErr.code === 'ER_BAD_FIELD_ERROR' || updateErr.errno === 1054) {
+          try {
+            await pool.query("ALTER TABLE orders ADD COLUMN purchase_email_sent TINYINT DEFAULT 0");
+            await pool.query('UPDATE orders SET purchase_email_sent = 1 WHERE id = ?', [orderId]);
+          } catch (e) {
+            console.warn('[PurchaseEmailService] Could not auto-add purchase_email_sent column:', e.message);
+          }
+        }
+      }
       console.log(`[PurchaseEmailService] Purchase confirmation email successfully sent for Order #${orderId} to ${recipientEmail}`);
       return true;
     } else {
+      try {
+        await pool.query('UPDATE orders SET purchase_email_sent = 2 WHERE id = ?', [orderId]);
+      } catch (e) {
+        // ignore
+      }
       console.error(`[PurchaseEmailService] Failed to send purchase confirmation email for Order #${orderId}`);
       return false;
     }
