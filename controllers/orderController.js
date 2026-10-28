@@ -24,9 +24,12 @@ exports.createOrder = async (req, res) => {
     const cleanIp = firstIp.startsWith('::ffff:') ? firstIp.substring(7) : firstIp;
     const userAgent = req.headers['user-agent'] || '';
 
+    const [userRows] = await connection.query('SELECT name FROM users WHERE id = ?', [userId]);
+    const loggedUserName = userRows.length > 0 ? userRows[0].name : null;
+
     const [orderResult] = await connection.query(
-      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, client_ip, client_user_agent, coupon_code, discount_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [userId, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || null, cleanIp, userAgent, coupon_code || null, discount_amount ? parseFloat(discount_amount) : 0]
+      'INSERT INTO orders (user_id, customer_name, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, client_ip, client_user_agent, coupon_code, discount_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, loggedUserName, total_amount, shipping_address, phone, payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || null, cleanIp, userAgent, coupon_code || null, discount_amount ? parseFloat(discount_amount) : 0]
     );
     const orderId = orderResult.insertId;
 
@@ -180,7 +183,20 @@ exports.trackOrder = async (req, res) => {
   const userRole = req.user.role;
 
   try {
-    const [orders] = await db.query('SELECT * FROM orders WHERE id = ?', [id]);
+    const [orders] = await db.query(
+      `SELECT o.*, 
+              COALESCE(NULLIF(TRIM(o.customer_name), ''), u.name, 'Customer') AS user_name,
+              CASE 
+                WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
+                WHEN o.customer_name IS NOT NULL AND TRIM(o.customer_name) != '' THEN NULL
+                WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
+                ELSE u.email 
+              END AS user_email
+       FROM orders o
+       LEFT JOIN users u ON o.user_id = u.id
+       WHERE o.id = ?`,
+      [id]
+    );
     if (orders.length === 0) {
       return res.status(404).json({ message: 'Order not found.' });
     }
@@ -221,9 +237,16 @@ exports.trackOrder = async (req, res) => {
 exports.getAllOrders = async (req, res) => {
   try {
     const [orders] = await db.query(
-      `SELECT o.*, u.name as user_name, u.email as user_email 
+      `SELECT o.*, 
+              COALESCE(NULLIF(TRIM(o.customer_name), ''), u.name, 'Customer') AS user_name,
+              CASE 
+                WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
+                WHEN o.customer_name IS NOT NULL AND TRIM(o.customer_name) != '' THEN NULL
+                WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
+                ELSE u.email 
+              END AS user_email
        FROM orders o
-       JOIN users u ON o.user_id = u.id
+       LEFT JOIN users u ON o.user_id = u.id
        ORDER BY o.id DESC`
     );
 
@@ -668,8 +691,8 @@ exports.createGuestOrder = async (req, res) => {
     const userAgent = req.headers['user-agent'] || '';
 
     const [orderResult] = await connection.query(
-      'INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, client_ip, client_user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [userId, total_amount, shipping_address, phone || 'Not Provided', payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || guest_email || null, cleanIp, userAgent]
+      'INSERT INTO orders (user_id, customer_name, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, client_ip, client_user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, guest_name ? guest_name.trim() : null, total_amount, shipping_address, phone || 'Not Provided', payment_method || 'Cash on Delivery', additional_notes || null, delivery_email || guest_email || null, cleanIp, userAgent]
     );
     const orderId = orderResult.insertId;
 

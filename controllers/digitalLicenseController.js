@@ -9,6 +9,7 @@ async function ensureTables() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         product_id INT DEFAULT NULL,
         product_name VARCHAR(255) NOT NULL,
+        package_name VARCHAR(255) DEFAULT NULL,
         account_email VARCHAR(255) NOT NULL,
         account_password VARCHAR(255) DEFAULT '',
         recovery_email VARCHAR(255) DEFAULT NULL,
@@ -55,6 +56,12 @@ async function ensureTables() {
 
     try {
       await db.query(`ALTER TABLE digital_license_slots ADD COLUMN order_id INT DEFAULT NULL AFTER slot_number`);
+    } catch (e) {
+      // Column already exists
+    }
+
+    try {
+      await db.query(`ALTER TABLE digital_license_accounts ADD COLUMN package_name VARCHAR(255) DEFAULT NULL AFTER product_name`);
     } catch (e) {
       // Column already exists
     }
@@ -464,6 +471,7 @@ exports.createAccount = async (req, res) => {
     const {
       product_id,
       product_name,
+      package_name,
       account_email,
       account_password,
       recovery_email,
@@ -491,14 +499,15 @@ exports.createAccount = async (req, res) => {
 
     const [result] = await db.query(
       `INSERT INTO digital_license_accounts (
-        product_id, product_name, account_email, account_password, recovery_email,
+        product_id, product_name, package_name, account_email, account_password, recovery_email,
         two_factor_status, two_factor_key, total_slots, status, expiry_date,
         vendor_id, vendor_name, purchased_date, renewal_date, purchase_price,
         renewal_cost, payment_method, invoice_no, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         product_id ? parseInt(product_id, 10) : null,
         product_name.trim(),
+        package_name ? package_name.trim() : null,
         account_email.trim(),
         account_password ? account_password.trim() : '',
         recovery_email ? recovery_email.trim() : null,
@@ -547,6 +556,7 @@ exports.updateAccount = async (req, res) => {
     const {
       product_id,
       product_name,
+      package_name,
       account_email,
       account_password,
       recovery_email,
@@ -576,7 +586,7 @@ exports.updateAccount = async (req, res) => {
 
     await db.query(
       `UPDATE digital_license_accounts SET
-        product_id = ?, product_name = ?, account_email = ?, account_password = ?,
+        product_id = ?, product_name = ?, package_name = ?, account_email = ?, account_password = ?,
         recovery_email = ?, two_factor_status = ?, two_factor_key = ?, total_slots = ?,
         status = ?, expiry_date = ?, vendor_id = ?, vendor_name = ?, purchased_date = ?,
         renewal_date = ?, purchase_price = ?, renewal_cost = ?, payment_method = ?,
@@ -585,6 +595,7 @@ exports.updateAccount = async (req, res) => {
       [
         product_id ? parseInt(product_id, 10) : null,
         product_name.trim(),
+        package_name ? package_name.trim() : null,
         account_email.trim(),
         account_password ? account_password.trim() : '',
         recovery_email ? recovery_email.trim() : null,
@@ -787,7 +798,7 @@ exports.lookupOrder = async (req, res) => {
     }
 
     const [orders] = await db.query(
-      `SELECT o.id, o.user_id, o.phone, o.delivery_email, o.total_amount, o.status, o.payment_status, o.created_at,
+      `SELECT o.id, o.user_id, o.customer_name, o.phone, o.delivery_email, o.total_amount, o.status, o.payment_status, o.created_at,
               u.name AS user_name, u.email AS user_email, u.role AS user_role, u.whatsapp_number AS user_whatsapp,
               COALESCE(
                 (SELECT GROUP_CONCAT(COALESCE(p.name, oi.package_name) SEPARATOR ', ') 
@@ -807,10 +818,12 @@ exports.lookupOrder = async (req, res) => {
     }
 
     const order = orders[0];
-    const customerEmailResolved = order.delivery_email || (order.user_role !== 'admin' ? order.user_email : '') || '';
+    const rawEmail = order.delivery_email || (order.user_role !== 'admin' ? order.user_email : '') || '';
+    const customerEmailResolved = (rawEmail && !rawEmail.includes('@guest.')) ? rawEmail : '';
+    const customerNameResolved = (order.customer_name && order.customer_name.trim()) ? order.customer_name.trim() : ((order.user_role !== 'admin' ? (order.user_name || '') : '').trim());
     res.json({
       order_id: order.id,
-      customer_name: (order.user_name || '').trim() || 'Customer',
+      customer_name: customerNameResolved || 'Customer',
       customer_email: customerEmailResolved.trim(),
       customer_phone: (order.phone || order.user_whatsapp || '').trim(),
       created_at: order.created_at,
@@ -828,8 +841,14 @@ exports.lookupOrder = async (req, res) => {
 exports.getRecentOrders = async (req, res) => {
   try {
     const [orders] = await db.query(
-      `SELECT o.id, o.created_at, o.phone, o.delivery_email,
-              u.name AS user_name, u.email AS user_email,
+      `SELECT o.id, o.created_at, o.phone, o.delivery_email, o.customer_name,
+              COALESCE(NULLIF(TRIM(o.customer_name), ''), u.name, 'Customer') AS user_name,
+              CASE 
+                WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
+                WHEN o.customer_name IS NOT NULL AND TRIM(o.customer_name) != '' THEN NULL
+                WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
+                ELSE u.email 
+              END AS user_email,
               (SELECT COALESCE(p.name, oi.package_name) FROM order_items oi LEFT JOIN products p ON oi.product_id = p.id WHERE oi.order_id = o.id LIMIT 1) AS product_name
        FROM orders o
        LEFT JOIN users u ON o.user_id = u.id

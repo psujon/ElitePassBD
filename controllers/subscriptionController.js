@@ -3,73 +3,80 @@ const { processSubscriptionStatuses } = require('../services/subscriptionCronSer
 const { getDirectWhatsAppUrl, replaceTemplateTags } = require('../services/whatsappService');
 
 /**
- * Calculate dashboard stat counts
+ * Calculate dashboard stat counts in a single optimized SQL query
  */
 const getDashboardStats = async (pool, product = null) => {
-  const hasProduct = Boolean(product && product.trim() && product.trim() !== 'All Products');
-  const prodPattern = hasProduct ? `%${product.trim()}%` : null;
-  const prodClause = hasProduct ? ' AND product_name LIKE ?' : '';
-  const prodParams = hasProduct ? [prodPattern] : [];
+  try {
+    const hasProduct = Boolean(product && product.trim() && product.trim() !== 'All Products');
+    const prodClause = hasProduct ? ' AND product_name LIKE ?' : '';
+    const prodParams = hasProduct ? [`%${product.trim()}%`] : [];
 
-  const [[activeRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE status IN ('Active', 'Expiring Soon') AND expiry_date >= CURDATE()${prodClause}`,
-    prodParams
-  );
-  const [[expiringTodayRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date = CURDATE() AND status NOT IN ('Cancelled', 'Not Renewed')${prodClause}`,
-    prodParams
-  );
-  const [[within3DaysRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY) AND status NOT IN ('Cancelled', 'Not Renewed')${prodClause}`,
-    prodParams
-  );
-  const [[within7DaysRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status NOT IN ('Cancelled', 'Not Renewed')${prodClause}`,
-    prodParams
-  );
-  const [[expiredRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE (status = 'Expired' OR (expiry_date < CURDATE() AND status NOT IN ('Cancelled', 'Not Renewed')))${prodClause}`,
-    prodParams
-  );
-  const [[renewedRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE (status = 'Renewed' OR id IN (SELECT DISTINCT subscription_id FROM subscription_renewals WHERE status = 'Previous'))${prodClause}`,
-    prodParams
-  );
-  const [[notRenewedRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions WHERE status = 'Not Renewed'${prodClause}`,
-    prodParams
-  );
-  const [[totalCustomersRes]] = await pool.query(
-    `SELECT COUNT(DISTINCT CASE 
-      WHEN email IS NOT NULL AND TRIM(email) != '' THEN LOWER(TRIM(email))
-      WHEN whatsapp_number IS NOT NULL AND TRIM(whatsapp_number) != '' THEN CONCAT('phone_', TRIM(whatsapp_number))
-      ELSE NULL 
-    END) as count FROM subscriptions ${hasProduct ? 'WHERE product_name LIKE ?' : ''}`,
-    prodParams
-  );
-  const [[totalSubscriptionsRes]] = await pool.query(
-    `SELECT COUNT(*) as count FROM subscriptions ${hasProduct ? 'WHERE product_name LIKE ?' : ''}`,
-    prodParams
-  );
+    const statsSql = `
+      SELECT 
+        COUNT(CASE WHEN status IN ('Active', 'Expiring Soon') AND expiry_date >= CURDATE() THEN 1 END) as active,
+        COUNT(CASE WHEN expiry_date = CURDATE() AND status NOT IN ('Cancelled', 'Not Renewed') THEN 1 END) as expiringToday,
+        COUNT(CASE WHEN expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY) AND status NOT IN ('Cancelled', 'Not Renewed') THEN 1 END) as within3Days,
+        COUNT(CASE WHEN expiry_date >= CURDATE() AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND status NOT IN ('Cancelled', 'Not Renewed') THEN 1 END) as within7Days,
+        COUNT(CASE WHEN status = 'Expired' OR (expiry_date < CURDATE() AND status NOT IN ('Cancelled', 'Not Renewed')) THEN 1 END) as expired,
+        COUNT(CASE WHEN status = 'Renewed' OR id IN (SELECT DISTINCT subscription_id FROM subscription_renewals WHERE status = 'Previous') THEN 1 END) as renewed,
+        COUNT(CASE WHEN status = 'Not Renewed' THEN 1 END) as notRenewed,
+        COUNT(DISTINCT CASE 
+          WHEN email IS NOT NULL AND TRIM(email) != '' THEN LOWER(TRIM(email))
+          WHEN whatsapp_number IS NOT NULL AND TRIM(whatsapp_number) != '' THEN CONCAT('phone_', TRIM(whatsapp_number))
+          ELSE NULL 
+        END) as totalCustomers,
+        COUNT(*) as totalSubscriptions
+      FROM subscriptions
+      WHERE 1=1 ${prodClause}
+    `;
 
-  return {
-    active: activeRes ? activeRes.count : 0,
-    expiringToday: expiringTodayRes ? expiringTodayRes.count : 0,
-    within3Days: within3DaysRes ? within3DaysRes.count : 0,
-    within7Days: within7DaysRes ? within7DaysRes.count : 0,
-    expired: expiredRes ? expiredRes.count : 0,
-    renewed: renewedRes ? renewedRes.count : 0,
-    notRenewed: notRenewedRes ? notRenewedRes.count : 0,
-    totalCustomers: totalCustomersRes ? totalCustomersRes.count : 0,
-    totalSubscriptions: totalSubscriptionsRes ? totalSubscriptionsRes.count : 0
-  };
+    const [[row]] = await pool.query(statsSql, prodParams);
+
+    return {
+      active: Number(row?.active) || 0,
+      expiringToday: Number(row?.expiringToday) || 0,
+      within3Days: Number(row?.within3Days) || 0,
+      within7Days: Number(row?.within7Days) || 0,
+      expired: Number(row?.expired) || 0,
+      renewed: Number(row?.renewed) || 0,
+      notRenewed: Number(row?.notRenewed) || 0,
+      totalCustomers: Number(row?.totalCustomers) || 0,
+      totalSubscriptions: Number(row?.totalSubscriptions) || 0
+    };
+  } catch (err) {
+    console.error('getDashboardStats error:', err);
+    return {
+      active: 0,
+      expiringToday: 0,
+      within3Days: 0,
+      within7Days: 0,
+      expired: 0,
+      renewed: 0,
+      notRenewed: 0,
+      totalCustomers: 0,
+      totalSubscriptions: 0
+    };
+  }
+};
+
+let lastStatusProcessTime = 0;
+const maybeProcessStatusesInBackground = (pool) => {
+  const now = Date.now();
+  // Run status update in background at most once every 15 minutes, never blocking HTTP GET requests
+  if (now - lastStatusProcessTime > 15 * 60 * 1000) {
+    lastStatusProcessTime = now;
+    processSubscriptionStatuses(pool).catch(err => {
+      console.warn('[subscriptionController] Background status process warning:', err.message);
+    });
+  }
 };
 
 exports.getAllSubscriptions = async (req, res) => {
   try {
     const pool = db.getPool();
-    await ensureSubscriptionColumns(pool);
-    await processSubscriptionStatuses(pool);
+    // Non-blocking background checks
+    ensureSubscriptionColumns(pool).catch(() => {});
+    maybeProcessStatusesInBackground(pool);
 
     const { search, product, status, source, expiryFilter } = req.query;
 
@@ -181,23 +188,19 @@ exports.getAllSubscriptions = async (req, res) => {
       }
     }
 
-    query += ` ORDER BY 
-      CASE s.status
-        WHEN 'Expired' THEN 1
-        WHEN 'Not Renewed' THEN 2
-        WHEN 'Expiring Soon' THEN 3
-        WHEN 'Active' THEN 4
-        WHEN 'Renewed' THEN 5
-        WHEN 'Cancelled' THEN 6
-        ELSE 7
-      END ASC,
-      s.expiry_date DESC,
-      s.id DESC`;
+    query += ` ORDER BY COALESCE(s.order_id, s.id) DESC, s.id DESC`;
 
-    const [rows] = await pool.query(query, params);
+    // Execute Main Query, Settings Query, and Dashboard Stats simultaneously in parallel
+    const [
+      [rows],
+      [settingRows],
+      stats
+    ] = await Promise.all([
+      pool.query(query, params),
+      pool.query('SELECT setting_key, setting_value FROM subscription_settings'),
+      getDashboardStats(pool, product)
+    ]);
 
-    // Fetch settings for direct WhatsApp message link generator
-    const [settingRows] = await pool.query('SELECT setting_key, setting_value FROM subscription_settings');
     const settings = {};
     settingRows.forEach(s => settings[s.setting_key] = s.setting_value);
     const waTemplate = settings.whatsapp_template || `Hello {customer_name}, your {product_name} subscription expires on {expiry_date}. Please complete renewal payment to continue. Thank you, ElitePassBD.`;
@@ -217,8 +220,6 @@ exports.getAllSubscriptions = async (req, res) => {
       };
     });
 
-    const stats = await getDashboardStats(pool, product);
-
     res.json({
       stats,
       subscriptions: items
@@ -233,6 +234,10 @@ let subColsEnsured = false;
 async function ensureSubscriptionColumns(pool) {
   if (subColsEnsured) return;
   try {
+    const [ordNameCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'customer_name'");
+    if (ordNameCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN customer_name VARCHAR(255) DEFAULT NULL AFTER user_id");
+    }
     const [cCols] = await pool.query("SHOW COLUMNS FROM subscriptions LIKE 'customer_notes'");
     if (cCols.length === 0) {
       await pool.query("ALTER TABLE subscriptions ADD COLUMN customer_notes TEXT DEFAULT NULL AFTER notes");
@@ -817,7 +822,19 @@ exports.createSubscription = async (req, res) => {
       }
     }
 
-    const cleanEmail = (email && typeof email === 'string' && email.trim()) ? email.trim() : null;
+    let cleanEmail = (email && typeof email === 'string' && email.trim()) ? email.trim() : null;
+
+    // Filter out Admin email: Customer subscription must NEVER take the admin's email address
+    if (cleanEmail) {
+      const [adminEmailCheck] = await connection.query(
+        'SELECT id FROM users WHERE role = "admin" AND LOWER(TRIM(email)) = LOWER(TRIM(?)) LIMIT 1',
+        [cleanEmail]
+      );
+      if (adminEmailCheck.length > 0) {
+        console.warn(`[createSubscription] Filtered out admin email '${cleanEmail}' from customer subscription.`);
+        cleanEmail = null;
+      }
+    }
 
     let finalOrderId = order_id || null;
     let orderItemId = null;
@@ -838,30 +855,22 @@ exports.createSubscription = async (req, res) => {
             const hashedPassword = await bcrypt.hash(randomPassword, 10);
             const [newUserRes] = await connection.query(
               'INSERT INTO users (name, email, password, role, whatsapp_number) VALUES (?, ?, ?, "user", ?)',
-              [customer_name, cleanEmail, hashedPassword, whatsapp_number]
+              [customer_name || 'Customer', cleanEmail, hashedPassword, whatsapp_number]
             );
             userId = newUserRes.insertId;
           }
         } else {
-          // If no customer email provided, check if a non-admin user exists with this phone number
-          let phoneUserId = null;
-          if (whatsapp_number && whatsapp_number.trim()) {
-            const [phoneCheck] = await connection.query(
-              'SELECT id FROM users WHERE whatsapp_number = ? AND role != "admin" LIMIT 1',
-              [whatsapp_number.trim()]
-            );
-            if (phoneCheck.length > 0) {
-              phoneUserId = phoneCheck[0].id;
-            }
-          }
-
-          if (phoneUserId) {
-            userId = phoneUserId;
-          } else {
-            // Fallback to Admin User for orders.user_id FK constraint only (delivery_email remains null)
-            const [adminCheck] = await connection.query('SELECT id FROM users WHERE role = "admin" LIMIT 1');
-            userId = adminCheck.length > 0 ? adminCheck[0].id : 1;
-          }
+          // Never link to existing user by phone/email or admin user! Create a separate customer user record
+          const cleanDigits = (whatsapp_number || '').replace(/[^0-9]/g, '');
+          const guestEmail = `customer_${cleanDigits || Date.now()}_${Math.floor(1000 + Math.random() * 9000)}@guest.elitepassbd.local`;
+          const randomPassword = Math.floor(100000 + Math.random() * 900000).toString();
+          const bcrypt = require('bcryptjs');
+          const hashedPassword = await bcrypt.hash(randomPassword, 10);
+          const [newUserRes] = await connection.query(
+            'INSERT INTO users (name, email, password, role, whatsapp_number) VALUES (?, ?, ?, "user", ?)',
+            [customer_name || 'Customer', guestEmail, hashedPassword, whatsapp_number]
+          );
+          userId = newUserRes.insertId;
         }
 
         // 2. Find product_id
@@ -877,16 +886,17 @@ exports.createSubscription = async (req, res) => {
         // 3. Create Order
         const ordStatus = (payment_status === 'Paid') ? 'Delivered' : 'Pending';
         const [ordRes] = await connection.query(`
-          INSERT INTO orders (user_id, total_amount, status, shipping_address, phone, payment_method, payment_status, delivery_email, additional_notes, completed_at)
-          VALUES (?, ?, ?, 'Manual / Social Order', ?, ?, ?, ?, ?, IF(? = 'Delivered', NOW(), NULL))
+          INSERT INTO orders (user_id, customer_name, total_amount, status, shipping_address, phone, payment_method, payment_status, delivery_email, additional_notes, completed_at)
+          VALUES (?, ?, ?, ?, 'Manual / Social Order', ?, ?, ?, ?, ?, IF(? = 'Delivered', NOW(), NULL))
         `, [
           userId,
+          customer_name ? customer_name.trim() : null,
           parseFloat(selling_price) || 0,
           ordStatus,
-          whatsapp_number,
+          whatsapp_number ? whatsapp_number.trim() : null,
           customer_source || 'Manual Order',
           payment_status || 'Paid',
-          cleanEmail,
+          cleanEmail || null,
           customer_notes ? customer_notes.trim() : null,
           ordStatus
         ]);
@@ -1122,6 +1132,18 @@ exports.updateSubscription = async (req, res) => {
     }
     const currSub = subCheck[0];
 
+    let cleanEmail = (email && typeof email === 'string' && email.trim()) ? email.trim() : null;
+    if (cleanEmail) {
+      const [adminEmailCheck] = await pool.query(
+        'SELECT id FROM users WHERE role = "admin" AND LOWER(TRIM(email)) = LOWER(TRIM(?)) LIMIT 1',
+        [cleanEmail]
+      );
+      if (adminEmailCheck.length > 0) {
+        console.warn(`[updateSubscription] Filtered out admin email '${cleanEmail}' from customer subscription update.`);
+        cleanEmail = null;
+      }
+    }
+
     const pDate = purchase_date ? new Date(purchase_date).toISOString().slice(0, 10) : undefined;
     const eDate = expiry_date ? new Date(expiry_date).toISOString().slice(0, 10) : undefined;
 
@@ -1210,7 +1232,7 @@ exports.updateSubscription = async (req, res) => {
     `, [
       customer_name,
       whatsapp_number,
-      email !== undefined ? email : null,
+      email !== undefined ? cleanEmail : null,
       product_name,
       package_plan,
       customer_source,
@@ -1232,6 +1254,33 @@ exports.updateSubscription = async (req, res) => {
       newSlotId,
       id
     ]);
+
+    // Sync customer_name, phone, and delivery_email to linked order if order_id exists
+    const targetOrderId = (order_id !== undefined && order_id) ? parseInt(order_id, 10) : currSub.order_id;
+    if (targetOrderId) {
+      try {
+        const orderUpdates = [];
+        const orderParams = [];
+        if (customer_name !== undefined) {
+          orderUpdates.push('customer_name = ?');
+          orderParams.push(customer_name ? customer_name.trim() : null);
+        }
+        if (whatsapp_number !== undefined) {
+          orderUpdates.push('phone = ?');
+          orderParams.push(whatsapp_number ? whatsapp_number.trim() : null);
+        }
+        if (email !== undefined) {
+          orderUpdates.push('delivery_email = ?');
+          orderParams.push(cleanEmail || null);
+        }
+        if (orderUpdates.length > 0) {
+          orderParams.push(targetOrderId);
+          await pool.query(`UPDATE orders SET ${orderUpdates.join(', ')} WHERE id = ?`, orderParams);
+        }
+      } catch (ordSyncErr) {
+        console.warn('Syncing subscription updates to order failed:', ordSyncErr.message);
+      }
+    }
 
     // Sync account_given and digital slot info to Current renewal record
     try {
@@ -1331,9 +1380,20 @@ exports.renewSubscription = async (req, res) => {
       }
     }
 
-    const targetEmail = (customer_email !== undefined && customer_email !== null && customer_email.trim() !== '')
+    let targetEmail = (customer_email !== undefined && customer_email !== null && customer_email.trim() !== '')
       ? customer_email.trim()
       : (sub.email || '').trim();
+
+    if (targetEmail) {
+      const [adminEmailCheck] = await connection.query(
+        'SELECT id FROM users WHERE role = "admin" AND LOWER(TRIM(email)) = LOWER(TRIM(?)) LIMIT 1',
+        [targetEmail]
+      );
+      if (adminEmailCheck.length > 0) {
+        console.warn(`[renewSubscription] Filtered out admin email '${targetEmail}' from renewal.`);
+        targetEmail = null;
+      }
+    }
 
     const finalCustomerNotes = customer_notes !== undefined ? (customer_notes ? customer_notes.trim() : null) : null;
     const finalAdminNotes = admin_notes !== undefined 

@@ -392,9 +392,11 @@ const sendPurchaseConfirmationEmail = async (orderId) => {
 
     // Fetch order details
     const [orders] = await pool.query(`
-      SELECT o.*, u.name as user_name, u.email as user_email, u.role as user_role
+      SELECT o.*, 
+             COALESCE(NULLIF(TRIM(o.customer_name), ''), u.name, 'Customer') AS user_name, 
+             u.email as user_email, u.role as user_role
       FROM orders o
-      JOIN users u ON o.user_id = u.id
+      LEFT JOIN users u ON o.user_id = u.id
       WHERE o.id = ?
     `, [orderId]);
 
@@ -404,8 +406,10 @@ const sendPurchaseConfirmationEmail = async (orderId) => {
     }
 
     const order = orders[0];
-    // Never fall back to admin user's email if customer did not provide an email
-    const recipientEmail = order.delivery_email || (order.user_role !== 'admin' ? order.user_email : null);
+    // Never fall back to admin user's email or guest emails if customer did not provide an email
+    const recipientEmail = (order.delivery_email && order.delivery_email.trim()) 
+      ? order.delivery_email.trim() 
+      : (!order.customer_name && order.user_role !== 'admin' && !order.user_email?.includes('@guest.') ? order.user_email : null);
 
     if (!recipientEmail || !recipientEmail.trim()) {
       console.warn(`[PurchaseEmailService] Order #${orderId} has no customer email address. Skipping email.`);

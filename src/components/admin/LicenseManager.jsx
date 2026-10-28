@@ -71,6 +71,7 @@ export default function LicenseManager() {
   const [accountForm, setAccountForm] = useState({
     product_id: '',
     product_name: '',
+    package_name: '',
     account_email: '',
     account_password: '',
     recovery_email: '',
@@ -236,11 +237,95 @@ export default function LicenseManager() {
     );
   }, [productOptions, accountProductSearch]);
 
+  // Selected catalog product object for activation resolution
+  const currentCatalogProduct = useMemo(() => {
+    if (!accountForm.product_name && !accountForm.product_id) return null;
+    const targetId = accountForm.product_id ? String(accountForm.product_id) : null;
+    const targetName = (accountForm.product_name || '').trim().toLowerCase();
+
+    if (targetId) {
+      const byId = catalogProducts.find(p => String(p.id) === targetId);
+      if (byId) return byId;
+    }
+
+    if (targetName) {
+      // 1. Exact match
+      const exact = catalogProducts.find(p => (p.name || '').trim().toLowerCase() === targetName);
+      if (exact) return exact;
+
+      // 2. Starts with / includes match
+      const partial = catalogProducts.find(p => {
+        const pName = (p.name || '').trim().toLowerCase();
+        return pName.includes(targetName) || targetName.includes(pName);
+      });
+      if (partial) return partial;
+    }
+
+    return null;
+  }, [catalogProducts, accountForm.product_id, accountForm.product_name]);
+
+  // Specific Activation Options for selected product (e.g. Shared, Private, Personal Mail, Readymade Account, etc.)
+  const productActivationOptions = useMemo(() => {
+    if (!currentCatalogProduct) return [];
+    const list = [];
+    const seen = new Set();
+
+    // 1. Primary: product.activation_options column (comma-separated string or array)
+    if (currentCatalogProduct.activation_options) {
+      const raw = Array.isArray(currentCatalogProduct.activation_options)
+        ? currentCatalogProduct.activation_options
+        : String(currentCatalogProduct.activation_options).split(',');
+      raw.forEach(opt => {
+        const clean = (typeof opt === 'string' ? opt : String(opt)).trim();
+        if (clean && !seen.has(clean.toLowerCase())) {
+          seen.add(clean.toLowerCase());
+          list.push(clean);
+        }
+      });
+    }
+
+    // 2. Fallback: If activation_options was not set directly, check pkg.activation in packages
+    if (list.length === 0 && Array.isArray(currentCatalogProduct.packages)) {
+      currentCatalogProduct.packages.forEach(pkg => {
+        if (!pkg) return;
+        const act = typeof pkg === 'object' && pkg.activation ? pkg.activation.trim() : '';
+        if (act && !seen.has(act.toLowerCase())) {
+          seen.add(act.toLowerCase());
+          list.push(act);
+        }
+      });
+    }
+
+    return list;
+  }, [currentCatalogProduct]);
+
   const handleSelectAccountProduct = (item) => {
+    const catProd =
+      catalogProducts.find(p => String(p.id) === String(item.id)) ||
+      catalogProducts.find(p => (p.name || '').trim().toLowerCase() === (item.name || '').trim().toLowerCase()) ||
+      catalogProducts.find(p => (p.name || '').toLowerCase().includes((item.name || '').toLowerCase()));
+
+    let defaultActivation = '';
+    if (catProd) {
+      if (catProd.activation_options) {
+        const raw = Array.isArray(catProd.activation_options)
+          ? catProd.activation_options
+          : String(catProd.activation_options).split(',');
+        const firstOpt = (typeof raw[0] === 'string' ? raw[0] : String(raw[0] || '')).trim();
+        if (firstOpt) defaultActivation = firstOpt;
+      } else if (Array.isArray(catProd.packages) && catProd.packages.length > 0) {
+        const firstPkg = catProd.packages[0];
+        if (firstPkg && firstPkg.activation) {
+          defaultActivation = firstPkg.activation.trim();
+        }
+      }
+    }
+
     setAccountForm(prev => ({
       ...prev,
       product_name: item.name,
-      product_id: item.id || ''
+      product_id: item.id || (catProd ? catProd.id : ''),
+      package_name: defaultActivation || prev.package_name || ''
     }));
     setAccountProductSearch(item.name);
     setAccountProductDropdownOpen(false);
@@ -508,6 +593,7 @@ export default function LicenseManager() {
     setAccountForm({
       product_id: '',
       product_name: '',
+      package_name: '',
       account_email: '',
       account_password: '',
       recovery_email: '',
@@ -537,6 +623,7 @@ export default function LicenseManager() {
     setAccountForm({
       product_id: acc.product_id || '',
       product_name: acc.product_name || '',
+      package_name: acc.package_name || '',
       account_email: acc.account_email || '',
       account_password: acc.account_password || '',
       recovery_email: acc.recovery_email || '',
@@ -1056,8 +1143,13 @@ export default function LicenseManager() {
                             <div className="truncate max-w-[160px] sm:max-w-[190px] text-blue-700 font-bold hover:underline" title={acc.account_email}>
                               {acc.account_email}
                             </div>
-                            <div className="text-[10px] text-slate-400 font-normal truncate">
-                              {acc.product_name}
+                            <div className="text-[10px] text-slate-400 font-normal truncate flex items-center gap-1">
+                              <span>{acc.product_name}</span>
+                              {acc.package_name && (
+                                <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1 py-0.2 rounded border border-blue-200">
+                                  {acc.package_name}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="py-2.5 px-2 text-center font-bold text-slate-700">
@@ -1254,6 +1346,11 @@ export default function LicenseManager() {
                           <Layers className="w-3 h-3" />
                         </span>
                         {selectedAccount.product_name}
+                        {selectedAccount.package_name && (
+                          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200">
+                            {selectedAccount.package_name}
+                          </span>
+                        )}
                       </span>
                       <button
                         type="button"
@@ -1675,8 +1772,8 @@ export default function LicenseManager() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                    {/* Col 1-2: Product Catalog */}
-                    <div ref={accountProductRef} className="lg:col-span-2 relative">
+                    {/* Col 1: Product Catalog */}
+                    <div ref={accountProductRef} className="relative">
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Product Catalog <span className="text-rose-500">*</span>
                       </label>
@@ -1688,8 +1785,10 @@ export default function LicenseManager() {
                           onChange={(e) => {
                             const val = e.target.value;
                             setAccountProductSearch(val);
-                            const matched = catalogProducts.find(p => p.name?.toLowerCase() === val.toLowerCase()) ||
-                              productOptions.find(p => p.name?.toLowerCase() === val.toLowerCase());
+                            const valLower = val.trim().toLowerCase();
+                            const matched = catalogProducts.find(p => (p.name || '').trim().toLowerCase() === valLower) ||
+                              catalogProducts.find(p => (p.name || '').toLowerCase().includes(valLower)) ||
+                              productOptions.find(p => (p.name || '').toLowerCase().includes(valLower));
                             setAccountForm(prev => ({
                               ...prev,
                               product_name: val,
@@ -1733,7 +1832,7 @@ export default function LicenseManager() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setAccountForm(prev => ({ ...prev, product_name: '', product_id: '' }));
+                                setAccountForm(prev => ({ ...prev, product_name: '', product_id: '', package_name: '' }));
                                 setAccountProductSearch('');
                               }}
                               className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
@@ -1760,7 +1859,7 @@ export default function LicenseManager() {
 
                       {/* Dropdown Menu */}
                       {accountProductDropdownOpen && (
-                        <div className="absolute left-0 top-full mt-1 w-full min-w-full sm:min-w-[420px] md:min-w-[500px] max-w-[95vw] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden py-1">
+                        <div className="absolute left-0 top-full mt-1 w-full min-w-full sm:min-w-[340px] md:min-w-[420px] max-w-[95vw] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden py-1">
                           <div className="px-3 py-1.5 text-[9.5px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
                             <span>Catalog Products ({filteredModalProductOptions.length})</span>
                             <span className="text-[9px] text-slate-400 font-normal">Type to filter</span>
@@ -1800,6 +1899,70 @@ export default function LicenseManager() {
                             )}
                           </div>
                         </div>
+                      )}
+                    </div>
+
+                    {/* Col 2: Activation Options */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-slate-700 truncate">
+                          Activation Options
+                        </label>
+                        {productActivationOptions.length > 0 && (
+                          <span className="text-[9.5px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                            {productActivationOptions.length} Options
+                          </span>
+                        )}
+                      </div>
+
+                      {productActivationOptions.length > 0 ? (
+                        <>
+                          <select
+                            value={
+                              accountForm.package_name === '__custom__'
+                                ? '__custom__'
+                                : (productActivationOptions.some(o => o.toLowerCase() === (accountForm.package_name || '').toLowerCase())
+                                    ? (productActivationOptions.find(o => o.toLowerCase() === (accountForm.package_name || '').toLowerCase()) || accountForm.package_name)
+                                    : (accountForm.package_name ? '__custom__' : ''))
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '__custom__') {
+                                setAccountForm(prev => ({ ...prev, package_name: '__custom__' }));
+                              } else {
+                                setAccountForm(prev => ({ ...prev, package_name: val }));
+                              }
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors cursor-pointer"
+                          >
+                            <option value="">Select Activation Option...</option>
+                            {productActivationOptions.map((opt, idx) => (
+                              <option key={idx} value={opt}>
+                                ⚡ {opt}
+                              </option>
+                            ))}
+                            <option value="__custom__">➕ Custom / Other Option...</option>
+                          </select>
+
+                          {(accountForm.package_name === '__custom__' || (!productActivationOptions.some(o => o.toLowerCase() === (accountForm.package_name || '').toLowerCase()) && accountForm.package_name)) && (
+                            <input
+                              type="text"
+                              value={accountForm.package_name === '__custom__' ? '' : (accountForm.package_name || '')}
+                              onChange={(e) => setAccountForm({ ...accountForm, package_name: e.target.value })}
+                              placeholder="Type custom activation option..."
+                              className="w-full mt-1.5 bg-white border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-colors"
+                              autoFocus
+                            />
+                          )}
+                        </>
+                      ) : (
+                        <input
+                          type="text"
+                          value={accountForm.package_name || ''}
+                          onChange={(e) => setAccountForm({ ...accountForm, package_name: e.target.value })}
+                          placeholder={accountForm.product_name ? "e.g. Shared, Private, Personal Mail..." : "Select product first or type..."}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        />
                       )}
                     </div>
 
@@ -2288,7 +2451,7 @@ export default function LicenseManager() {
                       <option value="">⚡ Or Select Recent Order to Auto-Fill...</option>
                       {recentOrders.map((ord) => (
                         <option key={ord.id} value={ord.id}>
-                          Order #{ord.id} — {ord.user_name || 'Customer'} • {ord.delivery_email || ord.user_email || ''} • {ord.phone || ''} ({ord.product_name || 'Product'})
+                          Order #{ord.id} — {ord.customer_name || ord.user_name || 'Customer'} • {ord.delivery_email || (!ord.user_email?.includes('@guest.') ? ord.user_email : '') || ''} • {ord.phone || ''} ({ord.product_name || 'Product'})
                         </option>
                       ))}
                     </select>

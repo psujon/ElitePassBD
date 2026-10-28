@@ -119,10 +119,86 @@ export default function SubscriptionManager() {
   const productFilterRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [expiryFilter, setExpiryFilter] = useState('All Dates');
+  const [uniqueCustomerOnly, setUniqueCustomerOnly] = useState(false);
   const [sourceFilter, setSourceFilter] = useState('All Sources');
-  const [subSortField, setSubSortField] = useState('expiry');
-  const [subSortAsc, setSubSortAsc] = useState(true);
+  const [subSortField, setSubSortField] = useState('order_no');
+  const [subSortAsc, setSubSortAsc] = useState(false);
   const [subPage, setSubPage] = useState(1);
+
+  // Active stat card calculation - returns null on initial load so NO card is active by default
+  const activeStatCard = React.useMemo(() => {
+    if (uniqueCustomerOnly) return 'uniqueCustomer';
+    if (expiryFilter === 'today' && statusFilter === 'All Status') return 'expiringToday';
+    if (expiryFilter === '3days' && statusFilter === 'All Status') return 'within3Days';
+    if (expiryFilter === '7days' && statusFilter === 'All Status') return 'within7Days';
+    if (statusFilter === 'Active' && expiryFilter === 'All Dates') return 'active';
+    if (statusFilter === 'Expired' && expiryFilter === 'All Dates') return 'expired';
+    if (statusFilter === 'Renewed' && expiryFilter === 'All Dates') return 'renewed';
+    if (statusFilter === 'Not Renewed' && expiryFilter === 'All Dates') return 'notRenewed';
+    return null;
+  }, [uniqueCustomerOnly, expiryFilter, statusFilter]);
+
+  // Click handler for 8 dashboard stat cards - filters data and allows toggling off
+  const handleStatCardClick = (cardKey) => {
+    setActiveSubTab('subscriptions');
+    setSubPage(1);
+
+    // If already active, toggle off and reset to default all subscriptions view
+    if (activeStatCard === cardKey) {
+      setStatusFilter('All Status');
+      setExpiryFilter('All Dates');
+      setUniqueCustomerOnly(false);
+      return;
+    }
+
+    switch (cardKey) {
+      case 'active':
+        setUniqueCustomerOnly(false);
+        setStatusFilter('Active');
+        setExpiryFilter('All Dates');
+        break;
+      case 'expiringToday':
+        setUniqueCustomerOnly(false);
+        setStatusFilter('All Status');
+        setExpiryFilter('today');
+        break;
+      case 'within3Days':
+        setUniqueCustomerOnly(false);
+        setStatusFilter('All Status');
+        setExpiryFilter('3days');
+        break;
+      case 'within7Days':
+        setUniqueCustomerOnly(false);
+        setStatusFilter('All Status');
+        setExpiryFilter('7days');
+        break;
+      case 'expired':
+        setUniqueCustomerOnly(false);
+        setStatusFilter('Expired');
+        setExpiryFilter('All Dates');
+        break;
+      case 'renewed':
+        setUniqueCustomerOnly(false);
+        setStatusFilter('Renewed');
+        setExpiryFilter('All Dates');
+        break;
+      case 'notRenewed':
+        setUniqueCustomerOnly(false);
+        setStatusFilter('Not Renewed');
+        setExpiryFilter('All Dates');
+        break;
+      case 'uniqueCustomer':
+        setUniqueCustomerOnly(true);
+        setStatusFilter('All Status');
+        setExpiryFilter('All Dates');
+        break;
+      default:
+        setUniqueCustomerOnly(false);
+        setStatusFilter('All Status');
+        setExpiryFilter('All Dates');
+        break;
+    }
+  };
 
   // Excel Export state
   const [exportingExcel, setExportingExcel] = useState(false);
@@ -247,11 +323,13 @@ export default function SubscriptionManager() {
       return;
     }
     const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 168;
+    const menuHeight = 230;
     const spaceBelow = window.innerHeight - rect.bottom;
-    const openUp = spaceBelow < 200;
+    const openUp = spaceBelow < menuHeight;
     setMenuPosition({
-      top: openUp ? Math.max(10, rect.top - 160) : (rect.bottom + 4),
-      left: Math.max(10, rect.right - 156),
+      top: openUp ? Math.max(10, rect.top - menuHeight) : (rect.bottom + 4),
+      left: Math.max(10, rect.right - menuWidth),
       openUp
     });
     setActiveMenuSub(sub);
@@ -378,7 +456,11 @@ export default function SubscriptionManager() {
   const sortedSubscriptions = React.useMemo(() => {
     return [...subscriptions].sort((a, b) => {
       let comparison = 0;
-      if (subSortField === 'expiry' || subSortField === 'status') {
+      if (subSortField === 'order_no') {
+        const numA = parseInt(a.order_id || a.id, 10) || 0;
+        const numB = parseInt(b.order_id || b.id, 10) || 0;
+        comparison = numA - numB;
+      } else if (subSortField === 'expiry' || subSortField === 'status') {
         const pA = getStatusPriority(a.status);
         const pB = getStatusPriority(b.status);
         if (pA !== pB) {
@@ -411,10 +493,46 @@ export default function SubscriptionManager() {
     });
   }, [subscriptions, subSortField, subSortAsc]);
 
-  const totalSubPages = Math.ceil(sortedSubscriptions.length / subsPerPage) || 1;
+  // Filter subscriptions - when uniqueCustomerOnly is active, deduplicate by customer
+  const filteredSubscriptions = React.useMemo(() => {
+    if (!uniqueCustomerOnly) {
+      return sortedSubscriptions;
+    }
+    const seenEmails = new Set();
+    const seenPhones = new Set();
+    const seenNames = new Set();
+    const seenIds = new Set();
+
+    return sortedSubscriptions.filter(sub => {
+      const cleanEmail = (sub.email || '').trim().toLowerCase();
+      const cleanPhone = (sub.whatsapp_number || '').trim();
+      const cleanName = (sub.customer_name || '').trim().toLowerCase();
+
+      if (cleanEmail && seenEmails.has(cleanEmail)) {
+        return false;
+      }
+      if (cleanPhone && seenPhones.has(cleanPhone)) {
+        return false;
+      }
+      if (!cleanEmail && !cleanPhone && cleanName && seenNames.has(cleanName)) {
+        return false;
+      }
+      if (!cleanEmail && !cleanPhone && !cleanName && seenIds.has(sub.id)) {
+        return false;
+      }
+
+      if (cleanEmail) seenEmails.add(cleanEmail);
+      if (cleanPhone) seenPhones.add(cleanPhone);
+      if (cleanName) seenNames.add(cleanName);
+      seenIds.add(sub.id);
+      return true;
+    });
+  }, [sortedSubscriptions, uniqueCustomerOnly]);
+
+  const totalSubPages = Math.ceil(filteredSubscriptions.length / subsPerPage) || 1;
   const paginatedSubscriptions = React.useMemo(() => {
-    return sortedSubscriptions.slice((subPage - 1) * subsPerPage, subPage * subsPerPage);
-  }, [sortedSubscriptions, subPage, subsPerPage]);
+    return filteredSubscriptions.slice((subPage - 1) * subsPerPage, subPage * subsPerPage);
+  }, [filteredSubscriptions, subPage, subsPerPage]);
 
   // Calculate Expiry Date automatically based on Purchase Date + Validity Days
   useEffect(() => {
@@ -526,25 +644,103 @@ export default function SubscriptionManager() {
     return false;
   };
 
+  const isAccountMatchingPackage = (acc, packagePlan) => {
+    if (!packagePlan || !packagePlan.trim()) return true;
+    if (!acc.package_name || !acc.package_name.trim()) {
+      return true; // Generic account without specific package restriction
+    }
+
+    const planLower = packagePlan.toLowerCase().trim();
+    const accPkgLower = acc.package_name.toLowerCase().trim();
+
+    // 1. Direct equality
+    if (planLower === accPkgLower) return true;
+
+    // 2. Contains check
+    if (planLower.includes(accPkgLower) || accPkgLower.includes(planLower)) return true;
+
+    // 3. Tokenized keyword matching
+    const tokenize = (str) =>
+      str
+        .toLowerCase()
+        .replace(/[\-_–—|/\\(),.]+/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2);
+
+    const planWords = tokenize(planLower);
+    const accWords = tokenize(accPkgLower);
+
+    const commonWords = accWords.filter(w => planWords.includes(w));
+    if (commonWords.length > 0) return true;
+
+    return false;
+  };
+
   const matchingDigitalAccounts = React.useMemo(() => {
     if (!subForm.product_name || !subForm.product_name.trim()) {
       return [];
     }
-    return digitalAccounts.filter(acc => 
+
+    // 1. Filter accounts by product first
+    const productAccounts = digitalAccounts.filter(acc => 
       isAccountMatchingProduct(acc, subForm.product_name) ||
       (editingSub && subForm.digital_account_id && String(acc.id) === String(subForm.digital_account_id))
     );
-  }, [digitalAccounts, subForm.product_name, subForm.digital_account_id, editingSub, catalogProducts]);
 
-  // Auto-clear digital_account_id if selected account is no longer in matching accounts
+    // If no package_plan specified, return all product accounts
+    if (!subForm.package_plan || !subForm.package_plan.trim()) {
+      return productAccounts;
+    }
+
+    // 2. Separate into accounts matching the specific package and generic accounts
+    const exactPackageAccounts = [];
+    const genericAccounts = [];
+
+    productAccounts.forEach(acc => {
+      // If currently editing and this account is already assigned to this subscription, keep it
+      if (editingSub && subForm.digital_account_id && String(acc.id) === String(subForm.digital_account_id)) {
+        exactPackageAccounts.push(acc);
+        return;
+      }
+
+      if (acc.package_name && acc.package_name.trim()) {
+        if (isAccountMatchingPackage(acc, subForm.package_plan)) {
+          exactPackageAccounts.push(acc);
+        }
+      } else {
+        genericAccounts.push(acc);
+      }
+    });
+
+    // If there are accounts matching the specific package, show those (and include generic accounts as fallback)
+    if (exactPackageAccounts.length > 0) {
+      return [...exactPackageAccounts, ...genericAccounts];
+    }
+
+    // If no account specifically has this package tagged, allow generic accounts
+    return genericAccounts;
+  }, [digitalAccounts, subForm.product_name, subForm.package_plan, subForm.digital_account_id, editingSub, catalogProducts]);
+
+  // Auto-clear or auto-select digital_account_id if selected account is no longer matching product & package
   React.useEffect(() => {
     if (subForm.digital_account_id) {
       const isStillMatching = matchingDigitalAccounts.some(acc => String(acc.id) === String(subForm.digital_account_id));
       if (!isStillMatching) {
-        setSubForm(prev => ({ ...prev, digital_account_id: '' }));
+        const firstAvailable = matchingDigitalAccounts.find(a => a.available_slots > 0) || matchingDigitalAccounts[0];
+        setSubForm(prev => ({
+          ...prev,
+          digital_account_id: firstAvailable ? String(firstAvailable.id) : ''
+        }));
+      }
+    } else if (matchingDigitalAccounts.length > 0 && showAddForm && !editingSub) {
+      const bestMatch = matchingDigitalAccounts.find(a => a.available_slots > 0 && a.package_name && isAccountMatchingPackage(a, subForm.package_plan)) ||
+        matchingDigitalAccounts.find(a => a.available_slots > 0) ||
+        matchingDigitalAccounts[0];
+      if (bestMatch) {
+        setSubForm(prev => prev.digital_account_id ? prev : ({ ...prev, digital_account_id: String(bestMatch.id) }));
       }
     }
-  }, [matchingDigitalAccounts, subForm.digital_account_id]);
+  }, [matchingDigitalAccounts, subForm.digital_account_id, showAddForm, editingSub, subForm.package_plan]);
 
   const selectedDigitalAccount = React.useMemo(() => {
     if (!subForm.digital_account_id) return null;
@@ -565,10 +761,12 @@ export default function SubscriptionManager() {
       const res = await api.get(`/digital-licenses/order-lookup/${cleanId}`);
       const ord = res?.order || res;
       if (ord) {
-        const resolvedEmail = ord.delivery_email || (ord.user_role !== 'admin' ? ord.customer_email : '') || '';
+        const rawEmail = (ord.delivery_email || (ord.user_role !== 'admin' ? ord.customer_email : '') || '').trim();
+        const resolvedEmail = (rawEmail && !rawEmail.includes('@guest.')) ? rawEmail : '';
+        const resolvedName = ((ord.customer_name && ord.customer_name.trim()) ? ord.customer_name.trim() : (ord.user_role !== 'admin' ? (ord.user_name || '') : '')).trim();
         setSubForm(prev => ({
           ...prev,
-          customer_name: prev.customer_name || ord.user_name || ord.customer_name || '',
+          customer_name: prev.customer_name || resolvedName,
           whatsapp_number: prev.whatsapp_number || ord.user_whatsapp || ord.phone || '',
           email: prev.email || resolvedEmail,
           selling_price: (!prev.selling_price || prev.selling_price === '0') ? (ord.total_amount ? String(ord.total_amount) : prev.selling_price) : prev.selling_price
@@ -669,9 +867,11 @@ export default function SubscriptionManager() {
     }
   };
 
-  const fetchSubscriptions = async () => {
+  const fetchSubscriptions = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       const params = {};
       if (searchQuery) params.search = searchQuery;
       if (productFilter && productFilter !== 'All Products') params.product = productFilter;
@@ -942,16 +1142,29 @@ export default function SubscriptionManager() {
 
     try {
       setSubFormSubmitting(true);
+
+      // Check if logged in user is admin and prevent accidental admin email submission
+      let currentLoggedUser = null;
+      try {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) currentLoggedUser = JSON.parse(storedUser);
+      } catch (e) {}
+
+      let cleanEmail = (subForm.email || '').trim();
+      if (currentLoggedUser?.email && cleanEmail.toLowerCase() === currentLoggedUser.email.toLowerCase()) {
+        cleanEmail = '';
+      }
+
       const payload = {
         ...subForm,
-        email: (subForm.email || '').trim() || '',
+        email: cleanEmail,
         product_name: targetProductName,
         order_id: subForm.order_id ? parseInt(subForm.order_id, 10) : null,
         vendor_id: subForm.vendor_id ? parseInt(subForm.vendor_id, 10) : null,
         vendor_price: subForm.vendor_price !== '' && subForm.vendor_price !== null ? parseFloat(subForm.vendor_price) : 0,
         license_id: (licenseInputMode === 'dropdown' && subForm.selected_license_id) ? subForm.selected_license_id : null,
         digital_account_id: subForm.digital_account_id ? parseInt(subForm.digital_account_id, 10) : null,
-        send_email: Boolean(subForm.email && subForm.email.trim() && subForm.send_email !== false)
+        send_email: Boolean(cleanEmail && subForm.send_email !== false)
       };
 
       if (editingSub) {
@@ -964,7 +1177,7 @@ export default function SubscriptionManager() {
 
       setShowAddForm(false);
       setEditingSub(null);
-      fetchSubscriptions();
+      await fetchSubscriptions(true);
       fetchDigitalAccounts();
     } catch (err) {
       console.error('Error saving subscription:', err);
@@ -1193,7 +1406,7 @@ export default function SubscriptionManager() {
           email: payload.customer_email || prev.email
         }));
       }
-      fetchSubscriptions();
+      fetchSubscriptions(true);
     } catch (err) {
       console.error('Renewal error:', err);
       toast.error(err.message || 'Failed to renew subscription.');
@@ -1211,7 +1424,7 @@ export default function SubscriptionManager() {
       if (showDetailModal && selectedSubDetail?.id === id) {
         setShowDetailModal(false);
       }
-      fetchSubscriptions();
+      fetchSubscriptions(true);
     } catch (err) {
       toast.error('Failed to delete subscription.');
     }
@@ -1239,7 +1452,7 @@ export default function SubscriptionManager() {
     try {
       await api.put(`/subscriptions/${sub.id}/status`, { status: newStatus });
       toast.success(isCurrentlyNotRenewed ? `Subscription marked as ${newStatus}` : 'Marked as Not Renewed');
-      await fetchSubscriptions();
+      await fetchSubscriptions(true);
     } catch (err) {
       console.error('Error updating status:', err);
       // Revert optimistic update on failure
@@ -1392,6 +1605,7 @@ export default function SubscriptionManager() {
   };
 
   const hasActiveFilters = Boolean(
+    uniqueCustomerOnly ||
     searchQuery ||
     (productFilter && productFilter !== 'All Products') ||
     (statusFilter && statusFilter !== 'All Status') ||
@@ -1408,7 +1622,7 @@ export default function SubscriptionManager() {
 
       if (mode === 'all') {
         if (!hasActiveFilters && subscriptions.length > 0) {
-          dataToExport = sortedSubscriptions;
+          dataToExport = filteredSubscriptions;
         } else {
           // Fetch complete list from backend
           const res = await api.get('/subscriptions');
@@ -1417,14 +1631,14 @@ export default function SubscriptionManager() {
         }
         isFilteredExport = false;
       } else if (mode === 'filtered') {
-        dataToExport = sortedSubscriptions;
+        dataToExport = filteredSubscriptions;
         isFilteredExport = true;
       } else {
         if (hasActiveFilters) {
-          dataToExport = sortedSubscriptions;
+          dataToExport = filteredSubscriptions;
           isFilteredExport = true;
         } else {
-          dataToExport = sortedSubscriptions.length > 0 ? sortedSubscriptions : subscriptions;
+          dataToExport = filteredSubscriptions.length > 0 ? filteredSubscriptions : subscriptions;
           isFilteredExport = false;
         }
       }
@@ -1552,8 +1766,11 @@ export default function SubscriptionManager() {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => {
+              setUniqueCustomerOnly(false);
+              setStatusFilter('All Status');
               setExpiryFilter('today');
               setActiveSubTab('subscriptions');
+              setSubPage(1);
             }}
             className="relative p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors border border-slate-200/80 cursor-pointer shadow-2xs"
             title="Expiring Today Notifications"
@@ -1572,7 +1789,7 @@ export default function SubscriptionManager() {
               <button
                 type="button"
                 onClick={() => handleExportExcel(hasActiveFilters ? 'filtered' : 'all')}
-                disabled={exportingExcel || sortedSubscriptions.length === 0}
+                disabled={exportingExcel || filteredSubscriptions.length === 0}
                 className="flex items-center gap-1.5 px-3 py-1.75 bg-emerald-50 hover:bg-emerald-100/90 active:bg-emerald-200 text-emerald-800 font-bold text-xs rounded-l-lg border border-emerald-300 border-r-emerald-400 transition-all cursor-pointer disabled:opacity-50"
                 title="Download subscriptions as Excel (.xlsx)"
               >
@@ -1585,7 +1802,7 @@ export default function SubscriptionManager() {
                 <span className="sm:hidden">Excel</span>
                 {hasActiveFilters && (
                   <span className="bg-emerald-200 text-emerald-900 text-[9px] px-1.5 py-0.2 rounded-full font-extrabold ml-0.5">
-                    {sortedSubscriptions.length}
+                    {filteredSubscriptions.length}
                   </span>
                 )}
               </button>
@@ -1611,7 +1828,7 @@ export default function SubscriptionManager() {
                     setHeaderExportMenuOpen(false);
                     handleExportExcel('filtered');
                   }}
-                  disabled={sortedSubscriptions.length === 0}
+                  disabled={filteredSubscriptions.length === 0}
                   className="w-full text-left px-3 py-2 hover:bg-emerald-50/70 flex items-center justify-between text-slate-700 hover:text-emerald-700 transition-colors disabled:opacity-40 cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
@@ -1619,7 +1836,7 @@ export default function SubscriptionManager() {
                     <span>Export Current View</span>
                   </div>
                   <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
-                    {sortedSubscriptions.length}
+                    {filteredSubscriptions.length}
                   </span>
                 </button>
                 <button
@@ -1709,6 +1926,10 @@ export default function SubscriptionManager() {
           </div>
 
           <form onSubmit={handleSaveCustomerSub} autoComplete="off" className="space-y-4">
+            {/* Hidden dummy fields to absorb aggressive browser autofill of saved admin credentials */}
+            <input type="text" name="dummy_username_block" tabIndex={-1} style={{ display: 'none' }} autoComplete="off" />
+            <input type="password" name="dummy_password_block" tabIndex={-1} style={{ display: 'none' }} autoComplete="off" />
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
 
               {/* Customer Name */}
@@ -1720,6 +1941,10 @@ export default function SubscriptionManager() {
                   placeholder="e.g. Rahim Ahmed"
                   value={subForm.customer_name}
                   onChange={(e) => setSubForm({ ...subForm, customer_name: e.target.value })}
+                  name="sub_customer_full_name"
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
@@ -1733,6 +1958,10 @@ export default function SubscriptionManager() {
                   placeholder="e.g. 019XX XXX101"
                   value={subForm.whatsapp_number}
                   onChange={(e) => setSubForm({ ...subForm, whatsapp_number: e.target.value })}
+                  name="sub_customer_mobile_phone"
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
@@ -1740,7 +1969,7 @@ export default function SubscriptionManager() {
               {/* Email Address */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-slate-700">Email Address</label>
+                  <label className="block text-xs font-bold text-slate-700">Email Address (ঐচ্ছিক)</label>
                   <label className="flex items-center gap-1.5 cursor-pointer text-[11px] select-none text-slate-600 hover:text-emerald-700">
                     <input
                       type="checkbox"
@@ -1752,12 +1981,15 @@ export default function SubscriptionManager() {
                   </label>
                 </div>
                 <input
-                  type="email"
-                  name="customer_subscription_email_address"
-                  autoComplete="new-password"
+                  type="text"
+                  inputMode="email"
+                  name="sub_customer_direct_email_field"
+                  autoComplete="off"
                   autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck="false"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   placeholder="e.g. customer@example.com (ঐচ্ছিক)"
                   value={subForm.email}
                   onChange={(e) => setSubForm({ ...subForm, email: e.target.value })}
@@ -2198,7 +2430,7 @@ export default function SubscriptionManager() {
                 </p>
               </div>
 
-              {/* License Manager Account (Product-Wise) */}
+              {/* License Manager Account (Product & Package Wise) */}
               <div className="col-span-1 sm:col-span-2 md:col-span-2 lg:col-span-2 xl:col-span-3">
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -2207,7 +2439,7 @@ export default function SubscriptionManager() {
                   </label>
                   {matchingDigitalAccounts.length > 0 && (
                     <span className="text-[10px] bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full font-bold">
-                      {matchingDigitalAccounts.length} matching product
+                      {matchingDigitalAccounts.length} matching product & package
                     </span>
                   )}
                 </div>
@@ -2226,24 +2458,26 @@ export default function SubscriptionManager() {
                       <option value="">-- No Account Selected --</option>
                       {matchingDigitalAccounts.map(acc => (
                         <option key={acc.id} value={acc.id}>
-                          {acc.account_email} • {acc.available_slots} / {acc.total_slots} Slots Free ({acc.product_name})
+                          {acc.account_email} • {acc.available_slots} / {acc.total_slots} Slots Free{acc.package_name ? ` • [${acc.package_name}]` : ''} ({acc.product_name})
                         </option>
                       ))}
                     </>
                   ) : (
                     <option value="">
                       {subForm.product_name
-                        ? '-- No Account Available for this Product --'
+                        ? (subForm.package_plan
+                            ? `-- No Account Available for ${subForm.product_name} (${subForm.package_plan}) --`
+                            : `-- No Account Available for ${subForm.product_name} --`)
                         : '-- Select a Product First --'}
                     </option>
                   )}
                 </select>
                 <p className="text-[10px] text-slate-500 mt-1">
                   {matchingDigitalAccounts.length > 0
-                    ? `Showing ${matchingDigitalAccounts.length} account(s) matching "${subForm.product_name}"`
+                    ? `Showing ${matchingDigitalAccounts.length} account(s) matching "${subForm.product_name}"${subForm.package_plan ? ` & "${subForm.package_plan}"` : ''}`
                     : (subForm.product_name
-                        ? `No license accounts found for "${subForm.product_name}"`
-                        : 'Select a product above to filter accounts')}
+                        ? `No license accounts found for "${subForm.product_name}"${subForm.package_plan ? ` with plan "${subForm.package_plan}"` : ''}`
+                        : 'Select a product and package above to filter accounts')}
                 </p>
               </div>
 
@@ -2589,8 +2823,11 @@ export default function SubscriptionManager() {
           </div>
           <button
             onClick={() => {
+              setUniqueCustomerOnly(false);
+              setStatusFilter('All Status');
               setExpiryFilter('today');
               setActiveSubTab('subscriptions');
+              setSubPage(1);
             }}
             className="text-[11px] font-bold text-rose-600 hover:text-rose-800 underline whitespace-nowrap flex items-center gap-1 transition-colors self-start sm:self-auto cursor-pointer"
           >
@@ -2641,6 +2878,7 @@ export default function SubscriptionManager() {
                 if (tab.id === 'add_customer') {
                   handleOpenAddModal();
                 } else if (tab.id === 'renewals') {
+                  setUniqueCustomerOnly(false);
                   setStatusFilter('Renewed');
                   setExpiryFilter('All Dates');
                   setActiveSubTab('subscriptions');
@@ -2691,9 +2929,9 @@ export default function SubscriptionManager() {
       <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5">
         {/* Card 1: Active Subscriptions */}
         <div
-          onClick={() => { setStatusFilter('Active'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          onClick={() => handleStatCardClick('active')}
           className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            statusFilter === 'Active' && expiryFilter === 'All Dates'
+            activeStatCard === 'active'
               ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/20'
               : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-emerald-500/40'
           }`}
@@ -2709,9 +2947,9 @@ export default function SubscriptionManager() {
 
         {/* Card 2: Expiring Today */}
         <div
-          onClick={() => { setStatusFilter('All Status'); setExpiryFilter('today'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          onClick={() => handleStatCardClick('expiringToday')}
           className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            expiryFilter === 'today'
+            activeStatCard === 'expiringToday'
               ? 'bg-rose-50/80 border-rose-500 ring-2 ring-rose-500/20'
               : 'bg-white hover:bg-rose-50/50 border-rose-200/90 hover:border-rose-300'
           }`}
@@ -2727,9 +2965,9 @@ export default function SubscriptionManager() {
 
         {/* Card 3: Within 3 Days */}
         <div
-          onClick={() => { setStatusFilter('All Status'); setExpiryFilter('3days'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          onClick={() => handleStatCardClick('within3Days')}
           className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            expiryFilter === '3days'
+            activeStatCard === 'within3Days'
               ? 'bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20'
               : 'bg-white hover:bg-amber-50/50 border-amber-200/90 hover:border-amber-300'
           }`}
@@ -2745,9 +2983,9 @@ export default function SubscriptionManager() {
 
         {/* Card 4: Within 7 Days */}
         <div
-          onClick={() => { setStatusFilter('All Status'); setExpiryFilter('7days'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          onClick={() => handleStatCardClick('within7Days')}
           className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            expiryFilter === '7days'
+            activeStatCard === 'within7Days'
               ? 'bg-yellow-50/80 border-yellow-500 ring-2 ring-yellow-500/20'
               : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-yellow-500/40'
           }`}
@@ -2763,9 +3001,9 @@ export default function SubscriptionManager() {
 
         {/* Card 5: Expired */}
         <div
-          onClick={() => { setStatusFilter('Expired'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          onClick={() => handleStatCardClick('expired')}
           className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            statusFilter === 'Expired' && expiryFilter === 'All Dates'
+            activeStatCard === 'expired'
               ? 'bg-rose-50/80 border-rose-500 ring-2 ring-rose-500/20'
               : 'bg-white hover:bg-rose-50/50 border-rose-200/90 hover:border-rose-300'
           }`}
@@ -2781,9 +3019,9 @@ export default function SubscriptionManager() {
 
         {/* Card 6: Renewed */}
         <div
-          onClick={() => { setStatusFilter('Renewed'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          onClick={() => handleStatCardClick('renewed')}
           className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            statusFilter === 'Renewed' && expiryFilter === 'All Dates'
+            activeStatCard === 'renewed'
               ? 'bg-teal-50/80 border-teal-500 ring-2 ring-teal-500/20'
               : 'bg-white hover:bg-teal-50/50 border-slate-200/90 hover:border-teal-400'
           }`}
@@ -2799,9 +3037,9 @@ export default function SubscriptionManager() {
 
         {/* Card 7: Not Renewed */}
         <div
-          onClick={() => { setStatusFilter('Not Renewed'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          onClick={() => handleStatCardClick('notRenewed')}
           className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            statusFilter === 'Not Renewed' && expiryFilter === 'All Dates'
+            activeStatCard === 'notRenewed'
               ? 'bg-slate-200/80 border-slate-600 ring-2 ring-slate-600/30'
               : 'bg-white hover:bg-slate-100/70 border-slate-200/90 hover:border-slate-400'
           }`}
@@ -2817,9 +3055,9 @@ export default function SubscriptionManager() {
 
         {/* Card 8: Unique Customer */}
         <div
-          onClick={() => { setStatusFilter('All Status'); setExpiryFilter('All Dates'); setActiveSubTab('subscriptions'); setSubPage(1); }}
+          onClick={() => handleStatCardClick('uniqueCustomer')}
           className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            statusFilter === 'All Status' && expiryFilter === 'All Dates' && searchQuery === '' && productFilter === 'All Products'
+            activeStatCard === 'uniqueCustomer'
               ? 'bg-blue-50/70 border-blue-500 ring-2 ring-blue-500/20'
               : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-blue-400'
           }`}
@@ -3250,6 +3488,7 @@ export default function SubscriptionManager() {
               <select
                 value={statusFilter}
                 onChange={(e) => {
+                  setUniqueCustomerOnly(false);
                   setStatusFilter(e.target.value);
                   setSubPage(1);
                 }}
@@ -3271,6 +3510,7 @@ export default function SubscriptionManager() {
               <select
                 value={expiryFilter}
                 onChange={(e) => {
+                  setUniqueCustomerOnly(false);
                   setExpiryFilter(e.target.value);
                   setSubPage(1);
                 }}
@@ -3290,10 +3530,14 @@ export default function SubscriptionManager() {
                 value={subSortField}
                 onChange={(e) => {
                   setSubSortField(e.target.value);
+                  if (e.target.value === 'order_no') {
+                    setSubSortAsc(false);
+                  }
                   setSubPage(1);
                 }}
                 className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 font-medium focus:outline-none focus:border-emerald-500 transition-all shadow-2xs cursor-pointer"
               >
+                <option value="order_no">Sort: Order No (High to Low)</option>
                 <option value="expiry">Sort: Priority (Expired First)</option>
                 <option value="expiry_date_only">Sort: Expiry Date (Strict)</option>
                 <option value="order_date">Sort: Order Date</option>
@@ -3315,18 +3559,19 @@ export default function SubscriptionManager() {
             </button>
 
             {/* Reset Filters Button */}
-            {(searchQuery || productFilter !== 'All Products' || statusFilter !== 'All Status' || expiryFilter !== 'All Dates' || subSortField !== 'expiry' || !subSortAsc) && (
+            {(uniqueCustomerOnly || searchQuery || productFilter !== 'All Products' || statusFilter !== 'All Status' || expiryFilter !== 'All Dates' || subSortField !== 'order_no' || subSortAsc) && (
               <button
                 type="button"
                 onClick={() => {
+                  setUniqueCustomerOnly(false);
                   setSearchQuery('');
                   setProductFilter('All Products');
                   setProductFilterInput('');
                   setProductFilterOpen(false);
                   setStatusFilter('All Status');
                   setExpiryFilter('All Dates');
-                  setSubSortField('expiry');
-                  setSubSortAsc(true);
+                  setSubSortField('order_no');
+                  setSubSortAsc(false);
                   setSubPage(1);
                 }}
                 className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-[10.5px] font-bold rounded-lg transition-colors cursor-pointer shadow-2xs"
@@ -3343,7 +3588,7 @@ export default function SubscriptionManager() {
                 <button
                   type="button"
                   onClick={() => handleExportExcel(hasActiveFilters ? 'filtered' : 'all')}
-                  disabled={exportingExcel || sortedSubscriptions.length === 0}
+                  disabled={exportingExcel || filteredSubscriptions.length === 0}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 text-white text-[11px] font-bold rounded-l-lg border-r border-emerald-500 transition-all cursor-pointer shadow-2xs"
                   title="Download subscriptions as Excel (.xlsx)"
                 >
@@ -3355,7 +3600,7 @@ export default function SubscriptionManager() {
                   <span>Export Excel</span>
                   {hasActiveFilters && (
                     <span className="bg-emerald-800/80 text-emerald-100 text-[9.5px] px-1.5 py-0.2 rounded-full font-bold ml-0.5">
-                      {sortedSubscriptions.length}
+                      {filteredSubscriptions.length}
                     </span>
                   )}
                 </button>
@@ -3381,7 +3626,7 @@ export default function SubscriptionManager() {
                       setExportMenuOpen(false);
                       handleExportExcel('filtered');
                     }}
-                    disabled={sortedSubscriptions.length === 0}
+                    disabled={filteredSubscriptions.length === 0}
                     className="w-full text-left px-3 py-2 hover:bg-emerald-50/70 flex items-center justify-between text-slate-700 hover:text-emerald-700 transition-colors disabled:opacity-40 cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
@@ -3389,7 +3634,7 @@ export default function SubscriptionManager() {
                       <span>Export Current View</span>
                     </div>
                     <span className="text-[10px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
-                      {sortedSubscriptions.length}
+                      {filteredSubscriptions.length}
                     </span>
                   </button>
                   <button
@@ -3437,18 +3682,18 @@ export default function SubscriptionManager() {
                   </th>
                   <th
                     onClick={() => {
-                      if (subSortField === 'order_date') {
+                      if (subSortField === 'order_no') {
                         setSubSortAsc(!subSortAsc);
                       } else {
-                        setSubSortField('order_date');
-                        setSubSortAsc(true);
+                        setSubSortField('order_no');
+                        setSubSortAsc(false);
                       }
                     }}
                     className="py-2.5 px-3 border-r border-slate-250 cursor-pointer hover:bg-slate-200/70 transition-colors"
                   >
                     <div className="flex items-center justify-between">
                       <span>Order No & Date</span>
-                      <ArrowUpDown size={10} className={subSortField === 'order_date' ? 'text-emerald-600' : 'text-slate-400 opacity-50'} />
+                      <ArrowUpDown size={10} className={subSortField === 'order_no' ? 'text-emerald-600' : 'text-slate-400 opacity-50'} />
                     </div>
                   </th>
                   <th
@@ -3512,7 +3757,7 @@ export default function SubscriptionManager() {
                       <span className="text-xs font-semibold">Loading customer subscriptions...</span>
                     </td>
                   </tr>
-                ) : sortedSubscriptions.length === 0 ? (
+                ) : filteredSubscriptions.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-slate-500 border-b border-slate-200">
                       <div className="max-w-sm mx-auto space-y-2">
@@ -3520,12 +3765,15 @@ export default function SubscriptionManager() {
                         <button
                           type="button"
                           onClick={() => {
+                            setUniqueCustomerOnly(false);
                             setSearchQuery('');
                             setProductFilter('All Products');
                             setProductFilterInput('');
                             setProductFilterOpen(false);
                             setStatusFilter('All Status');
                             setExpiryFilter('All Dates');
+                            setSubSortField('order_no');
+                            setSubSortAsc(false);
                             setSubPage(1);
                           }}
                           className="px-3 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
@@ -3749,62 +3997,13 @@ export default function SubscriptionManager() {
                               <Eye size={13} />
                             </button>
 
-                            {/* Renew / View Button */}
-                            {sub.status === 'Expiring Soon' || sub.status === 'Expired' ? (
-                              <button
-                                onClick={() => handleOpenDetailModal(sub)}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10.5px] rounded-md transition-all shadow-2xs cursor-pointer"
-                              >
-                                Renew
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleOpenDetailModal(sub)}
-                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] rounded-md border border-slate-200 transition-colors cursor-pointer"
-                              >
-                                Renew
-                              </button>
-                            )}
-
-                            {/* Not Renewed Action Button */}
-                            {sub.status === 'Not Renewed' ? (
-                              <button
-                                type="button"
-                                disabled={togglingNotRenewedId === sub.id}
-                                onClick={(e) => handleToggleNotRenewed(sub, e)}
-                                className="px-2 py-1 bg-slate-700 hover:bg-slate-800 text-white font-bold text-[10.5px] rounded-md transition-all shadow-2xs cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-60"
-                                title="Marked as Not Renewed (Click to revert status)"
-                              >
-                                {togglingNotRenewedId === sub.id ? (
-                                  <RefreshCw size={11} className="animate-spin text-slate-300" />
-                                ) : (
-                                  <XCircle size={11} className="text-rose-400" />
-                                )}
-                                <span>Not Renewed</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={togglingNotRenewedId === sub.id}
-                                onClick={(e) => handleToggleNotRenewed(sub, e)}
-                                className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200/80 font-bold text-[10.5px] rounded-md transition-colors shadow-2xs cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-60"
-                                title="Mark as Not Renewed (Customer will not renew)"
-                              >
-                                {togglingNotRenewedId === sub.id ? (
-                                  <RefreshCw size={11} className="animate-spin text-rose-600" />
-                                ) : (
-                                  <UserX size={11} />
-                                )}
-                                <span>Not Renew</span>
-                              </button>
-                            )}
-
-                            {/* More Actions Dropdown Toggle */}
+                            {/* More Actions Dropdown Toggle (Includes Renew, Not Renewed, View Details, Edit, History, Delete) */}
                             <button
+                              type="button"
                               onClick={(e) => toggleActionMenu(e, sub)}
-                              className={`p-1 rounded-md transition-colors cursor-pointer ${activeMenuSub?.id === sub.id
-                                ? 'bg-slate-200 text-slate-900'
-                                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                              className={`p-1.5 rounded-md transition-colors cursor-pointer border ${activeMenuSub?.id === sub.id
+                                ? 'bg-slate-200 text-slate-900 border-slate-300'
+                                : 'bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-slate-200 shadow-2xs'
                                 }`}
                               title="More actions"
                             >
@@ -3837,7 +4036,7 @@ export default function SubscriptionManager() {
             {/* Pagination Info & Controls */}
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-slate-500 font-medium">
-                Showing {sortedSubscriptions.length === 0 ? 0 : ((subPage - 1) * subsPerPage) + 1} to {Math.min(subPage * subsPerPage, sortedSubscriptions.length)} of {sortedSubscriptions.length} entries
+                Showing {filteredSubscriptions.length === 0 ? 0 : ((subPage - 1) * subsPerPage) + 1} to {Math.min(subPage * subsPerPage, filteredSubscriptions.length)} of {filteredSubscriptions.length} entries
               </span>
 
               {totalSubPages > 1 && (
@@ -4914,7 +5113,7 @@ export default function SubscriptionManager() {
                             <option value="">-- No Account Linked --</option>
                             {digitalAccounts.map(acc => (
                               <option key={acc.id} value={acc.id}>
-                                {acc.product_name} ({acc.account_email})
+                                {acc.product_name}{acc.package_name ? ` • [${acc.package_name}]` : ''} ({acc.account_email})
                               </option>
                             ))}
                           </select>
@@ -5273,13 +5472,59 @@ export default function SubscriptionManager() {
             position: 'fixed',
             top: `${menuPosition.top}px`,
             left: `${menuPosition.left}px`,
-            width: '156px',
+            width: '168px',
             zIndex: 999999
           }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-white border border-slate-200 rounded-xl shadow-2xl py-1 text-xs text-left ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100"
+          className="bg-white border border-slate-200 rounded-xl shadow-2xl py-1 text-xs text-left ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100 font-sans"
         >
+          {/* Renew Button */}
           <button
+            type="button"
+            onClick={() => {
+              const s = activeMenuSub;
+              setActiveMenuSub(null);
+              handleOpenDetailModal(s);
+            }}
+            className="w-full px-3 py-2 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 flex items-center gap-2 font-semibold cursor-pointer transition-colors"
+          >
+            <RefreshCw size={13} className="text-emerald-600 shrink-0" />
+            <span>Renew</span>
+          </button>
+
+          {/* Not Renewed Button */}
+          <button
+            type="button"
+            disabled={togglingNotRenewedId === activeMenuSub?.id}
+            onClick={(e) => {
+              const s = activeMenuSub;
+              setActiveMenuSub(null);
+              handleToggleNotRenewed(s, e);
+            }}
+            className={`w-full px-3 py-2 flex items-center gap-2 font-medium cursor-pointer transition-colors disabled:opacity-60 ${
+              activeMenuSub?.status === 'Not Renewed'
+                ? 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                : 'text-rose-600 hover:bg-rose-50 hover:text-rose-700'
+            }`}
+          >
+            {activeMenuSub?.status === 'Not Renewed' ? (
+              <>
+                <RotateCcw size={13} className="text-slate-500 shrink-0" />
+                <span>Revert Not Renewed</span>
+              </>
+            ) : (
+              <>
+                <UserX size={13} className="text-rose-500 shrink-0" />
+                <span>Not Renewed</span>
+              </>
+            )}
+          </button>
+
+          <div className="border-t border-slate-100 my-1"></div>
+
+          {/* View Details */}
+          <button
+            type="button"
             onClick={() => {
               const s = activeMenuSub;
               setActiveMenuSub(null);
@@ -5287,9 +5532,13 @@ export default function SubscriptionManager() {
             }}
             className="w-full px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 font-medium cursor-pointer transition-colors"
           >
-            <Eye size={13} className="text-blue-600" /> View Details
+            <Eye size={13} className="text-blue-600 shrink-0" />
+            <span>View Details</span>
           </button>
+
+          {/* Edit */}
           <button
+            type="button"
             onClick={() => {
               const s = activeMenuSub;
               setActiveMenuSub(null);
@@ -5297,9 +5546,13 @@ export default function SubscriptionManager() {
             }}
             className="w-full px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 font-medium cursor-pointer transition-colors"
           >
-            <Edit2 size={13} className="text-slate-500" /> Edit
+            <Edit2 size={13} className="text-slate-500 shrink-0" />
+            <span>Edit</span>
           </button>
+
+          {/* History */}
           <button
+            type="button"
             onClick={() => {
               const s = activeMenuSub;
               setActiveMenuSub(null);
@@ -5307,36 +5560,24 @@ export default function SubscriptionManager() {
             }}
             className="w-full px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2 font-medium cursor-pointer transition-colors"
           >
-            <History size={13} className="text-slate-500" /> History
+            <History size={13} className="text-slate-500 shrink-0" />
+            <span>History</span>
           </button>
-          <button
-            onClick={(e) => {
-              const s = activeMenuSub;
-              setActiveMenuSub(null);
-              handleToggleNotRenewed(s, e);
-            }}
-            className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-medium cursor-pointer transition-colors"
-          >
-            {activeMenuSub?.status === 'Not Renewed' ? (
-              <>
-                <XCircle size={13} className="text-rose-500" /> Revert Status
-              </>
-            ) : (
-              <>
-                <UserX size={13} className="text-rose-500" /> Mark Not Renewed
-              </>
-            )}
-          </button>
+
           <div className="border-t border-slate-100 my-1"></div>
+
+          {/* Delete */}
           <button
+            type="button"
             onClick={() => {
               const s = activeMenuSub;
               setActiveMenuSub(null);
               handleDeleteSubscription(s.id, s.customer_name);
             }}
-            className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-medium cursor-pointer transition-colors"
+            className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700 flex items-center gap-2 font-medium cursor-pointer transition-colors"
           >
-            <Trash2 size={13} className="text-rose-500" /> Delete
+            <Trash2 size={13} className="text-rose-500 shrink-0" />
+            <span>Delete</span>
           </button>
         </div>,
         document.body

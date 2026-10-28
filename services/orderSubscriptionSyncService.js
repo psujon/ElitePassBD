@@ -149,20 +149,21 @@ const syncWebsiteOrderToSubscriptions = async (orderId, connection = null) => {
   try {
     // 1. Fetch order details
     const [orders] = await conn.query(`
-      SELECT o.id, o.phone, o.delivery_email, o.created_at, o.completed_at,
+      SELECT o.id, o.phone, o.delivery_email, o.customer_name, o.created_at, o.completed_at,
              u.name AS user_name, u.email AS user_email, u.role AS user_role
       FROM orders o
-      JOIN users u ON o.user_id = u.id
+      LEFT JOIN users u ON o.user_id = u.id
       WHERE o.id = ?
     `, [orderId]);
 
     if (orders.length === 0) return;
     const ord = orders[0];
 
-    const customerName = ord.user_name || 'Website Customer';
+    const customerName = (ord.customer_name && ord.customer_name.trim()) ? ord.customer_name.trim() : ((ord.user_role !== 'admin' ? ord.user_name : null) || 'Website Customer');
     const customerPhone = ord.phone || '';
     // Never fall back to admin email if customer has no email
-    const customerEmail = ord.delivery_email || (ord.user_role !== 'admin' ? ord.user_email : null) || null;
+    const rawCustomerEmail = ord.delivery_email || (ord.user_role !== 'admin' ? ord.user_email : null) || null;
+    const customerEmail = (rawCustomerEmail && !rawCustomerEmail.includes('@guest.')) ? rawCustomerEmail : null;
     const purchaseDate = ord.created_at ? new Date(ord.created_at) : new Date();
 
     // 2. Fetch order items

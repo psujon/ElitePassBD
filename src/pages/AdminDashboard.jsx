@@ -1044,8 +1044,8 @@ export default function AdminDashboard() {
         const formattedId = `#${orderIdStr}`;
         const cleanOrderQuery = q.replace(/^(?:order[\s:#-]*#?|#)\s*/i, '').trim();
         const idMatch = orderIdStr.includes(q) || formattedId.toLowerCase().includes(q) || (cleanOrderQuery ? orderIdStr.includes(cleanOrderQuery) : false);
-        const nameMatch = String(ord.user_name ?? '').toLowerCase().includes(q);
-        const emailMatch = String(ord.user_email ?? '').toLowerCase().includes(q);
+        const nameMatch = String(ord.customer_name || ord.user_name || '').toLowerCase().includes(q);
+        const emailMatch = String(ord.delivery_email || (!ord.user_email?.includes('@guest.') ? ord.user_email : '') || '').toLowerCase().includes(q);
         const phoneMatch = String(ord.phone ?? '').toLowerCase().includes(q);
         const methodMatch = String(ord.payment_method ?? '').toLowerCase().includes(q);
         const pStatusMatch = String(ord.payment_status ?? '').toLowerCase().includes(q);
@@ -1126,8 +1126,8 @@ export default function AdminDashboard() {
         const formattedId = `#${orderIdStr}`;
         const cleanOrderQuery = q.replace(/^(?:order[\s:#-]*#?|#)\s*/i, '').trim();
         const idMatch = orderIdStr.includes(q) || formattedId.toLowerCase().includes(q) || (cleanOrderQuery ? orderIdStr.includes(cleanOrderQuery) : false);
-        const nameMatch = String(ord.user_name ?? '').toLowerCase().includes(q);
-        const emailMatch = String(ord.user_email ?? '').toLowerCase().includes(q);
+        const nameMatch = String(ord.customer_name || ord.user_name || '').toLowerCase().includes(q);
+        const emailMatch = String(ord.delivery_email || (!ord.user_email?.includes('@guest.') ? ord.user_email : '') || '').toLowerCase().includes(q);
         const phoneMatch = String(ord.phone ?? '').toLowerCase().includes(q);
         const addressMatch = String(ord.shipping_address ?? '').toLowerCase().includes(q);
         const methodStr = String(ord.payment_method ?? '').toLowerCase();
@@ -1171,7 +1171,7 @@ export default function AdminDashboard() {
       } else if (orderTabSortField === 'total') {
         comparison = (parseFloat(a.total_amount) || 0) - (parseFloat(b.total_amount) || 0);
       } else if (orderTabSortField === 'customer') {
-        comparison = String(a.user_name || '').localeCompare(String(b.user_name || ''));
+        comparison = String(a.customer_name || a.user_name || '').localeCompare(String(b.customer_name || b.user_name || ''));
       } else {
         const dateA = new Date(a.created_at || 0).getTime() || 0;
         const dateB = new Date(b.created_at || 0).getTime() || 0;
@@ -2883,15 +2883,15 @@ export default function AdminDashboard() {
                                     {/* Customer Avatar & Info */}
                                     <td className="px-2.5 py-2 sm:px-3 sm:py-2">
                                       <div className="flex items-center gap-2">
-                                        <div className={`w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full font-extrabold text-[10px] sm:text-[11px] flex items-center justify-center shrink-0 border shadow-2xs ${getAvatarStyle(ord.user_name)}`}>
-                                          {getInitials(ord.user_name)}
+                                        <div className={`w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full font-extrabold text-[10px] sm:text-[11px] flex items-center justify-center shrink-0 border shadow-2xs ${getAvatarStyle(ord.customer_name || ord.user_name)}`}>
+                                          {getInitials(ord.customer_name || ord.user_name)}
                                         </div>
                                         <div className="min-w-0">
                                           <p className="font-bold text-slate-900 text-xs truncate leading-tight">
-                                            {ord.user_name || 'Customer'}
+                                            {ord.customer_name || ord.user_name || 'Customer'}
                                           </p>
                                           <p className="text-[10px] sm:text-[11px] text-slate-400 truncate max-w-[150px]">
-                                            {ord.user_email}
+                                            {ord.delivery_email || (!ord.user_email?.includes('@guest.') ? ord.user_email : '') || ''}
                                           </p>
                                         </div>
                                       </div>
@@ -4394,8 +4394,8 @@ export default function AdminDashboard() {
 
                                 {/* Customer Cell */}
                                 <td className="px-3 py-2.5 text-left border-r border-b border-slate-200/80 align-top">
-                                  <p className="font-extrabold text-slate-850 text-[11.5px] tracking-tight">{ord.user_name}</p>
-                                  <p className="text-[10px] text-slate-500 font-medium break-all mt-0.5">{ord.user_email}</p>
+                                  <p className="font-extrabold text-slate-850 text-[11.5px] tracking-tight">{ord.customer_name || ord.user_name || 'Customer'}</p>
+                                  <p className="text-[10px] text-slate-500 font-medium break-all mt-0.5">{ord.delivery_email || (!ord.user_email?.includes('@guest.') ? ord.user_email : '') || ''}</p>
                                   {ord.phone && (
                                     <p className="text-[9.5px] text-slate-600 flex items-center gap-1 mt-1 font-semibold">
                                       <Phone className="w-3 h-3 text-slate-400 shrink-0" />
