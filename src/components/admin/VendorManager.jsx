@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
 import { api } from '../../utils/api';
+import { getWhatsAppLink } from '../../utils/whatsapp';
 import {
   Store,
   Plus,
@@ -211,16 +212,6 @@ export default function VendorManager() {
     if (!text) return;
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard!`);
-  };
-
-  // Format WhatsApp Link
-  const getWhatsAppLink = (number) => {
-    if (!number) return null;
-    let clean = number.replace(/[^0-9]/g, '');
-    if (clean.startsWith('01')) {
-      clean = '88' + clean;
-    }
-    return `https://wa.me/${clean}`;
   };
 
   // Format Telegram Link
@@ -868,23 +859,56 @@ export default function VendorManager() {
 
                 {/* 6. WhatsApp */}
                 <div className="col-span-1">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    WhatsApp Number <span className="text-[10px] text-slate-400 font-normal">(direct chat)</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      WhatsApp <span className="text-[10px] text-slate-400 font-normal">(Number or @username)</span>
+                    </label>
+                    {formData.whatsapp && getWhatsAppLink(formData.whatsapp) && (
+                      <a
+                        href={getWhatsAppLink(formData.whatsapp)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-medium text-emerald-600 hover:underline flex items-center gap-0.5"
+                        title="Test WhatsApp Link"
+                      >
+                        <span>Test Link</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
                   <input
                     type="text"
-                    placeholder="88019xxxxxxxx"
+                    placeholder="017xxxxxxxx or @dollar_abir"
                     value={formData.whatsapp}
                     onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-purple-500 focus:bg-white text-xs transition-colors"
                   />
+                  {formData.whatsapp && (
+                    <p className="text-[10px] text-slate-500 mt-1 truncate">
+                      Direct Chat: <span className="text-emerald-600 font-mono font-medium">{getWhatsAppLink(formData.whatsapp) || 'Invalid format'}</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* 7. Telegram (Number or Username) */}
                 <div className="col-span-1">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Telegram <span className="text-[10px] text-slate-400 font-normal">(Number or @username)</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Telegram <span className="text-[10px] text-slate-400 font-normal">(Number or @username)</span>
+                    </label>
+                    {formData.telegram && getTelegramLink(formData.telegram) && (
+                      <a
+                        href={getTelegramLink(formData.telegram)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-medium text-sky-600 hover:underline flex items-center gap-0.5"
+                        title="Test Telegram Link"
+                      >
+                        <span>Test Link</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
                   <input
                     type="text"
                     placeholder="@username or 017xxxxxxxx"
@@ -892,6 +916,11 @@ export default function VendorManager() {
                     onChange={(e) => setFormData({ ...formData, telegram: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:border-purple-500 focus:bg-white text-xs transition-colors"
                   />
+                  {formData.telegram && (
+                    <p className="text-[10px] text-slate-500 mt-1 truncate">
+                      Direct Chat: <span className="text-sky-600 font-mono font-medium">{getTelegramLink(formData.telegram) || 'Invalid format'}</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* 8. Email */}

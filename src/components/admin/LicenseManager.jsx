@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
 import { api } from '../../utils/api';
+import { getWhatsAppLink } from '../../utils/whatsapp';
 import {
   ShieldCheck,
   Search,
@@ -1652,7 +1653,7 @@ export default function LicenseManager() {
                       )}
                       {currentVendor.whatsapp && (
                         <a
-                          href={`https://wa.me/${currentVendor.whatsapp.replace(/[^0-9]/g, '')}`}
+                          href={getWhatsAppLink(currentVendor.whatsapp)}
                           target="_blank"
                           rel="noreferrer"
                           className="text-emerald-600 font-semibold hover:underline flex items-center gap-1"
@@ -2232,10 +2233,16 @@ export default function LicenseManager() {
                         )}
 
                         {selectedVendorDetails.whatsapp && (
-                          <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-emerald-800 font-medium shadow-2xs">
+                          <a
+                            href={getWhatsAppLink(selectedVendorDetails.whatsapp)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-emerald-800 font-medium hover:bg-emerald-100 transition-colors shadow-2xs"
+                            title="Chat on WhatsApp"
+                          >
                             <MessageCircle className="w-3 h-3 text-emerald-600" />
                             WA: {selectedVendorDetails.whatsapp}
-                          </span>
+                          </a>
                         )}
 
                         {selectedVendorDetails.email && (

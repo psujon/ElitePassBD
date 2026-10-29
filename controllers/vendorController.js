@@ -9,11 +9,31 @@ async function ensureVendorColumns() {
       await db.query("ALTER TABLE vendors ADD COLUMN website VARCHAR(255) DEFAULT NULL AFTER company_name");
       console.log("Added column 'website' to 'vendors' table.");
     }
+    try {
+      await db.query("ALTER TABLE vendors MODIFY COLUMN whatsapp VARCHAR(100) DEFAULT NULL");
+    } catch (_) {}
     vendorColsEnsured = true;
   } catch (err) {
     console.warn("ensureVendorColumns warning:", err.message);
   }
 }
+
+// Sanitizes WhatsApp input: allows numbers (+8801..., 017...) or @usernames (@dollar_abir, dollar_abir)
+const sanitizeWhatsapp = (val, phoneFallback) => {
+  if (val !== undefined && val !== null) {
+    let cleaned = String(val).trim();
+    if (!cleaned) return null;
+    if (/^(https?:\/\/)?(www\.)?wa\.me\//i.test(cleaned)) {
+      cleaned = cleaned.replace(/^(https?:\/\/)?(www\.)?wa\.me\//i, '').replace(/\/.*$/, '').trim();
+    }
+    return cleaned || null;
+  }
+  if (phoneFallback) {
+    let cleaned = String(phoneFallback).trim();
+    return cleaned || null;
+  }
+  return null;
+};
 
 // Get all vendors with optional search, status filtering, and pagination/stats
 exports.getAllVendors = async (req, res) => {
@@ -110,7 +130,7 @@ exports.createVendor = async (req, res) => {
   }
 
   try {
-    const cleanWhatsapp = whatsapp ? whatsapp.replace(/[^0-9]/g, '') : (phone ? phone.replace(/[^0-9]/g, '') : null);
+    const cleanWhatsapp = sanitizeWhatsapp(whatsapp, phone);
     const finalWebsite = (website || vendor_website || '').trim() || null;
 
     const [result] = await db.query(
@@ -171,7 +191,7 @@ exports.updateVendor = async (req, res) => {
   }
 
   try {
-    const cleanWhatsapp = whatsapp ? whatsapp.replace(/[^0-9]/g, '') : (phone ? phone.replace(/[^0-9]/g, '') : null);
+    const cleanWhatsapp = sanitizeWhatsapp(whatsapp, null);
     const finalWebsite = (website !== undefined || vendor_website !== undefined)
       ? ((website || vendor_website || '').trim() || null)
       : null;
