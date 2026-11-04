@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import UserProfileView from '../components/UserProfileView';
+import { htmlToPlainText } from '../utils/textUtils';
 
 export default function UserDashboard() {
   const { user, updateUser } = useAuth();
@@ -94,7 +95,7 @@ export default function UserDashboard() {
 
   const renderRules = (rules) => {
     if (!rules || typeof rules !== 'string') return null;
-    const trimmed = rules.trim();
+    const trimmed = htmlToPlainText(rules).trim();
     if (!trimmed) return null;
 
     const urlRegex = /(https?:\/\/[^\s]+)/gi;

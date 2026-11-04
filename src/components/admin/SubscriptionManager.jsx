@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
 import { api } from '../../utils/api';
+import { getWhatsAppLink, handleWhatsAppClick } from '../../utils/whatsapp';
 import * as XLSX from 'xlsx';
 import {
   Users,
@@ -49,6 +51,7 @@ import {
   XCircle,
   FileText,
   BookmarkPlus,
+  CreditCard,
   Server,
   Save,
   Loader2,
@@ -111,8 +114,17 @@ export default function SubscriptionManager() {
     totalSubscriptions: 0
   });
 
+  // URL search params (e.g. ?order=262 or ?search=262)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialOrderParam = searchParams.get('order') || searchParams.get('order_id') || searchParams.get('orderId') || '';
+  const initialSearchParam = searchParams.get('search') || '';
+
   // Search & Filter state
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => {
+    if (initialOrderParam) return `#${initialOrderParam.replace(/[^0-9]/g, '')}`;
+    if (initialSearchParam) return initialSearchParam;
+    return '';
+  });
   const [productFilter, setProductFilter] = useState('All Products');
   const [productFilterInput, setProductFilterInput] = useState('');
   const [productFilterOpen, setProductFilterOpen] = useState(false);
@@ -269,6 +281,9 @@ export default function SubscriptionManager() {
     package_plan: '',
     new_expiry_date: '',
     payment_amount: '',
+    vendor_id: '',
+    vendor_price: '',
+    digital_account_id: '',
     notes: 'Subscription renewed',
     customer_notes: '',
     admin_notes: '',
@@ -682,7 +697,7 @@ export default function SubscriptionManager() {
     }
 
     // 1. Filter accounts by product first
-    const productAccounts = digitalAccounts.filter(acc => 
+    const productAccounts = digitalAccounts.filter(acc =>
       isAccountMatchingProduct(acc, subForm.product_name) ||
       (editingSub && subForm.digital_account_id && String(acc.id) === String(subForm.digital_account_id))
     );
@@ -721,18 +736,19 @@ export default function SubscriptionManager() {
     return genericAccounts;
   }, [digitalAccounts, subForm.product_name, subForm.package_plan, subForm.digital_account_id, editingSub, catalogProducts]);
 
+  const [userSelectedNoAccount, setUserSelectedNoAccount] = React.useState(false);
+
   // Auto-clear or auto-select digital_account_id if selected account is no longer matching product & package
   React.useEffect(() => {
     if (subForm.digital_account_id) {
       const isStillMatching = matchingDigitalAccounts.some(acc => String(acc.id) === String(subForm.digital_account_id));
       if (!isStillMatching) {
-        const firstAvailable = matchingDigitalAccounts.find(a => a.available_slots > 0) || matchingDigitalAccounts[0];
         setSubForm(prev => ({
           ...prev,
-          digital_account_id: firstAvailable ? String(firstAvailable.id) : ''
+          digital_account_id: ''
         }));
       }
-    } else if (matchingDigitalAccounts.length > 0 && showAddForm && !editingSub) {
+    } else if (!userSelectedNoAccount && matchingDigitalAccounts.length > 0 && showAddForm && !editingSub) {
       const bestMatch = matchingDigitalAccounts.find(a => a.available_slots > 0 && a.package_name && isAccountMatchingPackage(a, subForm.package_plan)) ||
         matchingDigitalAccounts.find(a => a.available_slots > 0) ||
         matchingDigitalAccounts[0];
@@ -740,14 +756,55 @@ export default function SubscriptionManager() {
         setSubForm(prev => prev.digital_account_id ? prev : ({ ...prev, digital_account_id: String(bestMatch.id) }));
       }
     }
-  }, [matchingDigitalAccounts, subForm.digital_account_id, showAddForm, editingSub, subForm.package_plan]);
+  }, [matchingDigitalAccounts, subForm.digital_account_id, showAddForm, editingSub, subForm.package_plan, userSelectedNoAccount]);
 
   const selectedDigitalAccount = React.useMemo(() => {
     if (!subForm.digital_account_id) return null;
     return digitalAccounts.find(a => String(a.id) === String(subForm.digital_account_id)) || null;
   }, [digitalAccounts, subForm.digital_account_id]);
 
+  const renewMatchingDigitalAccounts = React.useMemo(() => {
+    const targetProdName = selectedSubDetail?.product_name || '';
+    if (!targetProdName.trim()) return [];
+
+    const productAccounts = digitalAccounts.filter(acc =>
+      isAccountMatchingProduct(acc, targetProdName) ||
+      (renewForm.digital_account_id && String(acc.id) === String(renewForm.digital_account_id))
+    );
+
+    const targetPkgPlan = renewForm.package_plan || selectedSubDetail?.package_plan || '';
+    if (!targetPkgPlan.trim()) return productAccounts;
+
+    const exactPackageAccounts = [];
+    const genericAccounts = [];
+
+    productAccounts.forEach(acc => {
+      if (renewForm.digital_account_id && String(acc.id) === String(renewForm.digital_account_id)) {
+        exactPackageAccounts.push(acc);
+        return;
+      }
+      if (acc.package_name && acc.package_name.trim()) {
+        if (isAccountMatchingPackage(acc, targetPkgPlan)) {
+          exactPackageAccounts.push(acc);
+        }
+      } else {
+        genericAccounts.push(acc);
+      }
+    });
+
+    if (exactPackageAccounts.length > 0) {
+      return [...exactPackageAccounts, ...genericAccounts];
+    }
+    return genericAccounts;
+  }, [digitalAccounts, selectedSubDetail?.product_name, selectedSubDetail?.package_plan, renewForm.package_plan, renewForm.digital_account_id, catalogProducts]);
+
+  const selectedRenewDigitalAccount = React.useMemo(() => {
+    if (!renewForm.digital_account_id) return null;
+    return digitalAccounts.find(a => String(a.id) === String(renewForm.digital_account_id)) || null;
+  }, [digitalAccounts, renewForm.digital_account_id]);
+
   const handleDigitalAccountChange = (accId) => {
+    setUserSelectedNoAccount(!accId);
     setSubForm(prev => ({
       ...prev,
       digital_account_id: accId || ''
@@ -992,6 +1049,56 @@ export default function SubscriptionManager() {
     setSubPage(1);
   }, [searchQuery, productFilter, statusFilter, sourceFilter, expiryFilter]);
 
+  const autoOpenedOrderRef = useRef(null);
+
+  // Sync URL search params to searchQuery state if changed dynamically
+  useEffect(() => {
+    const targetOrder = searchParams.get('order') || searchParams.get('order_id') || searchParams.get('orderId');
+    const targetSearch = searchParams.get('search');
+
+    if (targetOrder) {
+      const cleanNum = String(targetOrder).replace(/[^0-9]/g, '');
+      const formatted = `#${cleanNum}`;
+      if (searchQuery !== formatted) {
+        setSearchQuery(formatted);
+        setSubPage(1);
+      }
+    } else if (targetSearch && searchQuery !== targetSearch) {
+      setSearchQuery(targetSearch);
+      setSubPage(1);
+    }
+  }, [searchParams]);
+
+  // Auto-open View Details modal when an order parameter is specified in the URL
+  useEffect(() => {
+    const targetOrder = searchParams.get('order') || searchParams.get('order_id') || searchParams.get('orderId');
+    if (!targetOrder) {
+      autoOpenedOrderRef.current = null;
+      return;
+    }
+
+    if (loading) return;
+    if (autoOpenedOrderRef.current === String(targetOrder)) return;
+
+    const cleanOrderNum = String(targetOrder).replace(/[^0-9]/g, '');
+    if (!cleanOrderNum) return;
+
+    // Search for matching subscription by order_id or fallback to manual subscription ID
+    const matched = subscriptions.find(s => 
+      (s.order_id && String(s.order_id) === cleanOrderNum) || 
+      (!s.order_id && String(s.id) === cleanOrderNum)
+    );
+
+    if (matched) {
+      autoOpenedOrderRef.current = String(targetOrder);
+      handleOpenViewModal(matched);
+      toast.success(`Showing details for Order #${cleanOrderNum}`);
+    } else if (subscriptions.length === 0 && !loading) {
+      autoOpenedOrderRef.current = String(targetOrder);
+      toast(`No subscription record found for Order #${cleanOrderNum}`, { icon: 'ℹ️' });
+    }
+  }, [subscriptions, loading, searchParams]);
+
   const handleToggleAddForm = () => {
     if (showAddForm && !editingSub) {
       setShowAddForm(false);
@@ -1073,6 +1180,7 @@ export default function SubscriptionManager() {
       send_email: true
     });
     setProductSearchQuery('');
+    setUserSelectedNoAccount(false);
     setShowProductDropdown(false);
     setShowAddForm(true);
     setTimeout(() => {
@@ -1119,6 +1227,7 @@ export default function SubscriptionManager() {
     });
     setLicenseInputMode('manual');
     setProductSearchQuery('');
+    setUserSelectedNoAccount(!sub.digital_account_id);
     setShowProductDropdown(false);
     setShowAddForm(true);
     setActiveMenuSub(null);
@@ -1148,7 +1257,7 @@ export default function SubscriptionManager() {
       try {
         const storedUser = localStorage.getItem('user');
         if (storedUser) currentLoggedUser = JSON.parse(storedUser);
-      } catch (e) {}
+      } catch (e) { }
 
       let cleanEmail = (subForm.email || '').trim();
       if (currentLoggedUser?.email && cleanEmail.toLowerCase() === currentLoggedUser.email.toLowerCase()) {
@@ -1233,18 +1342,22 @@ export default function SubscriptionManager() {
     autoExpiry.setDate(autoExpiry.getDate() + (parseInt(initDays, 10) || 30));
     const formattedAutoExpiry = autoExpiry.toISOString().slice(0, 10);
 
+    fetchDigitalAccounts();
     setRenewForm({
       renewal_date: today.toISOString().slice(0, 10),
       validity_days: initDays,
       package_plan: initPackagePlan,
       new_expiry_date: formattedAutoExpiry,
       payment_amount: initAmount,
+      vendor_id: sub.vendor_id ? String(sub.vendor_id) : '',
+      vendor_price: sub.vendor_price !== null && sub.vendor_price !== undefined ? String(sub.vendor_price) : '',
+      digital_account_id: sub.digital_account_id ? String(sub.digital_account_id) : '',
       notes: 'Subscription renewed',
       customer_notes: '',
       admin_notes: '',
       license_id: null,
-      account_given: '',
-      license_rules: '',
+      account_given: sub.account_given || '',
+      license_rules: sub.license_rules || '',
       customer_email: sub.email || ''
     });
 
@@ -1384,6 +1497,9 @@ export default function SubscriptionManager() {
       setRenewSubmitting(true);
       const payload = {
         ...renewForm,
+        vendor_id: renewForm.vendor_id ? parseInt(renewForm.vendor_id, 10) : null,
+        vendor_price: renewForm.vendor_price !== '' && renewForm.vendor_price !== null ? parseFloat(renewForm.vendor_price) : 0,
+        digital_account_id: renewForm.digital_account_id ? parseInt(renewForm.digital_account_id, 10) : null,
         license_id: (renewLicenseMode === 'dropdown' && renewForm.license_id) ? renewForm.license_id : null,
         account_given: renewForm.account_given || '',
         customer_email: (renewForm.customer_email || selectedSubDetail.email || '').trim()
@@ -1951,19 +2067,41 @@ export default function SubscriptionManager() {
 
               {/* WhatsApp / Mobile */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">WhatsApp / Mobile *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    WhatsApp / Mobile <span className="text-[10px] text-slate-400 font-normal">(Number or @username)</span> *
+                  </label>
+                  {subForm.whatsapp_number && getWhatsAppLink(subForm.whatsapp_number) && (
+                    <a
+                      href={getWhatsAppLink(subForm.whatsapp_number)}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => handleWhatsAppClick(e, subForm.whatsapp_number, null, toast)}
+                      className="text-[10px] font-medium text-emerald-600 hover:underline flex items-center gap-0.5 cursor-pointer"
+                      title="Test WhatsApp Link"
+                    >
+                      <span>Test Chat</span>
+                      <ExternalLink size={10} />
+                    </a>
+                  )}
+                </div>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. 019XX XXX101"
+                  placeholder="019XXXXXXXX or @dollar_abir"
                   value={subForm.whatsapp_number}
                   onChange={(e) => setSubForm({ ...subForm, whatsapp_number: e.target.value })}
                   name="sub_customer_mobile_phone"
                   autoComplete="off"
                   data-lpignore="true"
                   data-1p-ignore="true"
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-medium"
                 />
+                {subForm.whatsapp_number && (
+                  <p className="text-[10.5px] text-slate-500 mt-1 truncate">
+                    Direct Link: <span className="text-emerald-600 font-mono font-medium">{getWhatsAppLink(subForm.whatsapp_number) || 'Invalid format'}</span>
+                  </p>
+                )}
               </div>
 
               {/* Email Address */}
@@ -2109,6 +2247,7 @@ export default function SubscriptionManager() {
                                 license_rules: matchedRule ? (matchedRule.rules_text || '') : ''
                               }));
                               setSelectedRuleId(matchedRule ? String(matchedRule.id) : '__none__');
+                              setUserSelectedNoAccount(false);
                               setProductSearchQuery('');
                               setShowProductDropdown(false);
                             }}
@@ -2437,21 +2576,32 @@ export default function SubscriptionManager() {
                     <Key size={13} className="text-violet-600" />
                     <span>License Manager Account</span>
                   </label>
-                  {matchingDigitalAccounts.length > 0 && (
-                    <span className="text-[10px] bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full font-bold">
-                      {matchingDigitalAccounts.length} matching product & package
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {subForm.digital_account_id && (
+                      <button
+                        type="button"
+                        onClick={() => handleDigitalAccountChange('')}
+                        className="text-[10px] text-slate-400 hover:text-red-500 font-medium transition-colors cursor-pointer"
+                        title="Deselect account"
+                      >
+                        Clear Selection
+                      </button>
+                    )}
+                    {matchingDigitalAccounts.length > 0 && (
+                      <span className="text-[10px] bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full font-bold">
+                        {matchingDigitalAccounts.length} matching product & package
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <select
                   value={subForm.digital_account_id || ''}
                   onChange={(e) => handleDigitalAccountChange(e.target.value)}
                   disabled={matchingDigitalAccounts.length === 0}
-                  className={`w-full border rounded-xl px-3.5 py-2 text-xs transition-colors shadow-xs ${
-                    matchingDigitalAccounts.length > 0
-                      ? 'bg-white border-slate-300 text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer'
-                      : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
-                  }`}
+                  className={`w-full border rounded-xl px-3.5 py-2 text-xs transition-colors shadow-xs ${matchingDigitalAccounts.length > 0
+                    ? 'bg-white border-slate-300 text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer'
+                    : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
                 >
                   {matchingDigitalAccounts.length > 0 ? (
                     <>
@@ -2466,18 +2616,18 @@ export default function SubscriptionManager() {
                     <option value="">
                       {subForm.product_name
                         ? (subForm.package_plan
-                            ? `-- No Account Available for ${subForm.product_name} (${subForm.package_plan}) --`
-                            : `-- No Account Available for ${subForm.product_name} --`)
+                          ? `-- No Account Available for ${subForm.product_name} (${subForm.package_plan}) --`
+                          : `-- No Account Available for ${subForm.product_name} --`)
                         : '-- Select a Product First --'}
                     </option>
                   )}
                 </select>
                 <p className="text-[10px] text-slate-500 mt-1">
-                  {matchingDigitalAccounts.length > 0
-                    ? `Showing ${matchingDigitalAccounts.length} account(s) matching "${subForm.product_name}"${subForm.package_plan ? ` & "${subForm.package_plan}"` : ''}`
-                    : (subForm.product_name
-                        ? `No license accounts found for "${subForm.product_name}"${subForm.package_plan ? ` with plan "${subForm.package_plan}"` : ''}`
-                        : 'Select a product and package above to filter accounts')}
+                  {!subForm.digital_account_id
+                    ? 'No account linked (optional). You can leave this blank to save without linking to License Manager.'
+                    : (matchingDigitalAccounts.length > 0
+                      ? `Showing ${matchingDigitalAccounts.length} account(s) matching "${subForm.product_name}"${subForm.package_plan ? ` & "${subForm.package_plan}"` : ''}`
+                      : 'Select an account or leave blank')}
                 </p>
               </div>
 
@@ -2489,11 +2639,10 @@ export default function SubscriptionManager() {
                     <span>Available Slots</span>
                   </label>
                   {selectedDigitalAccount && (
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                      selectedDigitalAccount.available_slots > 0
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-red-50 text-red-700 border-red-200'
-                    }`}>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${selectedDigitalAccount.available_slots > 0
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-red-50 text-red-700 border-red-200'
+                      }`}>
                       {selectedDigitalAccount.available_slots > 0 ? `${selectedDigitalAccount.available_slots} Free` : 'No Free Slots'}
                     </span>
                   )}
@@ -2503,20 +2652,19 @@ export default function SubscriptionManager() {
                   readOnly
                   placeholder=""
                   value={selectedDigitalAccount ? `${selectedDigitalAccount.available_slots} / ${selectedDigitalAccount.total_slots} Slots Available` : ''}
-                  className={`w-full border rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none transition-colors ${
-                    selectedDigitalAccount
-                      ? (selectedDigitalAccount.available_slots > 0
-                          ? 'bg-emerald-50/60 border-emerald-300 text-emerald-800'
-                          : 'bg-red-50/60 border-red-300 text-red-700')
-                      : 'bg-slate-50 border-slate-300 text-slate-400'
-                  }`}
+                  className={`w-full border rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none transition-colors ${selectedDigitalAccount
+                    ? (selectedDigitalAccount.available_slots > 0
+                      ? 'bg-emerald-50/60 border-emerald-300 text-emerald-800'
+                      : 'bg-red-50/60 border-red-300 text-red-700')
+                    : 'bg-slate-50 border-slate-300 text-slate-400'
+                    }`}
                 />
                 <p className="text-[10px] text-slate-500 mt-1">
                   {selectedDigitalAccount
                     ? (selectedDigitalAccount.available_slots > 0
-                        ? '✓ Auto-assigns the next free slot on save'
-                        : '⚠️ No available slots remaining in this account')
-                    : 'Blank until an account is chosen'}
+                      ? '✓ Auto-assigns the next free slot on save'
+                      : '⚠️ No available slots remaining in this account')
+                    : 'No account selected (optional)'}
                 </p>
               </div>
 
@@ -2742,11 +2890,10 @@ export default function SubscriptionManager() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-200 pt-4 mt-4">
               {/* Checkbox Button: কাস্টমারকে মেইল পাঠাবো কি না */}
               <label
-                className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border cursor-pointer select-none transition-all ${
-                  subForm.send_email
-                    ? 'bg-emerald-50/90 border-emerald-300 text-emerald-900 shadow-2xs'
-                    : 'bg-slate-100/90 border-slate-300 text-slate-600 hover:bg-slate-100'
-                }`}
+                className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border cursor-pointer select-none transition-all ${subForm.send_email
+                  ? 'bg-emerald-50/90 border-emerald-300 text-emerald-900 shadow-2xs'
+                  : 'bg-slate-100/90 border-slate-300 text-slate-600 hover:bg-slate-100'
+                  }`}
                 title="চেক করা থাকলে কাস্টমারকে মেইল পাঠানো হবে, আনচেক থাকলে কোনো মেইল যাবে না"
               >
                 <input
@@ -2759,11 +2906,10 @@ export default function SubscriptionManager() {
                   <Mail size={14} className={subForm.send_email ? 'text-emerald-600' : 'text-slate-400'} />
                   <span>কাস্টমারকে মেইল পাঠাবো কি না?</span>
                 </div>
-                <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
-                  subForm.send_email
-                    ? 'bg-emerald-100/90 text-emerald-800 border-emerald-200'
-                    : 'bg-slate-200/90 text-slate-600 border-slate-300'
-                }`}>
+                <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full border transition-colors ${subForm.send_email
+                  ? 'bg-emerald-100/90 text-emerald-800 border-emerald-200'
+                  : 'bg-slate-200/90 text-slate-600 border-slate-300'
+                  }`}>
                   {subForm.send_email ? '✓ হ্যাঁ, মেইল যাবে' : '✕ না, মেইল যাবে না'}
                 </span>
               </label>
@@ -2930,11 +3076,10 @@ export default function SubscriptionManager() {
         {/* Card 1: Active Subscriptions */}
         <div
           onClick={() => handleStatCardClick('active')}
-          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            activeStatCard === 'active'
-              ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/20'
-              : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-emerald-500/40'
-          }`}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${activeStatCard === 'active'
+            ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/20'
+            : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-emerald-500/40'
+            }`}
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Active">Active</span>
@@ -2948,11 +3093,10 @@ export default function SubscriptionManager() {
         {/* Card 2: Expiring Today */}
         <div
           onClick={() => handleStatCardClick('expiringToday')}
-          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            activeStatCard === 'expiringToday'
-              ? 'bg-rose-50/80 border-rose-500 ring-2 ring-rose-500/20'
-              : 'bg-white hover:bg-rose-50/50 border-rose-200/90 hover:border-rose-300'
-          }`}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${activeStatCard === 'expiringToday'
+            ? 'bg-rose-50/80 border-rose-500 ring-2 ring-rose-500/20'
+            : 'bg-white hover:bg-rose-50/50 border-rose-200/90 hover:border-rose-300'
+            }`}
         >
           <div className="flex items-center justify-between text-rose-600 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Expiring Today">Expiring Today</span>
@@ -2966,11 +3110,10 @@ export default function SubscriptionManager() {
         {/* Card 3: Within 3 Days */}
         <div
           onClick={() => handleStatCardClick('within3Days')}
-          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            activeStatCard === 'within3Days'
-              ? 'bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20'
-              : 'bg-white hover:bg-amber-50/50 border-amber-200/90 hover:border-amber-300'
-          }`}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${activeStatCard === 'within3Days'
+            ? 'bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20'
+            : 'bg-white hover:bg-amber-50/50 border-amber-200/90 hover:border-amber-300'
+            }`}
         >
           <div className="flex items-center justify-between text-amber-600 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Within 3 Days">Within 3 Days</span>
@@ -2984,11 +3127,10 @@ export default function SubscriptionManager() {
         {/* Card 4: Within 7 Days */}
         <div
           onClick={() => handleStatCardClick('within7Days')}
-          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            activeStatCard === 'within7Days'
-              ? 'bg-yellow-50/80 border-yellow-500 ring-2 ring-yellow-500/20'
-              : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-yellow-500/40'
-          }`}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${activeStatCard === 'within7Days'
+            ? 'bg-yellow-50/80 border-yellow-500 ring-2 ring-yellow-500/20'
+            : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-yellow-500/40'
+            }`}
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Within 7 Days">Within 7 Days</span>
@@ -3002,11 +3144,10 @@ export default function SubscriptionManager() {
         {/* Card 5: Expired */}
         <div
           onClick={() => handleStatCardClick('expired')}
-          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            activeStatCard === 'expired'
-              ? 'bg-rose-50/80 border-rose-500 ring-2 ring-rose-500/20'
-              : 'bg-white hover:bg-rose-50/50 border-rose-200/90 hover:border-rose-300'
-          }`}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${activeStatCard === 'expired'
+            ? 'bg-rose-50/80 border-rose-500 ring-2 ring-rose-500/20'
+            : 'bg-white hover:bg-rose-50/50 border-rose-200/90 hover:border-rose-300'
+            }`}
         >
           <div className="flex items-center justify-between text-rose-600 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Expired">Expired</span>
@@ -3020,11 +3161,10 @@ export default function SubscriptionManager() {
         {/* Card 6: Renewed */}
         <div
           onClick={() => handleStatCardClick('renewed')}
-          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            activeStatCard === 'renewed'
-              ? 'bg-teal-50/80 border-teal-500 ring-2 ring-teal-500/20'
-              : 'bg-white hover:bg-teal-50/50 border-slate-200/90 hover:border-teal-400'
-          }`}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${activeStatCard === 'renewed'
+            ? 'bg-teal-50/80 border-teal-500 ring-2 ring-teal-500/20'
+            : 'bg-white hover:bg-teal-50/50 border-slate-200/90 hover:border-teal-400'
+            }`}
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Renewed">Renewed</span>
@@ -3038,11 +3178,10 @@ export default function SubscriptionManager() {
         {/* Card 7: Not Renewed */}
         <div
           onClick={() => handleStatCardClick('notRenewed')}
-          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            activeStatCard === 'notRenewed'
-              ? 'bg-slate-200/80 border-slate-600 ring-2 ring-slate-600/30'
-              : 'bg-white hover:bg-slate-100/70 border-slate-200/90 hover:border-slate-400'
-          }`}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${activeStatCard === 'notRenewed'
+            ? 'bg-slate-200/80 border-slate-600 ring-2 ring-slate-600/30'
+            : 'bg-white hover:bg-slate-100/70 border-slate-200/90 hover:border-slate-400'
+            }`}
         >
           <div className="flex items-center justify-between text-slate-600 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Not Renewed">Not Renewed</span>
@@ -3056,11 +3195,10 @@ export default function SubscriptionManager() {
         {/* Card 8: Unique Customer */}
         <div
           onClick={() => handleStatCardClick('uniqueCustomer')}
-          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${
-            activeStatCard === 'uniqueCustomer'
-              ? 'bg-blue-50/70 border-blue-500 ring-2 ring-blue-500/20'
-              : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-blue-400'
-          }`}
+          className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${activeStatCard === 'uniqueCustomer'
+            ? 'bg-blue-50/70 border-blue-500 ring-2 ring-blue-500/20'
+            : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-blue-400'
+            }`}
         >
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[10.5px] font-bold truncate" title="Unique Customer">Unique Customer</span>
@@ -3349,6 +3487,9 @@ export default function SubscriptionManager() {
                   onClick={() => {
                     setSearchQuery('');
                     setSubPage(1);
+                    if (searchParams.get('order') || searchParams.get('order_id') || searchParams.get('orderId') || searchParams.get('search')) {
+                      setSearchParams({});
+                    }
                   }}
                   className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                   title="Clear search"
@@ -3390,11 +3531,10 @@ export default function SubscriptionManager() {
                   }}
                   placeholder={productFilter === 'All Products' ? 'All Products' : productFilter}
                   title="Type product name to search or select from list"
-                  className={`w-full bg-white border rounded-lg pl-2.5 pr-11 py-1.5 text-[11px] placeholder-slate-400 focus:outline-none transition-all shadow-2xs ${
-                    productFilter !== 'All Products'
-                      ? 'border-emerald-500 bg-emerald-50/40 text-emerald-900 font-bold focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500'
-                      : 'border-slate-300 text-slate-800 font-medium focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
-                  }`}
+                  className={`w-full bg-white border rounded-lg pl-2.5 pr-11 py-1.5 text-[11px] placeholder-slate-400 focus:outline-none transition-all shadow-2xs ${productFilter !== 'All Products'
+                    ? 'border-emerald-500 bg-emerald-50/40 text-emerald-900 font-bold focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500'
+                    : 'border-slate-300 text-slate-800 font-medium focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
+                    }`}
                 />
 
                 {/* Right controls: Clear (X) + Dropdown Chevron */}
@@ -3439,11 +3579,10 @@ export default function SubscriptionManager() {
                     {/* Option: All Products */}
                     <div
                       onClick={() => handleSelectProduct('All Products')}
-                      className={`px-3 py-1.5 text-[11px] flex items-center justify-between cursor-pointer transition-colors ${
-                        productFilter === 'All Products'
-                          ? 'bg-emerald-50 text-emerald-700 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50'
-                      }`}
+                      className={`px-3 py-1.5 text-[11px] flex items-center justify-between cursor-pointer transition-colors ${productFilter === 'All Products'
+                        ? 'bg-emerald-50 text-emerald-700 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50'
+                        }`}
                     >
                       <span className="flex items-center gap-1.5">
                         <span className={`w-1.5 h-1.5 rounded-full ${productFilter === 'All Products' ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
@@ -3459,11 +3598,10 @@ export default function SubscriptionManager() {
                         <div
                           key={i}
                           onClick={() => handleSelectProduct(p.name)}
-                          className={`px-3 py-1.5 text-[11px] flex items-center justify-between cursor-pointer transition-colors ${
-                            isSelected
-                              ? 'bg-emerald-50 text-emerald-700 font-bold'
-                              : 'text-slate-700 hover:bg-slate-50'
-                          }`}
+                          className={`px-3 py-1.5 text-[11px] flex items-center justify-between cursor-pointer transition-colors ${isSelected
+                            ? 'bg-emerald-50 text-emerald-700 font-bold'
+                            : 'text-slate-700 hover:bg-slate-50'
+                            }`}
                         >
                           <span className="truncate pr-2 font-medium" title={p.name}>
                             {p.name}
@@ -3573,6 +3711,9 @@ export default function SubscriptionManager() {
                   setSubSortField('order_no');
                   setSubSortAsc(false);
                   setSubPage(1);
+                  if (searchParams.get('order') || searchParams.get('order_id') || searchParams.get('orderId') || searchParams.get('search')) {
+                    setSearchParams({});
+                  }
                 }}
                 className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-[10.5px] font-bold rounded-lg transition-colors cursor-pointer shadow-2xs"
                 title="Reset all filters"
@@ -3807,7 +3948,20 @@ export default function SubscriptionManager() {
                                 {sub.customer_name}
                               </button>
                               <div className="flex items-center gap-1 text-[10.5px] text-slate-600">
-                                <span>{sub.whatsapp_number}</span>
+                                <a
+                                  href={getWhatsAppLink(sub.whatsapp_number)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => handleWhatsAppClick(e, sub.whatsapp_number, null, toast)}
+                                  className="hover:text-emerald-600 hover:underline font-medium inline-flex items-center gap-0.5 cursor-pointer"
+                                  title="Chat on WhatsApp"
+                                >
+                                  {sub.whatsapp_number?.startsWith('@') ? (
+                                    <span className="font-semibold text-emerald-700">{sub.whatsapp_number}</span>
+                                  ) : (
+                                    <span>{sub.whatsapp_number}</span>
+                                  )}
+                                </a>
                                 {sub.whatsapp_number && (
                                   <button
                                     type="button"
@@ -3817,7 +3971,7 @@ export default function SubscriptionManager() {
                                       toast.success(`Copied: ${sub.whatsapp_number}`, { duration: 1500 });
                                     }}
                                     className="p-0.5 text-slate-400 hover:text-emerald-600 transition-colors rounded cursor-pointer"
-                                    title="Copy phone number"
+                                    title="Copy WhatsApp / Mobile"
                                   >
                                     <Copy size={10} />
                                   </button>
@@ -3870,13 +4024,23 @@ export default function SubscriptionManager() {
                               <div className="space-y-0.5">
                                 <div>
                                   {sub.order_id ? (
-                                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenViewModal(sub)}
+                                      className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors cursor-pointer"
+                                      title={`View full details for Order #${sub.order_id}`}
+                                    >
                                       Order #{sub.order_id}
-                                    </span>
+                                    </button>
                                   ) : (
-                                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenViewModal(sub)}
+                                      className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                                      title={`View full details for Order #${sub.id}`}
+                                    >
                                       Order #{sub.id}
-                                    </span>
+                                    </button>
                                   )}
                                 </div>
 
@@ -3975,11 +4139,12 @@ export default function SubscriptionManager() {
                           <div className="flex items-center justify-end gap-1.5">
 
                             {/* Direct WhatsApp Chat 1-Click Link Button */}
-                            {sub.direct_whatsapp_url && (
+                            {(sub.direct_whatsapp_url || getWhatsAppLink(sub.whatsapp_number)) && (
                               <a
-                                href={sub.direct_whatsapp_url}
+                                href={sub.direct_whatsapp_url && sub.direct_whatsapp_url !== '#' ? sub.direct_whatsapp_url : getWhatsAppLink(sub.whatsapp_number)}
                                 target="_blank"
                                 rel="noreferrer"
+                                onClick={(e) => handleWhatsAppClick(e, sub.whatsapp_number, null, toast)}
                                 className="p-1 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs cursor-pointer"
                                 title="Open Direct WhatsApp Chat with Reminder Text"
                               >
@@ -4097,7 +4262,7 @@ export default function SubscriptionManager() {
         >
           <div className="min-h-full flex items-center justify-center py-4 sm:py-8">
             <div
-              className="bg-white border border-slate-200 rounded-2xl max-w-5xl lg:max-w-6xl w-full max-h-[88vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6 shadow-2xl text-left overflow-hidden text-slate-900 relative my-auto animate-in zoom-in-95 duration-150"
+              className="bg-white border border-slate-200 rounded-2xl max-w-5xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1400px] w-full max-h-[88vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6 shadow-2xl text-left overflow-hidden text-slate-900 relative my-auto animate-in zoom-in-95 duration-150"
               onClick={(e) => e.stopPropagation()}
             >
 
@@ -4115,11 +4280,10 @@ export default function SubscriptionManager() {
                         type="button"
                         disabled={togglingNotRenewedId === selectedSubDetail.id}
                         onClick={(e) => handleToggleNotRenewed(selectedSubDetail, e)}
-                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition-all cursor-pointer flex items-center gap-1 disabled:opacity-60 ${
-                          selectedSubDetail.status === 'Not Renewed'
-                            ? 'bg-slate-700 text-white border-slate-700 hover:bg-slate-800'
-                            : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                        }`}
+                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition-all cursor-pointer flex items-center gap-1 disabled:opacity-60 ${selectedSubDetail.status === 'Not Renewed'
+                          ? 'bg-slate-700 text-white border-slate-700 hover:bg-slate-800'
+                          : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                          }`}
                         title={selectedSubDetail.status === 'Not Renewed' ? 'Click to revert status' : 'Click to mark as Not Renewed (will not renew)'}
                       >
                         {togglingNotRenewedId === selectedSubDetail.id ? (
@@ -4526,6 +4690,131 @@ export default function SubscriptionManager() {
                             </p>
                           </div>
 
+                          {/* Row 2.5: Vendor / Supplier, Vendor Price & License Manager Account */}
+                          <div className="col-span-1 sm:col-span-2 lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+                            {/* Col 1: Vendor / Supplier */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                                  <Store size={12} className="text-purple-600" />
+                                  <span>Vendor / Supplier</span>
+                                </label>
+                              </div>
+                              <select
+                                value={renewForm.vendor_id || ''}
+                                onChange={(e) => setRenewForm({ ...renewForm, vendor_id: e.target.value })}
+                                className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                              >
+                                <option value="">-- No Vendor Selected --</option>
+                                {vendors.map((v) => (
+                                  <option key={v.id} value={v.id}>
+                                    {v.name} {v.company_name ? `(${v.company_name})` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Supplier (not shared with customer)</p>
+                            </div>
+
+                            {/* Col 2: Vendor Buying Price */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                                  <CreditCard size={12} className="text-emerald-600" />
+                                  <span>Vendor Price (BDT)</span>
+                                </label>
+                                <span className="text-[9.5px] text-slate-400 font-normal">Buying Cost</span>
+                              </div>
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={renewForm.vendor_price}
+                                onChange={(e) => setRenewForm({ ...renewForm, vendor_price: e.target.value })}
+                                className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-mono"
+                              />
+                              <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                                {renewForm.payment_amount && renewForm.vendor_price && parseFloat(renewForm.payment_amount) >= parseFloat(renewForm.vendor_price) ? (
+                                  <span className="text-emerald-600 font-semibold">
+                                    Profit: ৳{(parseFloat(renewForm.payment_amount) - parseFloat(renewForm.vendor_price)).toFixed(2)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">Supplier cost (internal reference)</span>
+                                )}
+                              </p>
+                            </div>
+
+                            {/* Col 3 & 4: License Manager Account (Span 2 cols on lg) */}
+                            <div className="col-span-1 sm:col-span-2 lg:col-span-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                                  <Key size={12} className="text-violet-600" />
+                                  <span>License Manager Account</span>
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  {renewForm.digital_account_id && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setRenewForm({ ...renewForm, digital_account_id: '' })}
+                                      className="text-[10px] text-slate-400 hover:text-red-500 font-medium transition-colors cursor-pointer"
+                                      title="Deselect account"
+                                    >
+                                      Clear Selection
+                                    </button>
+                                  )}
+                                  {renewMatchingDigitalAccounts.length > 0 && (
+                                    <span className="text-[9.5px] bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full font-bold">
+                                      {renewMatchingDigitalAccounts.length} matching
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <select
+                                value={renewForm.digital_account_id || ''}
+                                onChange={(e) => {
+                                  const chosenId = e.target.value;
+                                  const matchedAcc = digitalAccounts.find(a => String(a.id) === String(chosenId));
+                                  setRenewForm(prev => ({
+                                    ...prev,
+                                    digital_account_id: chosenId,
+                                    vendor_id: (matchedAcc?.vendor_id && !prev.vendor_id) ? String(matchedAcc.vendor_id) : prev.vendor_id
+                                  }));
+                                }}
+                                disabled={renewMatchingDigitalAccounts.length === 0}
+                                className={`w-full border rounded-lg px-2.5 py-1.5 text-xs transition-colors shadow-2xs ${renewMatchingDigitalAccounts.length > 0
+                                  ? 'bg-slate-50 border-slate-300 text-slate-900 focus:outline-none focus:border-emerald-500 cursor-pointer'
+                                  : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  }`}
+                              >
+                                {renewMatchingDigitalAccounts.length > 0 ? (
+                                  <>
+                                    <option value="">-- No Account Selected (Optional) --</option>
+                                    {renewMatchingDigitalAccounts.map(acc => (
+                                      <option key={acc.id} value={acc.id}>
+                                        {acc.account_email} • {acc.available_slots} / {acc.total_slots} Free{acc.package_name ? ` • [${acc.package_name}]` : ''} ({acc.product_name})
+                                      </option>
+                                    ))}
+                                  </>
+                                ) : (
+                                  <option value="">
+                                    -- No Digital Account Available for {selectedSubDetail?.product_name || 'this product'} --
+                                  </option>
+                                )}
+                              </select>
+                              <div className="flex items-center justify-between text-[10px] text-slate-500 mt-0.5">
+                                <span className="truncate">
+                                  {selectedRenewDigitalAccount
+                                    ? `${selectedRenewDigitalAccount.available_slots} / ${selectedRenewDigitalAccount.total_slots} Slots Available`
+                                    : 'No account selected (optional)'}
+                                </span>
+                                {selectedRenewDigitalAccount && (
+                                  <span className={`font-semibold shrink-0 ml-1 ${selectedRenewDigitalAccount.available_slots > 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                    {selectedRenewDigitalAccount.available_slots > 0 ? '✓ Auto-assigns slot' : '⚠️ No free slots'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
                           {/* Row 3: Customer Notes (Sent in Email) (Span 2 cols) */}
                           <div className="col-span-1 sm:col-span-2 lg:col-span-2 bg-emerald-50/50 p-2.5 sm:p-3 rounded-xl border border-emerald-200/80 space-y-1.5">
                             <div className="flex flex-wrap items-center justify-between gap-1.5">
@@ -4622,23 +4911,45 @@ export default function SubscriptionManager() {
                               <RefreshCw size={12} className="text-emerald-600 shrink-0" />
                               <span>Clicking confirm will extend validity, record renewal history, and email customer credentials.</span>
                             </div>
-                            <button
-                              type="submit"
-                              disabled={renewSubmitting}
-                              className="w-full sm:w-auto min-w-[190px] h-[38px] px-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
-                            >
-                              {renewSubmitting ? (
-                                <>
-                                  <RefreshCw size={14} className="animate-spin" />
-                                  <span>Processing...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <RefreshCw size={14} />
-                                  <span>Confirm Renewal</span>
-                                </>
-                              )}
-                            </button>
+                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                disabled={togglingNotRenewedId === selectedSubDetail.id || renewSubmitting}
+                                onClick={(e) => handleToggleNotRenewed(selectedSubDetail, e)}
+                                className={`h-[38px] px-4 font-bold text-xs rounded-xl border shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 ${selectedSubDetail.status === 'Not Renewed'
+                                  ? 'bg-slate-800 hover:bg-slate-900 text-white border-slate-800'
+                                  : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+                                  }`}
+                                title={selectedSubDetail.status === 'Not Renewed' ? 'Revert status to Active' : 'Mark this subscription as Not Renewed'}
+                              >
+                                {togglingNotRenewedId === selectedSubDetail.id ? (
+                                  <RefreshCw size={13} className="animate-spin text-slate-400" />
+                                ) : selectedSubDetail.status === 'Not Renewed' ? (
+                                  <XCircle size={13} className="text-rose-400" />
+                                ) : (
+                                  <UserX size={13} />
+                                )}
+                                <span>{selectedSubDetail.status === 'Not Renewed' ? 'Revert Status' : 'Mark as Not Renewed'}</span>
+                              </button>
+
+                              <button
+                                type="submit"
+                                disabled={renewSubmitting}
+                                className="min-w-[170px] h-[38px] px-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                              >
+                                {renewSubmitting ? (
+                                  <>
+                                    <RefreshCw size={14} className="animate-spin" />
+                                    <span>Processing...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCw size={14} />
+                                    <span>Confirm Renewal</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
 
                         </div>
@@ -4647,62 +4958,62 @@ export default function SubscriptionManager() {
                   );
                 })()}
 
-                {/* BOTTOM SECTION: Renewal History & Reminder History Side-by-Side */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-
-                  {/* 1. Renewal History */}
+                {/* BOTTOM SECTION: Reminder History & Renewal History (Full-Width Stacked) */}
+                <div className="space-y-4 sm:space-y-5">
                   <div className="bg-slate-50/70 p-3 sm:p-3.5 rounded-xl border border-slate-200/90 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                        <History size={14} className="text-slate-600" />
+                        <History size={14} className="text-emerald-600" />
                         Renewal History
                       </h4>
-                      <span className="text-[10.5px] text-slate-500">Previous records preserved.</span>
+                      <span className="text-[10.5px] text-slate-500">
+                        {selectedSubDetail.renewals?.length || 0} record(s) preserved
+                      </span>
                     </div>
 
                     <div className="overflow-x-auto rounded-lg border border-slate-250 bg-white shadow-2xs">
-                      <table className="w-full min-w-[500px] text-left text-[10.5px] border-collapse">
+                      <table className="w-full text-left text-[11px] border-collapse">
                         <thead>
-                          <tr className="border-b-2 border-slate-250 text-slate-700 font-black uppercase text-[9.5px] bg-slate-100 tracking-wider">
-                            <th className="py-2 px-2.5 border-r border-slate-250">Start Date</th>
-                            <th className="py-2 px-2.5 border-r border-slate-250">End Date</th>
-                            <th className="py-2 px-2.5 border-r border-slate-250">Amount</th>
-                            <th className="py-2 px-2.5 border-r border-slate-250">Status</th>
-                            <th className="py-2 px-2.5 border-r border-slate-250 min-w-[150px]">Account / License Given</th>
-                            <th className="py-2 px-2.5">Notes</th>
+                          <tr className="border-b-2 border-slate-250 text-slate-700 font-black uppercase text-[10px] bg-slate-100 tracking-wider">
+                            <th className="py-2 px-3 border-r border-slate-250 whitespace-nowrap">Start Date</th>
+                            <th className="py-2 px-3 border-r border-slate-250 whitespace-nowrap">End Date</th>
+                            <th className="py-2 px-3 border-r border-slate-250 whitespace-nowrap">Amount</th>
+                            <th className="py-2 px-3 border-r border-slate-250 whitespace-nowrap">Status</th>
+                            <th className="py-2 px-3 border-r border-slate-250 min-w-[220px]">Account / License Given</th>
+                            <th className="py-2 px-3 min-w-[240px]">Notes</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/70">
                           {selectedSubDetail.renewals && selectedSubDetail.renewals.length > 0 ? (
                             selectedSubDetail.renewals.map((ren) => (
                               <tr key={ren.id} className="odd:bg-white even:bg-slate-50/40 hover:bg-emerald-50/20 transition-colors">
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 text-slate-800 font-medium whitespace-nowrap">{new Date(ren.start_date).toISOString().slice(0, 10)}</td>
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 text-slate-800 font-medium whitespace-nowrap">{new Date(ren.end_date).toISOString().slice(0, 10)}</td>
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 font-bold text-emerald-700 whitespace-nowrap">BDT {ren.amount}</td>
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 whitespace-nowrap">
-                                  <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold border shadow-2xs ${ren.status === 'Current' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                <td className="py-2 px-3 border-r border-slate-200/80 text-slate-800 font-medium whitespace-nowrap">{new Date(ren.start_date).toISOString().slice(0, 10)}</td>
+                                <td className="py-2 px-3 border-r border-slate-200/80 text-slate-800 font-medium whitespace-nowrap">{new Date(ren.end_date).toISOString().slice(0, 10)}</td>
+                                <td className="py-2 px-3 border-r border-slate-200/80 font-bold text-emerald-700 whitespace-nowrap">BDT {ren.amount}</td>
+                                <td className="py-2 px-3 border-r border-slate-200/80 whitespace-nowrap">
+                                  <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold border shadow-2xs ${ren.status === 'Current' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'
                                     }`}>
                                     {ren.status}
                                   </span>
                                 </td>
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80">
-                                  <div className="space-y-1 max-w-[220px]">
+                                <td className="py-2 px-3 border-r border-slate-200/80">
+                                  <div className="space-y-1">
                                     {(ren.digital_account_email || ren.digital_slot_number || ren.digital_account_product) && (
-                                      <div className="flex items-center gap-1 text-[9.5px] font-semibold text-blue-700 bg-blue-50/90 border border-blue-200 px-1.5 py-0.5 rounded leading-tight">
-                                        <Server size={10} className="shrink-0 text-blue-600" />
-                                        <span className="truncate" title={`${ren.digital_account_product || 'Account'}: ${ren.digital_account_email || ''}`}>
+                                      <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-blue-700 bg-blue-50/90 border border-blue-200 px-2 py-0.5 rounded leading-tight">
+                                        <Server size={11} className="shrink-0 text-blue-600" />
+                                        <span title={`${ren.digital_account_product || 'Account'}: ${ren.digital_account_email || ''}`}>
                                           {ren.digital_account_email || ren.digital_account_product || 'Digital Account'}
                                         </span>
                                         {ren.digital_slot_number && (
-                                          <span className="bg-blue-600 text-white text-[8.5px] font-bold px-1 rounded-xs shrink-0">
-                                            #{ren.digital_slot_number}
+                                          <span className="bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-xs shrink-0">
+                                            Slot #{ren.digital_slot_number}
                                           </span>
                                         )}
                                       </div>
                                     )}
                                     {ren.account_given ? (
-                                      <div className="flex items-center gap-1 bg-slate-900 text-emerald-300 font-mono text-[9.5px] px-1.5 py-0.5 rounded border border-slate-800 leading-tight">
-                                        <Key size={10} className="shrink-0 text-emerald-400" />
+                                      <div className="flex items-center gap-1.5 bg-slate-900 text-emerald-300 font-mono text-[10px] px-2 py-1 rounded border border-slate-800 leading-tight">
+                                        <Key size={11} className="shrink-0 text-emerald-400" />
                                         <span className="truncate flex-1 select-all font-mono" title={ren.account_given}>
                                           {ren.account_given}
                                         </span>
@@ -4716,29 +5027,29 @@ export default function SubscriptionManager() {
                                           title="Copy credentials"
                                           className="text-slate-400 hover:text-emerald-300 p-0.5 rounded hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
                                         >
-                                          <Copy size={10} />
+                                          <Copy size={11} />
                                         </button>
                                       </div>
                                     ) : null}
                                     {!ren.account_given && !ren.digital_account_email && !ren.digital_slot_number && !ren.digital_account_product && (
-                                      <span className="text-slate-400 italic text-[9.5px]">- Not recorded -</span>
+                                      <span className="text-slate-400 italic text-[10px]">- Not recorded -</span>
                                     )}
                                   </div>
                                 </td>
-                                <td className="py-1.75 px-2.5 text-slate-700">
-                                  <div className="space-y-1 max-w-[220px]">
+                                <td className="py-2 px-3 text-slate-700">
+                                  <div className="space-y-1">
                                     {ren.customer_notes && (
-                                      <div className="flex items-start gap-1 bg-emerald-50/90 text-emerald-800 text-[10px] p-1 rounded border border-emerald-200 leading-tight">
+                                      <div className="flex items-start gap-1 bg-emerald-50/90 text-emerald-800 text-[10px] p-1.5 rounded border border-emerald-200 leading-tight">
                                         <Mail size={11} className="shrink-0 text-emerald-600 mt-0.5" />
-                                        <span className="font-normal break-words line-clamp-2" title={`Customer Note: ${ren.customer_notes}`}>
+                                        <span className="font-normal break-words" title={`Customer Note: ${ren.customer_notes}`}>
                                           <strong className="font-semibold text-emerald-900">Cust:</strong> {ren.customer_notes}
                                         </span>
                                       </div>
                                     )}
                                     {(ren.admin_notes || (ren.notes && ren.notes !== 'Subscription renewed' && ren.notes !== 'Initial purchase')) ? (
-                                      <div className="flex items-start gap-1 bg-slate-100 text-slate-700 text-[10px] p-1 rounded border border-slate-200 leading-tight">
+                                      <div className="flex items-start gap-1 bg-slate-100 text-slate-700 text-[10px] p-1.5 rounded border border-slate-200 leading-tight">
                                         <Shield size={11} className="shrink-0 text-amber-600 mt-0.5" />
-                                        <span className="font-normal break-words line-clamp-2" title={`Admin Note: ${ren.admin_notes || ren.notes}`}>
+                                        <span className="font-normal break-words" title={`Admin Note: ${ren.admin_notes || ren.notes}`}>
                                           <strong className="font-semibold text-slate-800">Admin:</strong> {ren.admin_notes || ren.notes}
                                         </span>
                                       </div>
@@ -4761,8 +5072,7 @@ export default function SubscriptionManager() {
                       </table>
                     </div>
                   </div>
-
-                  {/* 2. Reminder History */}
+                  {/* 1. Reminder History */}
                   <div className="bg-slate-50/70 p-3 sm:p-3.5 rounded-xl border border-slate-200/90 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -4773,27 +5083,27 @@ export default function SubscriptionManager() {
                     </div>
 
                     <div className="overflow-x-auto rounded-lg border border-slate-250 bg-white shadow-2xs">
-                      <table className="w-full min-w-[380px] text-left text-[10.5px] border-collapse">
+                      <table className="w-full text-left text-[10.5px] border-collapse">
                         <thead>
                           <tr className="border-b-2 border-slate-250 text-slate-700 font-black uppercase text-[9.5px] bg-slate-100 tracking-wider">
-                            <th className="py-2 px-2.5 border-r border-slate-250">Channel</th>
-                            <th className="py-2 px-2.5 border-r border-slate-250">Scheduled</th>
-                            <th className="py-2 px-2.5 border-r border-slate-250">Result</th>
-                            <th className="py-2 px-2.5">Detail</th>
+                            <th className="py-2 px-3 border-r border-slate-250">Channel</th>
+                            <th className="py-2 px-3 border-r border-slate-250">Scheduled</th>
+                            <th className="py-2 px-3 border-r border-slate-250">Result</th>
+                            <th className="py-2 px-3">Detail</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/70">
                           {selectedSubDetail.reminders && selectedSubDetail.reminders.length > 0 ? (
                             selectedSubDetail.reminders.map((rem) => (
                               <tr key={rem.id} className="odd:bg-white even:bg-slate-50/40 hover:bg-emerald-50/20 transition-colors">
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 text-slate-800 font-semibold">{rem.channel}</td>
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80 text-slate-500">{new Date(rem.scheduled_at).toLocaleString()}</td>
-                                <td className="py-1.75 px-2.5 border-r border-slate-200/80">
+                                <td className="py-2 px-3 border-r border-slate-200/80 text-slate-800 font-semibold">{rem.channel}</td>
+                                <td className="py-2 px-3 border-r border-slate-200/80 text-slate-500">{new Date(rem.scheduled_at).toLocaleString()}</td>
+                                <td className="py-2 px-3 border-r border-slate-200/80">
                                   <span className={`font-bold ${rem.status === 'Sent' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                     {rem.status}
                                   </span>
                                 </td>
-                                <td className="py-1.75 px-2.5 text-slate-500">{rem.failure_reason || 'Delivered'}</td>
+                                <td className="py-2 px-3 text-slate-500">{rem.failure_reason || 'Delivered'}</td>
                               </tr>
                             ))
                           ) : (
@@ -4805,6 +5115,9 @@ export default function SubscriptionManager() {
                       </table>
                     </div>
                   </div>
+
+                  {/* 2. Renewal History (Full Width) */}
+
 
                 </div>
 
@@ -4824,7 +5137,7 @@ export default function SubscriptionManager() {
         >
           <div className="min-h-full flex items-center justify-center py-4 sm:py-8">
             <div
-              className="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full max-h-[88vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6 shadow-2xl text-left overflow-hidden text-slate-900 relative my-auto animate-in zoom-in-95 duration-150"
+              className="bg-white border border-slate-200 rounded-2xl max-w-5xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1400px] w-full max-h-[88vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6 shadow-2xl text-left overflow-hidden text-slate-900 relative my-auto animate-in zoom-in-95 duration-150"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -4850,11 +5163,12 @@ export default function SubscriptionManager() {
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {viewingSub.direct_whatsapp_url && (
+                  {(viewingSub.direct_whatsapp_url || getWhatsAppLink(viewingSub.whatsapp_number)) && (
                     <a
-                      href={viewingSub.direct_whatsapp_url}
+                      href={viewingSub.direct_whatsapp_url && viewingSub.direct_whatsapp_url !== '#' ? viewingSub.direct_whatsapp_url : getWhatsAppLink(viewingSub.whatsapp_number)}
                       target="_blank"
                       rel="noreferrer"
+                      onClick={(e) => handleWhatsAppClick(e, viewingSub.whatsapp_number, null, toast)}
                       className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Open WhatsApp Chat"
                     >
@@ -5251,61 +5565,105 @@ export default function SubscriptionManager() {
                   </div>
                 </div>
 
-                {/* Renewal & Reminder History */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Renewal History */}
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                {/* Reminder Logs & Renewal History (Stacked Full-Width) */}
+                <div className="space-y-4">
+
+                  {/* Reminder Logs */}
+                  <div className="bg-slate-50 p-3 sm:p-3.5 rounded-xl border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <History size={13} className="text-slate-600" />
+                        <Bell size={13} className="text-slate-600" />
+                        Reminder Logs
+                      </h4>
+                      <span className="text-[10px] text-slate-500 font-semibold">
+                        {viewingSub.reminders?.length || 0} log(s)
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-2xs">
+                      <table className="w-full text-left text-[11px] border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-100 text-[9.5px] uppercase tracking-wider">
+                            <th className="py-2 px-3">Channel</th>
+                            <th className="py-2 px-3">Scheduled / Sent Time</th>
+                            <th className="py-2 px-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {viewingSub.reminders && viewingSub.reminders.length > 0 ? (
+                            viewingSub.reminders.map(rem => (
+                              <tr key={rem.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="py-2 px-3 font-semibold text-slate-800">{rem.channel}</td>
+                                <td className="py-2 px-3 text-slate-500">{new Date(rem.scheduled_at).toLocaleString()}</td>
+                                <td className="py-2 px-3">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${rem.status === 'Sent' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                                    {rem.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={3} className="py-2.5 text-center text-slate-400 italic">No reminder records yet</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Renewal History (Full Width) */}
+                  <div className="bg-slate-50 p-3 sm:p-3.5 rounded-xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <History size={13} className="text-emerald-600" />
                         Renewal History
                       </h4>
                       <span className="text-[10px] text-slate-500 font-semibold">
                         {viewingSub.renewals?.length || 0} record(s)
                       </span>
                     </div>
-                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                      <table className="w-full min-w-[540px] text-left text-[10.5px] border-collapse">
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-2xs">
+                      <table className="w-full text-left text-[11px] border-collapse">
                         <thead>
-                          <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-100 text-[9.5px] uppercase">
-                            <th className="py-1.5 px-2">Start</th>
-                            <th className="py-1.5 px-2">End</th>
-                            <th className="py-1.5 px-2">Amount</th>
-                            <th className="py-1.5 px-2">Status</th>
-                            <th className="py-1.5 px-2 min-w-[150px]">Account / License Given</th>
-                            <th className="py-1.5 px-2">Notes</th>
+                          <tr className="border-b border-slate-200 text-slate-700 font-bold bg-slate-100 text-[10px] uppercase tracking-wider">
+                            <th className="py-2 px-3 whitespace-nowrap">Start Date</th>
+                            <th className="py-2 px-3 whitespace-nowrap">End Date</th>
+                            <th className="py-2 px-3 whitespace-nowrap">Amount</th>
+                            <th className="py-2 px-3 whitespace-nowrap">Status</th>
+                            <th className="py-2 px-3 min-w-[220px]">Account / License Given</th>
+                            <th className="py-2 px-3 min-w-[240px]">Notes</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {viewingSub.renewals && viewingSub.renewals.length > 0 ? (
                             viewingSub.renewals.map(r => (
-                              <tr key={r.id} className="hover:bg-slate-50">
-                                <td className="py-1.5 px-2 whitespace-nowrap">{new Date(r.start_date).toISOString().slice(0, 10)}</td>
-                                <td className="py-1.5 px-2 whitespace-nowrap">{new Date(r.end_date).toISOString().slice(0, 10)}</td>
-                                <td className="py-1.5 px-2 font-bold text-emerald-700 whitespace-nowrap">৳{r.amount}</td>
-                                <td className="py-1.5 px-2 whitespace-nowrap">
-                                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${r.status === 'Current' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                              <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="py-2 px-3 whitespace-nowrap font-medium text-slate-800">{new Date(r.start_date).toISOString().slice(0, 10)}</td>
+                                <td className="py-2 px-3 whitespace-nowrap font-medium text-slate-800">{new Date(r.end_date).toISOString().slice(0, 10)}</td>
+                                <td className="py-2 px-3 font-bold text-emerald-700 whitespace-nowrap">৳{r.amount}</td>
+                                <td className="py-2 px-3 whitespace-nowrap">
+                                  <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold ${r.status === 'Current' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
                                     {r.status}
                                   </span>
                                 </td>
-                                <td className="py-1.5 px-2">
-                                  <div className="space-y-1 max-w-[220px]">
+                                <td className="py-2 px-3">
+                                  <div className="space-y-1">
                                     {(r.digital_account_email || r.digital_slot_number || r.digital_account_product) && (
-                                      <div className="flex items-center gap-1 text-[9.5px] font-semibold text-blue-700 bg-blue-50/90 border border-blue-200 px-1.5 py-0.5 rounded leading-tight">
-                                        <Server size={10} className="shrink-0 text-blue-600" />
-                                        <span className="truncate" title={`${r.digital_account_product || 'Account'}: ${r.digital_account_email || ''}`}>
+                                      <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-blue-700 bg-blue-50/90 border border-blue-200 px-2 py-0.5 rounded leading-tight">
+                                        <Server size={11} className="shrink-0 text-blue-600" />
+                                        <span title={`${r.digital_account_product || 'Account'}: ${r.digital_account_email || ''}`}>
                                           {r.digital_account_email || r.digital_account_product || 'Digital Account'}
                                         </span>
                                         {r.digital_slot_number && (
-                                          <span className="bg-blue-600 text-white text-[8.5px] font-bold px-1 rounded-xs shrink-0">
-                                            #{r.digital_slot_number}
+                                          <span className="bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-xs shrink-0">
+                                            Slot #{r.digital_slot_number}
                                           </span>
                                         )}
                                       </div>
                                     )}
                                     {r.account_given ? (
-                                      <div className="flex items-center gap-1 bg-slate-900 text-emerald-300 font-mono text-[9.5px] px-1.5 py-0.5 rounded border border-slate-800 leading-tight">
-                                        <Key size={10} className="shrink-0 text-emerald-400" />
+                                      <div className="flex items-center gap-1.5 bg-slate-900 text-emerald-300 font-mono text-[10px] px-2 py-1 rounded border border-slate-800 leading-tight">
+                                        <Key size={11} className="shrink-0 text-emerald-400" />
                                         <span className="truncate flex-1 select-all font-mono" title={r.account_given}>
                                           {r.account_given}
                                         </span>
@@ -5319,37 +5677,37 @@ export default function SubscriptionManager() {
                                           title="Copy credentials"
                                           className="text-slate-400 hover:text-emerald-300 p-0.5 rounded hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
                                         >
-                                          <Copy size={10} />
+                                          <Copy size={11} />
                                         </button>
                                       </div>
                                     ) : null}
                                     {!r.account_given && !r.digital_account_email && !r.digital_slot_number && !r.digital_account_product && (
-                                      <span className="text-slate-400 italic text-[9.5px]">- Not recorded -</span>
+                                      <span className="text-slate-400 italic text-[10px]">- Not recorded -</span>
                                     )}
                                   </div>
                                 </td>
-                                <td className="py-1.5 px-2 text-slate-700">
-                                  <div className="space-y-1 max-w-[180px]">
+                                <td className="py-2 px-3 text-slate-700">
+                                  <div className="space-y-1">
                                     {r.customer_notes && (
-                                      <div className="flex items-start gap-1 bg-emerald-50/80 text-emerald-800 text-[9.5px] p-1 rounded border border-emerald-200 leading-tight">
-                                        <Mail size={10} className="shrink-0 text-emerald-600 mt-0.5" />
-                                        <span className="font-normal break-words line-clamp-2" title={`Customer Note: ${r.customer_notes}`}>
+                                      <div className="flex items-start gap-1 bg-emerald-50/80 text-emerald-800 text-[10px] p-1.5 rounded border border-emerald-200 leading-tight">
+                                        <Mail size={11} className="shrink-0 text-emerald-600 mt-0.5" />
+                                        <span className="font-normal break-words" title={`Customer Note: ${r.customer_notes}`}>
                                           <strong className="font-semibold text-emerald-900">Cust:</strong> {r.customer_notes}
                                         </span>
                                       </div>
                                     )}
                                     {(r.admin_notes || (r.notes && r.notes !== 'Subscription renewed' && r.notes !== 'Initial purchase')) ? (
-                                      <div className="flex items-start gap-1 bg-slate-100 text-slate-700 text-[9.5px] p-1 rounded border border-slate-200 leading-tight">
-                                        <Shield size={10} className="shrink-0 text-amber-600 mt-0.5" />
-                                        <span className="font-normal break-words line-clamp-2" title={`Admin Note: ${r.admin_notes || r.notes}`}>
+                                      <div className="flex items-start gap-1 bg-slate-100 text-slate-700 text-[10px] p-1.5 rounded border border-slate-200 leading-tight">
+                                        <Shield size={11} className="shrink-0 text-amber-600 mt-0.5" />
+                                        <span className="font-normal break-words" title={`Admin Note: ${r.admin_notes || r.notes}`}>
                                           <strong className="font-semibold text-slate-800">Admin:</strong> {r.admin_notes || r.notes}
                                         </span>
                                       </div>
                                     ) : (r.notes && !r.customer_notes && !r.admin_notes ? (
-                                      <span className="text-[9.5px] text-slate-500 italic">{r.notes}</span>
+                                      <span className="text-[10px] text-slate-500 italic">{r.notes}</span>
                                     ) : null)}
                                     {!r.customer_notes && !r.admin_notes && (!r.notes || r.notes === 'Subscription renewed' || r.notes === 'Initial purchase') && (
-                                      <span className="text-slate-400 italic text-[9.5px]">-</span>
+                                      <span className="text-slate-400 italic text-[10px]">-</span>
                                     )}
                                   </div>
                                 </td>
@@ -5357,50 +5715,7 @@ export default function SubscriptionManager() {
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={6} className="py-2.5 text-center text-slate-400 italic">No renewal records yet</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Reminder Logs */}
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <Bell size={13} className="text-slate-600" />
-                        Reminder Logs
-                      </h4>
-                      <span className="text-[10px] text-slate-500 font-semibold">
-                        {viewingSub.reminders?.length || 0} log(s)
-                      </span>
-                    </div>
-                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                      <table className="w-full text-left text-[10.5px] border-collapse">
-                        <thead>
-                          <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-100 text-[9.5px] uppercase">
-                            <th className="py-1.5 px-2">Channel</th>
-                            <th className="py-1.5 px-2">Time</th>
-                            <th className="py-1.5 px-2">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {viewingSub.reminders && viewingSub.reminders.length > 0 ? (
-                            viewingSub.reminders.map(rem => (
-                              <tr key={rem.id} className="hover:bg-slate-50">
-                                <td className="py-1.5 px-2 font-semibold">{rem.channel}</td>
-                                <td className="py-1.5 px-2 text-slate-500">{new Date(rem.scheduled_at).toLocaleDateString()}</td>
-                                <td className="py-1.5 px-2">
-                                  <span className={`font-bold ${rem.status === 'Sent' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                    {rem.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={3} className="py-2.5 text-center text-slate-400 italic">No reminder records yet</td>
+                              <td colSpan={6} className="py-3 text-center text-slate-400 italic">No renewal records yet</td>
                             </tr>
                           )}
                         </tbody>
@@ -5434,6 +5749,26 @@ export default function SubscriptionManager() {
                   >
                     <Edit2 size={13} />
                     <span>Edit</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={togglingNotRenewedId === viewingSub.id}
+                    onClick={(e) => handleToggleNotRenewed(viewingSub, e)}
+                    className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-60 ${viewingSub.status === 'Not Renewed'
+                      ? 'bg-slate-800 text-white border-slate-800 hover:bg-slate-900'
+                      : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                      }`}
+                    title={viewingSub.status === 'Not Renewed' ? 'Revert status' : 'Mark as Not Renewed'}
+                  >
+                    {togglingNotRenewedId === viewingSub.id ? (
+                      <RefreshCw size={13} className="animate-spin text-slate-300" />
+                    ) : viewingSub.status === 'Not Renewed' ? (
+                      <XCircle size={13} className="text-rose-400" />
+                    ) : (
+                      <UserX size={13} />
+                    )}
+                    <span>{viewingSub.status === 'Not Renewed' ? 'Revert Status' : 'Not Renewed'}</span>
                   </button>
 
                   <button
@@ -5501,11 +5836,10 @@ export default function SubscriptionManager() {
               setActiveMenuSub(null);
               handleToggleNotRenewed(s, e);
             }}
-            className={`w-full px-3 py-2 flex items-center gap-2 font-medium cursor-pointer transition-colors disabled:opacity-60 ${
-              activeMenuSub?.status === 'Not Renewed'
-                ? 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                : 'text-rose-600 hover:bg-rose-50 hover:text-rose-700'
-            }`}
+            className={`w-full px-3 py-2 flex items-center gap-2 font-medium cursor-pointer transition-colors disabled:opacity-60 ${activeMenuSub?.status === 'Not Renewed'
+              ? 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+              : 'text-rose-600 hover:bg-rose-50 hover:text-rose-700'
+              }`}
           >
             {activeMenuSub?.status === 'Not Renewed' ? (
               <>
@@ -5628,11 +5962,10 @@ export default function SubscriptionManager() {
                       setActiveTemplateTab('list');
                       setEditingTemplate(null);
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      activeTemplateTab === 'list'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTemplateTab === 'list'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
                   >
                     Saved Templates ({noteTemplates.length})
                   </button>
@@ -5644,11 +5977,10 @@ export default function SubscriptionManager() {
                         setTemplateForm({ title: '', content: '' });
                       }
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                      activeTemplateTab === 'add'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${activeTemplateTab === 'add'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
                   >
                     <Plus size={12} />
                     <span>{editingTemplate ? 'Edit Template' : 'Add New Template'}</span>

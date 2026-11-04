@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import JoditEditor from 'jodit-react';
 import { api, API_BASE_URL } from '../utils/api';
-import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, ChevronUp, ChevronRight, Database, KeyRound, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent, Search, RefreshCw, Megaphone, ArrowUp, ArrowDown, Headphones, ExternalLink, Globe, Mail, Phone, TrendingUp, ShoppingBag, ArrowRight, ArrowUpRight, CheckCircle2, Sparkles, Clock, Calendar, Eye, Copy, Filter, ArrowUpDown, RotateCcw, Hourglass, Truck, XCircle, ShieldCheck, Save, Send, HardDrive, AlertCircle, Bell, Menu, MoreVertical, Crown, Info, SlidersHorizontal, LogOut, User, Store, Shield, ScrollText } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, ChevronUp, ChevronRight, Database, KeyRound, Key, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent, Search, RefreshCw, Megaphone, ArrowUp, ArrowDown, Headphones, ExternalLink, Globe, Mail, Phone, TrendingUp, ShoppingBag, ArrowRight, ArrowUpRight, CheckCircle2, Sparkles, Clock, Calendar, Eye, Copy, Filter, ArrowUpDown, RotateCcw, Hourglass, Truck, XCircle, ShieldCheck, Save, Send, HardDrive, AlertCircle, Bell, Menu, MoreVertical, Crown, Info, SlidersHorizontal, LogOut, User, Store, Shield, ScrollText } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import SubscriptionManager from '../components/admin/SubscriptionManager';
@@ -11,6 +11,7 @@ import VendorManager from '../components/admin/VendorManager';
 import LicenseManager from '../components/admin/LicenseManager';
 import ProductUsageRules from '../components/admin/ProductUsageRules';
 import UserProfileView from '../components/UserProfileView';
+import { htmlToPlainText } from '../utils/textUtils';
 
 const parseJSON = (str, fallback) => {
   if (!str) return fallback;
@@ -1653,13 +1654,14 @@ export default function AdminDashboard() {
 
   const handleEditLicense = async (license) => {
     setEditingLicense(license);
-    const existingRule = (usageRules || []).find(r => r.rules_text && r.rules_text.trim() === (license.rules || '').trim());
-    setSelectedLicenseRuleId(existingRule ? String(existingRule.id) : (license.rules ? '__custom__' : ''));
+    const plainRule = htmlToPlainText(license.rules || '');
+    const existingRule = (usageRules || []).find(r => String(r.product_id) === String(license.product_id) && htmlToPlainText(r.rules_text || '').trim() === plainRule.trim());
+    setSelectedLicenseRuleId(existingRule ? String(existingRule.id) : (plainRule ? '__custom__' : ''));
     setLicenseForm({
       product_id: license.product_id,
       activation_option: license.activation_option || '',
       package_option: license.package_option || '',
-      rules: license.rules || '',
+      rules: plainRule,
       license_key: license.license_key
     });
     setLicenseFormError('');
@@ -1669,7 +1671,7 @@ export default function AdminDashboard() {
         const rData = await api.get('/product-usage-rules');
         const list = Array.isArray(rData) ? rData : (rData?.data || []);
         setUsageRules(list);
-        const match = list.find(r => r.rules_text && r.rules_text.trim() === (license.rules || '').trim());
+        const match = list.find(r => String(r.product_id) === String(license.product_id) && htmlToPlainText(r.rules_text || '').trim() === plainRule.trim());
         if (match) setSelectedLicenseRuleId(String(match.id));
       } catch (err) {
         // ignore
@@ -8205,256 +8207,349 @@ export default function AdminDashboard() {
         </div>
       )}
       {showLicenseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs" onClick={() => setShowLicenseModal(false)} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto">
+          <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs transition-opacity" onClick={() => setShowLicenseModal(false)} />
 
-          <div className="relative bg-white border border-slate-200 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl z-10 animate-slide-up text-left">
-            <div className="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-              <h4 className="text-base font-bold text-slate-850">{editingLicense ? 'Edit License Key' : 'Add License Keys'}</h4>
-              <button onClick={() => setShowLicenseModal(false)} className="text-slate-400 hover:text-slate-650"><X className="w-5 h-5 cursor-pointer" /></button>
+          <div className="relative bg-white border border-slate-200/90 w-full max-w-5xl xl:max-w-6xl rounded-2xl overflow-hidden shadow-2xl z-10 animate-slide-up text-left max-h-[92vh] flex flex-col my-auto">
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 sm:px-6 sm:py-4 bg-linear-to-r from-slate-50 via-violet-50/25 to-slate-50 border-b border-slate-200 flex justify-between items-center shrink-0">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-violet-600/10 border border-violet-200 flex items-center justify-center text-violet-600 shrink-0 shadow-2xs">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center space-x-2">
+                    <h4 className="text-base font-bold text-slate-800 tracking-tight">
+                      {editingLicense ? 'Edit License Key' : 'Add License Keys'}
+                    </h4>
+                    {!editingLicense && (
+                      <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">
+                        Bulk Supported
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    Select product options, customize usage rules, and paste digital license keys.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowLicenseModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-650 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Close Modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <form onSubmit={handleLicenseSubmit} className="p-5 space-y-4">
-              {licenseFormError && (
-                <div className="text-xs font-semibold text-red-500 bg-red-50 border border-red-100 px-3 py-2 rounded-xl">
-                  {licenseFormError}
-                </div>
-              )}
+            {/* Modal Form */}
+            <form onSubmit={handleLicenseSubmit} className="flex-1 overflow-y-auto flex flex-col min-h-0">
+              <div className="p-4 sm:p-5 md:p-6 space-y-4 flex-1">
+                {licenseFormError && (
+                  <div className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-3.5 py-2.5 rounded-xl flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                    <span>{licenseFormError}</span>
+                  </div>
+                )}
 
-              <div className="relative">
-                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Product *</label>
+                {/* 3 Grid View Columns */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 items-stretch">
+                  {/* Grid Col 1: Product & Options */}
+                  <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-4 flex flex-col justify-between space-y-3.5 shadow-2xs">
+                    <div className="space-y-3 flex-1">
+                      <div className="flex items-center gap-1.5 pb-2 border-b border-slate-200/90 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        <Package className="w-3.5 h-3.5 text-violet-600" />
+                        <span>1. Product & Package</span>
+                      </div>
 
-                <div
-                  className="w-full text-xs bg-slate-50 border border-slate-250 focus-within:border-violet-500 focus-within:bg-white rounded-lg px-3 py-2 text-slate-800 cursor-text flex items-center justify-between"
-                  onClick={() => setShowProductDropdown(true)}
-                >
-                  <input
-                    type="text"
-                    className="bg-transparent border-none outline-none w-full"
-                    placeholder="Search a Product..."
-                    value={showProductDropdown ? licenseProductSearch : (products.find(p => p.id === parseInt(licenseForm.product_id))?.name || '')}
-                    onChange={(e) => {
-                      setLicenseProductSearch(e.target.value);
-                      setShowProductDropdown(true);
-                    }}
-                    onFocus={() => setShowProductDropdown(true)}
-                  />
-                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                </div>
-
-                {showProductDropdown && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)}></div>
-                    <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto custom-scrollbar">
-                      {products
-                        .filter(prod => String(prod.name ?? '').toLowerCase().includes(String(licenseProductSearch ?? '').toLowerCase()))
-                        .map((prod) => (
-                          <div
-                            key={prod.id}
-                            className={`px-3 py-2 text-xs cursor-pointer hover:bg-violet-50 ${licenseForm.product_id == prod.id ? 'bg-violet-100 text-violet-700 font-bold' : 'text-slate-700'}`}
-                            onClick={() => {
-                              const matchingRule = (usageRules || []).find(r => String(r.product_id) === String(prod.id) && r.is_active != 0);
-                              setLicenseForm(prev => ({
-                                ...prev,
-                                product_id: prod.id,
-                                activation_option: '',
-                                package_option: '',
-                                rules: matchingRule ? matchingRule.rules_text : prev.rules
-                              }));
-                              if (matchingRule) {
-                                setSelectedLicenseRuleId(String(matchingRule.id));
-                              } else if (!licenseForm.rules) {
-                                setSelectedLicenseRuleId('');
-                              }
-                              setLicenseProductSearch('');
-                              setShowProductDropdown(false);
+                      {/* Product Selector */}
+                      <div className="relative">
+                        <label className="block text-xxs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Product *
+                        </label>
+                        <div
+                          className="w-full text-xs bg-white border border-slate-250 focus-within:border-violet-500 rounded-lg px-3 py-2 text-slate-800 cursor-text flex items-center justify-between shadow-2xs transition-colors"
+                          onClick={() => setShowProductDropdown(true)}
+                        >
+                          <input
+                            type="text"
+                            className="bg-transparent border-none outline-none w-full text-xs"
+                            placeholder="Search a Product..."
+                            value={showProductDropdown ? licenseProductSearch : (products.find(p => p.id === parseInt(licenseForm.product_id))?.name || '')}
+                            onChange={(e) => {
+                              setLicenseProductSearch(e.target.value);
+                              setShowProductDropdown(true);
                             }}
+                            onFocus={() => setShowProductDropdown(true)}
+                          />
+                          <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                        </div>
+
+                        {showProductDropdown && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)}></div>
+                            <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto custom-scrollbar">
+                              {products
+                                .filter(prod => String(prod.name ?? '').toLowerCase().includes(String(licenseProductSearch ?? '').toLowerCase()))
+                                .map((prod) => (
+                                  <div
+                                    key={prod.id}
+                                    className={`px-3 py-2 text-xs cursor-pointer hover:bg-violet-50 transition-colors ${licenseForm.product_id == prod.id ? 'bg-violet-100 text-violet-700 font-bold' : 'text-slate-700'}`}
+                                    onClick={() => {
+                                      const matchingRule = (usageRules || []).find(r => String(r.product_id) === String(prod.id) && r.is_active != 0);
+                                      setLicenseForm(prev => ({
+                                        ...prev,
+                                        product_id: prod.id,
+                                        activation_option: '',
+                                        package_option: '',
+                                        rules: matchingRule ? htmlToPlainText(matchingRule.rules_text) : ''
+                                      }));
+                                      if (matchingRule) {
+                                        setSelectedLicenseRuleId(String(matchingRule.id));
+                                      } else {
+                                        setSelectedLicenseRuleId('');
+                                      }
+                                      setLicenseProductSearch('');
+                                      setShowProductDropdown(false);
+                                    }}
+                                  >
+                                    {prod.name}
+                                  </div>
+                                ))}
+                              {products.filter(prod => String(prod.name ?? '').toLowerCase().includes(String(licenseProductSearch ?? '').toLowerCase())).length === 0 && (
+                                <div className="px-3 py-2 text-xs text-slate-500 text-center italic">No products found.</div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Activation Option */}
+                      <div>
+                        <label className="block text-xxs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Activation Option
+                        </label>
+                        {(() => {
+                          const selectedProduct = products.find(p => p.id === parseInt(licenseForm.product_id));
+                          const activationOptions = selectedProduct?.activation_options
+                            ? selectedProduct.activation_options.split(',').map(opt => opt.trim()).filter(Boolean)
+                            : [];
+
+                          return (
+                            <select
+                              value={licenseForm.activation_option}
+                              onChange={(e) => setLicenseForm({ ...licenseForm, activation_option: e.target.value })}
+                              disabled={!licenseForm.product_id || activationOptions.length === 0}
+                              className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
+                            >
+                              <option value="">{activationOptions.length === 0 ? 'No Activation Options' : 'Select Activation Option...'}</option>
+                              {activationOptions.map((opt, idx) => (
+                                <option key={idx} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Package Option */}
+                      <div>
+                        <label className="block text-xxs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Package Option
+                        </label>
+                        {(() => {
+                          const selectedProduct = products.find(p => p.id === parseInt(licenseForm.product_id));
+                          const packages = selectedProduct?.packages || [];
+
+                          return (
+                            <select
+                              value={licenseForm.package_option}
+                              onChange={(e) => setLicenseForm({ ...licenseForm, package_option: e.target.value })}
+                              disabled={!licenseForm.product_id || packages.length === 0}
+                              className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
+                            >
+                              <option value="">{packages.length === 0 ? 'No Package Options' : 'Select Package Option...'}</option>
+                              {packages.map((pkg, idx) => (
+                                <option key={idx} value={pkg.duration}>{pkg.duration} (৳{pkg.price})</option>
+                              ))}
+                            </select>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-violet-50/80 border border-violet-100 text-[11px] text-violet-700 leading-relaxed">
+                      💡 Select a product to auto-populate activation types, durations, and usage rules.
+                    </div>
+                  </div>
+
+                  {/* Grid Col 2: License Rules / Instructions */}
+                  <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-4 flex flex-col justify-between space-y-3.5 shadow-2xs">
+                    <div className="space-y-3 flex-1 flex flex-col">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-200/90">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          <ScrollText className="w-3.5 h-3.5 text-amber-600" />
+                          <span>2. Rules / Instructions</span>
+                        </div>
+                        {licenseForm.rules && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedLicenseRuleId('');
+                              setLicenseForm(prev => ({ ...prev, rules: '' }));
+                            }}
+                            className="text-xxs text-slate-400 hover:text-red-500 font-medium transition-colors cursor-pointer"
                           >
-                            {prod.name}
-                          </div>
-                        ))}
-                      {products.filter(prod => String(prod.name ?? '').toLowerCase().includes(String(licenseProductSearch ?? '').toLowerCase())).length === 0 && (
-                        <div className="px-3 py-2 text-xs text-slate-500 text-center italic">No products found.</div>
+                            Clear Rules
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Rule Template Dropdown */}
+                      <div>
+                        <label className="block text-xxs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Preset Rule Template
+                        </label>
+                        <select
+                          value={selectedLicenseRuleId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSelectedLicenseRuleId(val);
+                            if (!val) {
+                              setLicenseForm(prev => ({ ...prev, rules: '' }));
+                            } else if (val === '__custom__') {
+                              // Allow custom typing without changing existing text
+                            } else {
+                              const rule = (usageRules || []).find(r => String(r.id) === String(val));
+                              if (rule) {
+                                setLicenseForm(prev => ({ ...prev, rules: htmlToPlainText(rule.rules_text) }));
+                              }
+                            }
+                          }}
+                          className="w-full text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer shadow-2xs"
+                        >
+                          <option value="">-- Select Product Usage Rules --</option>
+                          {(() => {
+                            const currentProdId = String(licenseForm.product_id || '');
+                            const matchingRules = (usageRules || []).filter(r => currentProdId && String(r.product_id) === currentProdId);
+                            const selectedProdName = products.find(p => String(p.id) === currentProdId)?.name;
+
+                            return (
+                              <>
+                                {matchingRules.length > 0 ? (
+                                  <optgroup label={`Rules for ${selectedProdName || 'Selected Product'}`}>
+                                    {matchingRules.map(r => (
+                                      <option key={r.id} value={String(r.id)}>
+                                        {r.title || 'Standard Rules'} {r.is_active ? '' : '(Inactive)'}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                ) : currentProdId ? (
+                                  <option value="" disabled>-- No saved rules for this product --</option>
+                                ) : (
+                                  <option value="" disabled>-- Select a product first --</option>
+                                )}
+                                <option value="__custom__">Custom / Manual Rules (Type below)</option>
+                              </>
+                            );
+                          })()}
+                        </select>
+                      </div>
+
+                      {/* Rules Textarea */}
+                      <div className="flex-1 flex flex-col min-h-[160px]">
+                        <label className="block text-xxs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Rules Text (Customer Notice)
+                        </label>
+                        <textarea
+                          value={licenseForm.rules}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setLicenseForm(prev => ({ ...prev, rules: val }));
+                            const currentRule = (usageRules || []).find(r => String(r.id) === String(selectedLicenseRuleId));
+                            if (currentRule && htmlToPlainText(currentRule.rules_text).trim() !== val.trim()) {
+                              setSelectedLicenseRuleId('__custom__');
+                            }
+                          }}
+                          placeholder="e.g. Do not change password. Valid for 1 device. Contact support if locked."
+                          className="w-full flex-1 min-h-[140px] text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg p-3 text-slate-800 placeholder-slate-400 font-sans shadow-2xs leading-relaxed resize-y"
+                        />
+                      </div>
+                    </div>
+
+                    {selectedLicenseRuleId && selectedLicenseRuleId !== '__custom__' && (
+                      <div className="flex items-center text-xxs text-emerald-600 font-medium space-x-1 pt-1">
+                        <span>✓ Pre-filled from Product Usage Rules. Editable above.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Grid Col 3: License Keys */}
+                  <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-4 flex flex-col justify-between space-y-3.5 shadow-2xs">
+                    <div className="space-y-3 flex-1 flex flex-col">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-200/90">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          <Key className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>3. License Keys</span>
+                        </div>
+                        {!editingLicense && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
+                            {licenseForm.license_key.split('\n').filter(k => k.trim()).length} Keys Detected
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex-1 flex flex-col min-h-[220px]">
+                        <label className="block text-xxs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          {editingLicense ? 'License Key *' : 'License Keys (One per line for bulk) *'}
+                        </label>
+                        <textarea
+                          value={licenseForm.license_key}
+                          onChange={(e) => setLicenseForm({ ...licenseForm, license_key: e.target.value })}
+                          placeholder={editingLicense ? "Key-XXXX" : "Paste keys here (one per line):\nKey-1-XXXX\nKey-2-XXXX\nKey-3-XXXX"}
+                          className="w-full flex-1 min-h-[200px] text-xs bg-white border border-slate-250 focus:border-violet-500 focus:outline-none rounded-lg p-3 text-slate-800 placeholder-slate-400 font-mono shadow-2xs resize-y leading-relaxed"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-100 text-[11px] text-emerald-800 leading-relaxed">
+                      {editingLicense ? (
+                        <span>✏️ Updating single license key.</span>
+                      ) : (
+                        <span>⚡ Paste as many keys as needed. Each line will create 1 available unit in stock.</span>
                       )}
                     </div>
-                  </>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Activation Option</label>
-                  {(() => {
-                    const selectedProduct = products.find(p => p.id === parseInt(licenseForm.product_id));
-                    const activationOptions = selectedProduct?.activation_options
-                      ? selectedProduct.activation_options.split(',').map(opt => opt.trim()).filter(Boolean)
-                      : [];
-
-                    return (
-                      <select
-                        value={licenseForm.activation_option}
-                        onChange={(e) => setLicenseForm({ ...licenseForm, activation_option: e.target.value })}
-                        disabled={!licenseForm.product_id || activationOptions.length === 0}
-                        className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <option value="">{activationOptions.length === 0 ? 'No Activation Options' : 'Select Activation Option...'}</option>
-                        {activationOptions.map((opt, idx) => (
-                          <option key={idx} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                </div>
-
-                <div>
-                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">Package Option</label>
-                  {(() => {
-                    const selectedProduct = products.find(p => p.id === parseInt(licenseForm.product_id));
-                    const packages = selectedProduct?.packages || [];
-
-                    return (
-                      <select
-                        value={licenseForm.package_option}
-                        onChange={(e) => setLicenseForm({ ...licenseForm, package_option: e.target.value })}
-                        disabled={!licenseForm.product_id || packages.length === 0}
-                        className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <option value="">{packages.length === 0 ? 'No Package Options' : 'Select Package Option...'}</option>
-                        {packages.map((pkg, idx) => (
-                          <option key={idx} value={pkg.duration}>{pkg.duration} (৳{pkg.price})</option>
-                        ))}
-                      </select>
-                    );
-                  })()}
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider">
-                    License Rules / Instructions (Optional)
-                  </label>
-                  {licenseForm.rules && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedLicenseRuleId('');
-                        setLicenseForm(prev => ({ ...prev, rules: '' }));
-                      }}
-                      className="text-xxs text-slate-400 hover:text-red-500 font-medium transition-colors cursor-pointer"
-                    >
-                      Clear Rules
-                    </button>
-                  )}
+              {/* Modal Footer */}
+              <div className="px-5 py-3.5 sm:px-6 sm:py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+                <div className="text-xs text-slate-500 hidden sm:block">
+                  {editingLicense ? 'Updating 1 active license key' : 'Bulk add license keys directly to product stock'}
                 </div>
-
-                <div className="space-y-2">
-                  <select
-                    value={selectedLicenseRuleId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSelectedLicenseRuleId(val);
-                      if (!val) {
-                        setLicenseForm(prev => ({ ...prev, rules: '' }));
-                      } else if (val === '__custom__') {
-                        // Allow custom typing without changing existing text
-                      } else {
-                        const rule = (usageRules || []).find(r => String(r.id) === String(val));
-                        if (rule) {
-                          setLicenseForm(prev => ({ ...prev, rules: rule.rules_text }));
-                        }
-                      }
-                    }}
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 cursor-pointer"
+                <div className="flex items-center space-x-3 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setShowLicenseModal(false)}
+                    className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
                   >
-                    <option value="">-- Select Product Usage Rules --</option>
-                    {(() => {
-                      const currentProdId = String(licenseForm.product_id || '');
-                      const matchingRules = (usageRules || []).filter(r => currentProdId && String(r.product_id) === currentProdId);
-                      const otherRules = (usageRules || []).filter(r => !currentProdId || String(r.product_id) !== currentProdId);
-                      const selectedProdName = products.find(p => String(p.id) === currentProdId)?.name;
-
-                      return (
-                        <>
-                          {matchingRules.length > 0 && (
-                            <optgroup label={`Rules for ${selectedProdName || 'Selected Product'}`}>
-                              {matchingRules.map(r => (
-                                <option key={r.id} value={String(r.id)}>
-                                  {r.title || 'Standard Rules'} {r.is_active ? '' : '(Inactive)'}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {otherRules.length > 0 && (
-                            <optgroup label={matchingRules.length > 0 ? "Other Product Rules" : "All Product Rules"}>
-                              {otherRules.map(r => (
-                                <option key={r.id} value={String(r.id)}>
-                                  {r.product_name ? `[${r.product_name}] ` : ''}{r.title || 'Usage Rule'}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                          <option value="__custom__">Custom / Manual Rules (Type below)</option>
-                        </>
-                      );
-                    })()}
-                  </select>
-
-                  <textarea
-                    rows="3"
-                    value={licenseForm.rules}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setLicenseForm(prev => ({ ...prev, rules: val }));
-                      const currentRule = (usageRules || []).find(r => String(r.id) === String(selectedLicenseRuleId));
-                      if (currentRule && currentRule.rules_text.trim() !== val.trim()) {
-                        setSelectedLicenseRuleId('__custom__');
-                      }
-                    }}
-                    placeholder="e.g. Do not change password. Valid for 1 device. Contact support if locked."
-                    className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 font-sans"
-                  />
-                  {selectedLicenseRuleId && selectedLicenseRuleId !== '__custom__' && (
-                    <div className="flex items-center text-xxs text-emerald-600 font-medium space-x-1">
-                      <span>✓ Pre-filled from Product Usage Rules. You can edit above if needed.</span>
-                    </div>
-                  )}
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={licenseFormSubmitting}
+                    className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm hover:shadow"
+                  >
+                    {licenseFormSubmitting ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <span>{editingLicense ? 'Update Key' : 'Save Keys'}</span>
+                    )}
+                  </button>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xxs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                  {editingLicense ? 'License Key *' : 'License Keys (One per line for bulk) *'}
-                </label>
-                <textarea
-                  rows={editingLicense ? "2" : "5"}
-                  value={licenseForm.license_key}
-                  onChange={(e) => setLicenseForm({ ...licenseForm, license_key: e.target.value })}
-                  placeholder={editingLicense ? "Key-XXXX" : "Paste keys here\nKey-1-XXXX\nKey-2-XXXX"}
-                  className="w-full text-xs bg-slate-50 border border-slate-250 focus:border-violet-500 focus:bg-white focus:outline-none rounded-lg px-3 py-2 text-slate-800 placeholder-slate-400 font-mono"
-                  required
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowLicenseModal(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-550 hover:bg-slate-50 rounded-lg text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={licenseFormSubmitting}
-                  className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition-all flex items-center space-x-1 cursor-pointer"
-                >
-                  {licenseFormSubmitting ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <span>{editingLicense ? 'Update Key' : 'Save Keys'}</span>
-                  )}
-                </button>
               </div>
             </form>
           </div>

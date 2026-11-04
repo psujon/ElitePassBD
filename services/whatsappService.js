@@ -6,7 +6,16 @@ const https = require('https');
  */
 const formatPhoneNumber = (phone) => {
   if (!phone) return '';
-  let cleaned = phone.replace(/[^\d+]/g, '');
+  let clean = String(phone).trim();
+  // Direct wa.me link
+  if (/^(https?:\/\/)?(www\.)?wa\.me\//i.test(clean)) {
+    clean = clean.replace(/^(https?:\/\/)?(www\.)?wa\.me\//i, '').replace(/\/.*$/, '').trim();
+  }
+  // If username handle (starts with @ or contains letters)
+  if (clean.startsWith('@') || /[a-zA-Z]/.test(clean)) {
+    return clean.replace(/^@+/, '').trim();
+  }
+  let cleaned = clean.replace(/[^\d+]/g, '');
   if (cleaned.startsWith('+')) {
     cleaned = cleaned.substring(1);
   }
@@ -49,6 +58,9 @@ const sendWhatsAppCloudApi = async ({ token, phoneNumberId, to, text }) => {
   }
 
   const recipient = formatPhoneNumber(to);
+  if (!recipient || !/^\d+$/.test(recipient)) {
+    return { success: false, reason: 'WhatsApp Cloud API requires international phone number digits, not a username.' };
+  }
   const payload = JSON.stringify({
     messaging_product: 'whatsapp',
     recipient_type: 'individual',

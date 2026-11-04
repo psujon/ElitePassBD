@@ -2,7 +2,27 @@ const db = require('../config/db');
 const { sendPurchaseConfirmationEmail } = require('../services/purchaseEmailService');
 const { syncWebsiteOrderToSubscriptions } = require('../services/orderSubscriptionSyncService');
 
+let orderColsEnsured = false;
+async function ensureOrderColumns(pool) {
+  if (orderColsEnsured) return true;
+  try {
+    const p = pool || (db.getPool ? db.getPool() : db);
+    const [custNameCols] = await p.query("SHOW COLUMNS FROM orders LIKE 'customer_name'");
+    if (custNameCols.length === 0) {
+      await p.query("ALTER TABLE orders ADD COLUMN customer_name VARCHAR(255) DEFAULT NULL AFTER user_id");
+      console.log("Added column 'customer_name' to 'orders' table via ensureOrderColumns.");
+    }
+    orderColsEnsured = true;
+    return true;
+  } catch (err) {
+    console.warn('[ensureOrderColumns] Failed to ensure orders columns:', err.message);
+    return false;
+  }
+}
+
+
 exports.createOrder = async (req, res) => {
+  await ensureOrderColumns(db);
   const { items, total_amount, shipping_address, phone, payment_method, additional_notes, delivery_email, coupon_code, discount_amount } = req.body;
   const userId = req.user.id;
 
@@ -183,20 +203,61 @@ exports.trackOrder = async (req, res) => {
   const userRole = req.user.role;
 
   try {
-    const [orders] = await db.query(
-      `SELECT o.*, 
-              COALESCE(NULLIF(TRIM(o.customer_name), ''), u.name, 'Customer') AS user_name,
-              CASE 
-                WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
-                WHEN o.customer_name IS NOT NULL AND TRIM(o.customer_name) != '' THEN NULL
-                WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
-                ELSE u.email 
-              END AS user_email
-       FROM orders o
-       LEFT JOIN users u ON o.user_id = u.id
-       WHERE o.id = ?`,
-      [id]
-    );
+    await ensureOrderColumns(db);
+    let orders;
+    try {
+      [orders] = await db.query(
+        `SELECT o.*, 
+                COALESCE(NULLIF(TRIM(o.customer_name), ''), u.name, 'Customer') AS user_name,
+                CASE 
+                  WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
+                  WHEN o.customer_name IS NOT NULL AND TRIM(o.customer_name) != '' THEN NULL
+                  WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
+                  ELSE u.email 
+                END AS user_email
+         FROM orders o
+         LEFT JOIN users u ON o.user_id = u.id
+         WHERE o.id = ?`,
+        [id]
+      );
+    } catch (sqlErr) {
+      if (sqlErr.code === 'ER_BAD_FIELD_ERROR' && sqlErr.message.includes('customer_name')) {
+        try {
+          await db.query("ALTER TABLE orders ADD COLUMN customer_name VARCHAR(255) DEFAULT NULL AFTER user_id");
+          [orders] = await db.query(
+            `SELECT o.*, 
+                    COALESCE(NULLIF(TRIM(o.customer_name), ''), u.name, 'Customer') AS user_name,
+                    CASE 
+                      WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
+                      WHEN o.customer_name IS NOT NULL AND TRIM(o.customer_name) != '' THEN NULL
+                      WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
+                      ELSE u.email 
+                    END AS user_email
+             FROM orders o
+             LEFT JOIN users u ON o.user_id = u.id
+             WHERE o.id = ?`,
+            [id]
+          );
+        } catch (repairErr) {
+          console.warn('[trackOrder] Fallback query used without o.customer_name:', repairErr.message);
+          [orders] = await db.query(
+            `SELECT o.*, 
+                    COALESCE(u.name, 'Customer') AS user_name,
+                    CASE 
+                      WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
+                      WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
+                      ELSE u.email 
+                    END AS user_email
+             FROM orders o
+             LEFT JOIN users u ON o.user_id = u.id
+             WHERE o.id = ?`,
+            [id]
+          );
+        }
+      } else {
+        throw sqlErr;
+      }
+    }
     if (orders.length === 0) {
       return res.status(404).json({ message: 'Order not found.' });
     }
@@ -236,19 +297,58 @@ exports.trackOrder = async (req, res) => {
 
 exports.getAllOrders = async (req, res) => {
   try {
-    const [orders] = await db.query(
-      `SELECT o.*, 
-              COALESCE(NULLIF(TRIM(o.customer_name), ''), u.name, 'Customer') AS user_name,
-              CASE 
-                WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
-                WHEN o.customer_name IS NOT NULL AND TRIM(o.customer_name) != '' THEN NULL
-                WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
-                ELSE u.email 
-              END AS user_email
-       FROM orders o
-       LEFT JOIN users u ON o.user_id = u.id
-       ORDER BY o.id DESC`
-    );
+    await ensureOrderColumns(db);
+    let orders;
+    try {
+      [orders] = await db.query(
+        `SELECT o.*, 
+                COALESCE(NULLIF(TRIM(o.customer_name), ''), u.name, 'Customer') AS user_name,
+                CASE 
+                  WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
+                  WHEN o.customer_name IS NOT NULL AND TRIM(o.customer_name) != '' THEN NULL
+                  WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
+                  ELSE u.email 
+                END AS user_email
+         FROM orders o
+         LEFT JOIN users u ON o.user_id = u.id
+         ORDER BY o.id DESC`
+      );
+    } catch (sqlErr) {
+      if (sqlErr.code === 'ER_BAD_FIELD_ERROR' && sqlErr.message.includes('customer_name')) {
+        try {
+          await db.query("ALTER TABLE orders ADD COLUMN customer_name VARCHAR(255) DEFAULT NULL AFTER user_id");
+          [orders] = await db.query(
+            `SELECT o.*, 
+                    COALESCE(NULLIF(TRIM(o.customer_name), ''), u.name, 'Customer') AS user_name,
+                    CASE 
+                      WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
+                      WHEN o.customer_name IS NOT NULL AND TRIM(o.customer_name) != '' THEN NULL
+                      WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
+                      ELSE u.email 
+                    END AS user_email
+             FROM orders o
+             LEFT JOIN users u ON o.user_id = u.id
+             ORDER BY o.id DESC`
+          );
+        } catch (repairErr) {
+          console.warn('[getAllOrders] Fallback query used without o.customer_name:', repairErr.message);
+          [orders] = await db.query(
+            `SELECT o.*, 
+                    COALESCE(u.name, 'Customer') AS user_name,
+                    CASE 
+                      WHEN o.delivery_email IS NOT NULL AND TRIM(o.delivery_email) != '' THEN TRIM(o.delivery_email)
+                      WHEN u.email LIKE '%@guest.elitepassbd.local' OR u.email LIKE '%@guest.%' THEN NULL
+                      ELSE u.email 
+                    END AS user_email
+             FROM orders o
+             LEFT JOIN users u ON o.user_id = u.id
+             ORDER BY o.id DESC`
+          );
+        }
+      } else {
+        throw sqlErr;
+      }
+    }
 
     const ordersWithItems = [];
     for (const order of orders) {
@@ -649,6 +749,7 @@ const sendGuestAccountEmail = async (email, name, password) => {
 };
 
 exports.createGuestOrder = async (req, res) => {
+  await ensureOrderColumns(db);
   const { items, total_amount, shipping_address, phone, payment_method, additional_notes, guest_name, guest_email, delivery_email } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {

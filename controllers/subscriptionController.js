@@ -286,6 +286,14 @@ async function ensureSubscriptionColumns(pool) {
     if (accRenCols.length === 0) {
       await pool.query("ALTER TABLE subscription_renewals ADD COLUMN account_given LONGTEXT DEFAULT NULL AFTER amount");
     }
+    const [vRenCols] = await pool.query("SHOW COLUMNS FROM subscription_renewals LIKE 'vendor_id'");
+    if (vRenCols.length === 0) {
+      await pool.query("ALTER TABLE subscription_renewals ADD COLUMN vendor_id INT DEFAULT NULL");
+    }
+    const [vpRenCols] = await pool.query("SHOW COLUMNS FROM subscription_renewals LIKE 'vendor_price'");
+    if (vpRenCols.length === 0) {
+      await pool.query("ALTER TABLE subscription_renewals ADD COLUMN vendor_price DECIMAL(10, 2) DEFAULT 0.00");
+    }
 
     // Backfill any existing subscription_renewals that have empty account_given or missing slot info
     try {
@@ -362,10 +370,12 @@ exports.getSubscriptionById = async (req, res) => {
         SELECT r.*,
                dla.product_name AS digital_account_product,
                dla.account_email AS digital_account_email,
-               dls.slot_number AS digital_slot_number
+               dls.slot_number AS digital_slot_number,
+               v.name AS vendor_name, v.company_name AS vendor_company
         FROM subscription_renewals r
         LEFT JOIN digital_license_accounts dla ON r.digital_account_id = dla.id
         LEFT JOIN digital_license_slots dls ON r.digital_slot_id = dls.id
+        LEFT JOIN vendors v ON r.vendor_id = v.id
         WHERE r.subscription_id = ?
         ORDER BY r.id DESC
       `, [id]);
@@ -1311,6 +1321,9 @@ exports.renewSubscription = async (req, res) => {
     validity_days,
     new_expiry_date,
     payment_amount,
+    vendor_id,
+    vendor_price,
+    digital_account_id,
     notes,
     customer_notes,
     admin_notes,
@@ -1400,15 +1413,109 @@ exports.renewSubscription = async (req, res) => {
       ? (admin_notes ? admin_notes.trim() : null) 
       : (notes ? notes.trim() : null);
 
+    const finalVendorId = vendor_id !== undefined
+      ? (vendor_id ? parseInt(vendor_id, 10) : null)
+      : sub.vendor_id;
+    const finalVendorPrice = vendor_price !== undefined && vendor_price !== null && vendor_price !== ''
+      ? parseFloat(vendor_price)
+      : (sub.vendor_price !== null && sub.vendor_price !== undefined ? parseFloat(sub.vendor_price) : 0.00);
+
+    let finalDigitalAccountId = digital_account_id !== undefined
+      ? (digital_account_id ? parseInt(digital_account_id, 10) : null)
+      : sub.digital_account_id;
+    let assignedSlotId = sub.digital_slot_id;
+
+    // Handle digital account & slot updates
+    if (digital_account_id !== undefined) {
+      const parsedAccId = digital_account_id ? parseInt(digital_account_id, 10) : null;
+      if (parsedAccId !== sub.digital_account_id) {
+        // Digital account has changed or cleared!
+        // 1. Release previous slot if assigned
+        if (sub.digital_slot_id) {
+          await connection.query(`
+            UPDATE digital_license_slots SET
+              status = 'Available',
+              assigned_to = NULL,
+              order_id = NULL,
+              customer_name = NULL,
+              customer_phone = NULL,
+              start_date = NULL,
+              end_date = NULL,
+              notes = NULL
+            WHERE id = ?
+          `, [sub.digital_slot_id]);
+          assignedSlotId = null;
+        }
+
+        // 2. Assign slot from new account if selected
+        if (parsedAccId) {
+          const [freeSlots] = await connection.query(`
+            SELECT id, slot_number FROM digital_license_slots
+            WHERE account_id = ? AND (status = 'Available' OR status IS NULL)
+            ORDER BY slot_number ASC
+            LIMIT 1
+            FOR UPDATE
+          `, [parsedAccId]);
+
+          if (freeSlots.length > 0) {
+            assignedSlotId = freeSlots[0].id;
+            const slotNotes = `Assigned via Renewal #${id}${sub.order_id ? ` (Order #${sub.order_id})` : ''}`;
+            const assignedRecipient = targetEmail || (sub.whatsapp_number ? sub.whatsapp_number.trim() : (sub.customer_name ? sub.customer_name.trim() : 'Customer'));
+            await connection.query(`
+              UPDATE digital_license_slots SET
+                order_id = ?,
+                assigned_to = ?,
+                customer_name = ?,
+                customer_phone = ?,
+                start_date = ?,
+                end_date = ?,
+                status = 'Active',
+                notes = ?
+              WHERE id = ?
+            `, [
+              sub.order_id || null,
+              assignedRecipient,
+              sub.customer_name ? sub.customer_name.trim() : 'Customer',
+              sub.whatsapp_number ? sub.whatsapp_number.trim() : '',
+              formattedRDate,
+              formattedEDate,
+              slotNotes,
+              assignedSlotId
+            ]);
+          } else {
+            console.warn(`No available slots left in digital account #${parsedAccId} during renewal of #${id}`);
+          }
+        }
+        finalDigitalAccountId = parsedAccId;
+      } else if (sub.digital_slot_id) {
+        // Same account kept, extend slot expiry date!
+        await connection.query(`
+          UPDATE digital_license_slots SET
+            end_date = ?,
+            status = 'Active'
+          WHERE id = ?
+        `, [formattedEDate, sub.digital_slot_id]);
+      }
+    } else if (sub.digital_slot_id) {
+      // No digital_account_id passed in request, extend existing slot expiry
+      await connection.query(`
+        UPDATE digital_license_slots SET
+          end_date = ?,
+          status = 'Active'
+        WHERE id = ?
+      `, [formattedEDate, sub.digital_slot_id]);
+    }
+
     // Try logging into subscription_renewals if table exists
     try {
       await connection.query('UPDATE subscription_renewals SET status = "Previous" WHERE subscription_id = ?', [id]);
       await connection.query(`
         INSERT INTO subscription_renewals (
           subscription_id, start_date, end_date, validity_days, amount, status, notes,
-          customer_notes, admin_notes, license_rules, account_given, digital_account_id, digital_slot_id
+          customer_notes, admin_notes, license_rules, account_given, digital_account_id, digital_slot_id,
+          vendor_id, vendor_price
         )
-        VALUES (?, ?, ?, ?, ?, 'Current', ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, 'Current', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         id,
         formattedRDate,
@@ -1420,8 +1527,10 @@ exports.renewSubscription = async (req, res) => {
         finalAdminNotes,
         finalRules || null,
         finalAccountGiven || null,
-        sub.digital_account_id || null,
-        sub.digital_slot_id || null
+        finalDigitalAccountId || null,
+        assignedSlotId || null,
+        finalVendorId || null,
+        finalVendorPrice || 0
       ]);
     } catch (renErr) {
       console.warn('Skipping subscription_renewals log:', renErr.message);
@@ -1440,6 +1549,10 @@ exports.renewSubscription = async (req, res) => {
         email = COALESCE(?, email),
         customer_notes = COALESCE(?, customer_notes),
         admin_notes = COALESCE(?, admin_notes),
+        vendor_id = ?,
+        vendor_price = ?,
+        digital_account_id = ?,
+        digital_slot_id = ?,
         payment_status = 'Paid',
         status = 'Renewed',
         updated_at = NOW()
@@ -1455,6 +1568,10 @@ exports.renewSubscription = async (req, res) => {
       targetEmail || null,
       finalCustomerNotes !== null ? finalCustomerNotes : null,
       finalAdminNotes !== null ? finalAdminNotes : null,
+      finalVendorId || null,
+      finalVendorPrice || 0,
+      finalDigitalAccountId || null,
+      assignedSlotId || null,
       id
     ]);
 

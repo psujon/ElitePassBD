@@ -96,6 +96,7 @@ async function createTables() {
     CREATE TABLE IF NOT EXISTS orders (
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
+      customer_name VARCHAR(255) DEFAULT NULL,
       total_amount DECIMAL(10, 2) NOT NULL,
       status ENUM('Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled') DEFAULT 'Pending',
       shipping_address TEXT NOT NULL,
@@ -229,7 +230,7 @@ async function createTables() {
     CREATE TABLE IF NOT EXISTS subscriptions (
       id INT AUTO_INCREMENT PRIMARY KEY,
       customer_name VARCHAR(255) NOT NULL,
-      whatsapp_number VARCHAR(30) NOT NULL,
+      whatsapp_number VARCHAR(100) NOT NULL,
       email VARCHAR(255) DEFAULT NULL,
       product_name VARCHAR(255) NOT NULL,
       package_plan VARCHAR(255) NOT NULL,
@@ -470,6 +471,12 @@ async function updateSchema() {
     if (additionalNotesCols.length === 0) {
       await pool.query("ALTER TABLE orders ADD COLUMN additional_notes TEXT DEFAULT NULL");
       console.log("Added column 'additional_notes' to 'orders' table.");
+    }
+
+    const [custNameCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'customer_name'");
+    if (custNameCols.length === 0) {
+      await pool.query("ALTER TABLE orders ADD COLUMN customer_name VARCHAR(255) DEFAULT NULL AFTER user_id");
+      console.log("Added column 'customer_name' to 'orders' table.");
     }
 
     const [deliveryEmailCols] = await pool.query("SHOW COLUMNS FROM orders LIKE 'delivery_email'");

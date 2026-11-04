@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
 import { api } from '../../utils/api';
-import { getWhatsAppLink } from '../../utils/whatsapp';
+import { getWhatsAppLink, getTelegramLink, handleWhatsAppClick } from '../../utils/whatsapp';
+import { htmlToPlainText } from '../../utils/textUtils';
 import {
   ShieldCheck,
   Search,
@@ -43,7 +45,8 @@ import {
   MessageCircle,
   ScrollText,
   Globe,
-  Package
+  Package,
+  Send
 } from 'lucide-react';
 
 export default function LicenseManager() {
@@ -381,10 +384,13 @@ export default function LicenseManager() {
   // Current vendor details matched from database vendors table for Right Details Panel
   const currentVendor = useMemo(() => {
     if (!selectedAccount) return null;
+    const cleanAccName = (selectedAccount.vendor_name || '').normalize('NFKD').toLowerCase().trim();
     return (
-      vendorList.find(v => selectedAccount.vendor_id && v.id === selectedAccount.vendor_id) ||
-      vendorList.find(v => v.name && selectedAccount.vendor_name && v.name.toLowerCase() === selectedAccount.vendor_name.toLowerCase()) ||
-      vendorList.find(v => v.company_name && selectedAccount.vendor_name && v.company_name.toLowerCase() === selectedAccount.vendor_name.toLowerCase()) ||
+      vendorList.find(v => selectedAccount.vendor_id && String(v.id) === String(selectedAccount.vendor_id)) ||
+      vendorList.find(v => v.name && (v.name.toLowerCase().trim() === cleanAccName || v.name.normalize('NFKD').toLowerCase().trim() === cleanAccName)) ||
+      vendorList.find(v => v.company_name && (v.company_name.toLowerCase().trim() === cleanAccName || v.company_name.normalize('NFKD').toLowerCase().trim() === cleanAccName)) ||
+      vendorList.find(v => v.whatsapp && v.whatsapp.toLowerCase().trim() === cleanAccName) ||
+      vendorList.find(v => v.telegram && v.telegram.toLowerCase().trim() === cleanAccName) ||
       null
     );
   }, [selectedAccount, vendorList]);
@@ -497,7 +503,7 @@ export default function LicenseManager() {
       const res = await api.get(`/product-usage-rules/by-product/${targetId}`);
       const list = Array.isArray(res) ? res : (res?.data || []);
       if (list.length > 0 && list[0].rules_text) {
-        navigator.clipboard.writeText(list[0].rules_text);
+        navigator.clipboard.writeText(htmlToPlainText(list[0].rules_text));
         toast.success(`✓ Usage rules for "${productName}" copied! Ready to paste & send.`);
       } else {
         toast.error(`No usage rules saved for "${productName}" yet. Create them in Product Usages Rules menu.`);
@@ -570,10 +576,13 @@ export default function LicenseManager() {
   // Selected vendor details in the modal
   const selectedVendorDetails = useMemo(() => {
     if (!accountForm.vendor_name && !accountForm.vendor_id) return null;
+    const cleanFormName = (accountForm.vendor_name || '').normalize('NFKD').toLowerCase().trim();
     return (
-      vendorList.find(v => accountForm.vendor_id && v.id === accountForm.vendor_id) ||
-      vendorList.find(v => v.name && v.name.toLowerCase() === (accountForm.vendor_name || '').toLowerCase()) ||
-      vendorList.find(v => v.company_name && v.company_name.toLowerCase() === (accountForm.vendor_name || '').toLowerCase()) ||
+      vendorList.find(v => accountForm.vendor_id && String(v.id) === String(accountForm.vendor_id)) ||
+      vendorList.find(v => v.name && (v.name.toLowerCase().trim() === cleanFormName || v.name.normalize('NFKD').toLowerCase().trim() === cleanFormName)) ||
+      vendorList.find(v => v.company_name && (v.company_name.toLowerCase().trim() === cleanFormName || v.company_name.normalize('NFKD').toLowerCase().trim() === cleanFormName)) ||
+      vendorList.find(v => v.whatsapp && v.whatsapp.toLowerCase().trim() === cleanFormName) ||
+      vendorList.find(v => v.telegram && v.telegram.toLowerCase().trim() === cleanFormName) ||
       null
     );
   }, [accountForm.vendor_name, accountForm.vendor_id, vendorList]);
@@ -1534,12 +1543,29 @@ export default function LicenseManager() {
                                     <div className="flex flex-col">
                                       <span className="font-semibold text-slate-800 truncate">{slot.assigned_to}</span>
                                       {slot.order_id && (
-                                        <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-blue-600">
-                                          <Hash className="w-2.5 h-2.5" />
-                                          Order #{slot.order_id}
-                                        </span>
+                                        <Link
+                                          to={`/dashboard/subscriptions?order=${slot.order_id}`}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-blue-600 hover:text-blue-800 hover:underline transition-all cursor-pointer group/ord w-fit mt-0.5 bg-blue-50/80 hover:bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200/90"
+                                          title={`View Order #${slot.order_id} in Subscriptions`}
+                                        >
+                                          <Hash className="w-2.5 h-2.5 shrink-0 text-blue-500 group-hover/ord:text-blue-700" />
+                                          <span>Order #{slot.order_id}</span>
+                                          <ExternalLink className="w-2.5 h-2.5 opacity-60 group-hover/ord:opacity-100 group-hover/ord:translate-x-0.5 transition-all shrink-0 ml-0.5" />
+                                        </Link>
                                       )}
                                     </div>
+                                  ) : slot.order_id ? (
+                                    <Link
+                                      to={`/dashboard/subscriptions?order=${slot.order_id}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-blue-600 hover:text-blue-800 hover:underline transition-all cursor-pointer group/ord w-fit bg-blue-50/80 hover:bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200/90"
+                                      title={`View Order #${slot.order_id} in Subscriptions`}
+                                    >
+                                      <Hash className="w-2.5 h-2.5 shrink-0 text-blue-500 group-hover/ord:text-blue-700" />
+                                      <span>Order #{slot.order_id}</span>
+                                      <ExternalLink className="w-2.5 h-2.5 opacity-60 group-hover/ord:opacity-100 group-hover/ord:translate-x-0.5 transition-all shrink-0 ml-0.5" />
+                                    </Link>
                                   ) : (
                                     <span className="text-slate-400 italic">—</span>
                                   )}
@@ -1641,28 +1667,42 @@ export default function LicenseManager() {
                     <span className="font-semibold text-slate-700 mt-0.5 block">{formatDate(selectedAccount.renewal_date)}</span>
                   </div>
 
-                  {/* Vendor Contact (Phone, WhatsApp, Email) if vendor exists in DB */}
-                  {currentVendor && (currentVendor.phone || currentVendor.whatsapp || currentVendor.email) && (
+                  {/* Vendor Contact (Phone, WhatsApp, Telegram, Email) */}
+                  {((currentVendor && (currentVendor.phone || currentVendor.whatsapp || currentVendor.telegram || currentVendor.email)) || (!currentVendor && selectedAccount.vendor_name && (selectedAccount.vendor_name.startsWith('@') || /^[0-9+ ]{8,}$/.test(selectedAccount.vendor_name)))) && (
                     <div className="col-span-2 p-2 bg-white rounded-lg border border-slate-200/90 flex flex-wrap items-center gap-3 text-[11px]">
                       <span className="font-bold text-slate-700">Contact:</span>
-                      {currentVendor.phone && (
+                      {currentVendor?.phone && (
                         <a href={`tel:${currentVendor.phone}`} className="text-purple-600 hover:underline flex items-center gap-1">
                           <Phone className="w-3 h-3" />
                           <span>{currentVendor.phone}</span>
                         </a>
                       )}
-                      {currentVendor.whatsapp && (
+                      {(currentVendor?.whatsapp || (!currentVendor && selectedAccount.vendor_name?.startsWith('@'))) && (
                         <a
-                          href={getWhatsAppLink(currentVendor.whatsapp)}
+                          href={getWhatsAppLink(currentVendor ? currentVendor.whatsapp : selectedAccount.vendor_name, currentVendor?.phone)}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-emerald-600 font-semibold hover:underline flex items-center gap-1"
+                          onClick={(e) => handleWhatsAppClick(e, currentVendor ? currentVendor.whatsapp : selectedAccount.vendor_name, currentVendor?.phone, toast)}
+                          className="text-emerald-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                          title="Chat on WhatsApp"
                         >
                           <MessageCircle className="w-3 h-3" />
-                          <span>WA: {currentVendor.whatsapp}</span>
+                          <span>WA: {currentVendor ? currentVendor.whatsapp : selectedAccount.vendor_name}</span>
                         </a>
                       )}
-                      {currentVendor.email && (
+                      {(currentVendor?.telegram || (!currentVendor && selectedAccount.vendor_name?.startsWith('@'))) && (
+                        <a
+                          href={getTelegramLink(currentVendor ? currentVendor.telegram : selectedAccount.vendor_name)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sky-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                          title="Chat on Telegram"
+                        >
+                          <Send className="w-3 h-3" />
+                          <span>TG: {currentVendor ? currentVendor.telegram : selectedAccount.vendor_name}</span>
+                        </a>
+                      )}
+                      {currentVendor?.email && (
                         <a href={`mailto:${currentVendor.email}`} className="text-blue-600 hover:underline flex items-center gap-1">
                           <Mail className="w-3 h-3" />
                           <span>{currentVendor.email}</span>
@@ -2234,14 +2274,28 @@ export default function LicenseManager() {
 
                         {selectedVendorDetails.whatsapp && (
                           <a
-                            href={getWhatsAppLink(selectedVendorDetails.whatsapp)}
+                            href={getWhatsAppLink(selectedVendorDetails.whatsapp, selectedVendorDetails.phone)}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-emerald-800 font-medium hover:bg-emerald-100 transition-colors shadow-2xs"
+                            onClick={(e) => handleWhatsAppClick(e, selectedVendorDetails.whatsapp, selectedVendorDetails.phone, toast)}
+                            className="inline-flex items-center gap-1 text-[11px] bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-emerald-800 font-medium hover:bg-emerald-100 transition-colors shadow-2xs cursor-pointer"
                             title="Chat on WhatsApp"
                           >
                             <MessageCircle className="w-3 h-3 text-emerald-600" />
                             WA: {selectedVendorDetails.whatsapp}
+                          </a>
+                        )}
+
+                        {selectedVendorDetails.telegram && (
+                          <a
+                            href={getTelegramLink(selectedVendorDetails.telegram)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md text-sky-800 font-medium hover:bg-sky-100 transition-colors shadow-2xs cursor-pointer"
+                            title="Chat on Telegram"
+                          >
+                            <Send className="w-3 h-3 text-sky-600" />
+                            TG: {selectedVendorDetails.telegram}
                           </a>
                         )}
 
