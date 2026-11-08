@@ -27,8 +27,8 @@ app.use(cors({
 
 app.options('*', cors());
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -72,6 +72,7 @@ const backupRoutes = require('./routes/backupRoutes');
 const vendorRoutes = require('./routes/vendorRoutes');
 const digitalLicenseRoutes = require('./routes/digitalLicenseRoutes');
 const productUsageRulesRoutes = require('./routes/productUsageRulesRoutes');
+const pageSectionRoutes = require('./routes/pageSectionRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -88,6 +89,7 @@ app.use('/api/admin/backup', backupRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/digital-licenses', digitalLicenseRoutes);
 app.use('/api/product-usage-rules', productUsageRulesRoutes);
+app.use('/api/page-sections', pageSectionRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'E-commerce API is running.' });

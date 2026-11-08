@@ -56,7 +56,10 @@ import {
   Save,
   Loader2,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  RotateCw,
+  ShoppingBag,
+  CopyPlus
 } from 'lucide-react';
 
 const getDurationDays = (durationStr) => {
@@ -223,6 +226,7 @@ export default function SubscriptionManager() {
   const [showAddForm, setShowAddForm] = useState(false);
   const customerFormRef = useRef(null);
   const [editingSub, setEditingSub] = useState(null); // null = Add, object = Edit
+  const [reOrderSourceCustomer, setReOrderSourceCustomer] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedSubDetail, setSelectedSubDetail] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -1187,10 +1191,76 @@ export default function SubscriptionManager() {
       customerFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
   };
+
+  // RE-ORDER HANDLER: Clones/populates repeat customer details into a BRAND NEW subscription entry (editingSub = null)
+  const handleOpenReOrderModal = (sub) => {
+    setEditingSub(null); // Crucial: must be null so it saves as a new subscription (POST), not an update!
+    setReOrderSourceCustomer(sub.customer_name || 'Customer');
+    fetchDigitalAccounts();
+    const subProd = sub.product_name || '';
+    const existingRules = sub.license_rules || '';
+    const matchedEditRule = allUsageRules.find(r =>
+      r.rules_text && existingRules && r.rules_text.trim() === existingRules.trim()
+    );
+    setSelectedRuleId(matchedEditRule ? String(matchedEditRule.id) : (existingRules ? '__custom__' : '__none__'));
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const validityDays = sub.validity_days || 30;
+    const expiryDateObj = new Date();
+    expiryDateObj.setDate(expiryDateObj.getDate() + validityDays);
+    const newExpiryStr = expiryDateObj.toISOString().slice(0, 10);
+
+    setSubForm({
+      customer_name: sub.customer_name || '',
+      whatsapp_number: sub.whatsapp_number || '',
+      email: sub.email || '',
+      product_name: subProd,
+      custom_product_name: '',
+      package_plan: sub.package_plan || 'Monthly',
+      customer_source: sub.customer_source || 'Manual',
+      purchase_date: todayStr,
+      validity_days: validityDays,
+      expiry_date: newExpiryStr,
+      account_given: '', // Blank for new credential allocation
+      selected_license_id: null,
+      license_rules: existingRules,
+      selling_price: sub.selling_price || '',
+      payment_status: 'Paid',
+      status: 'Active',
+      notes: sub.admin_notes || sub.notes || '',
+      customer_notes: sub.customer_notes || '',
+      admin_notes: sub.admin_notes || sub.notes || '',
+      order_id: '', // Blank for new order number generation
+      vendor_id: sub.vendor_id || '',
+      vendor_price: sub.vendor_price !== undefined && sub.vendor_price !== null ? String(sub.vendor_price) : '',
+      digital_account_id: '',
+      send_email: true
+    });
+
+    setLicenseInputMode('manual');
+    setProductSearchQuery('');
+    setUserSelectedNoAccount(true);
+    setShowProductDropdown(false);
+    setShowAddForm(true);
+    setActiveMenuSub(null);
+    setShowViewModal(false);
+    setShowDetailModal(false);
+
+    toast.success(`রি-অর্ডার ফর্ম তৈরি হয়েছে (${sub.customer_name})! তথ্য পরিবর্তন করে নতুন সাবস্ক্রিপশন হিসেবে সেভ করুন।`, {
+      icon: '🛒',
+      duration: 4000
+    });
+
+    setTimeout(() => {
+      customerFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  };
+
   const handleOpenAddModal = handleToggleAddForm;
 
   const handleOpenEditModal = (sub) => {
     setEditingSub(sub);
+    setReOrderSourceCustomer(null);
     fetchDigitalAccounts();
     const subProd = sub.product_name || '';
     const existingRules = sub.license_rules || '';
@@ -2016,15 +2086,19 @@ export default function SubscriptionManager() {
                   </h3>
                   <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${editingSub
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : reOrderSourceCustomer
+                      ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     }`}>
-                    {editingSub ? 'Edit Mode' : 'New Entry'}
+                    {editingSub ? 'Edit Mode' : reOrderSourceCustomer ? 'Re-Order (নতুন এন্ট্রি)' : 'New Entry'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {editingSub
                     ? `Updating customer subscription record for: ${editingSub.customer_name}`
-                    : 'Fill in the customer information and subscription plan details below.'}
+                    : reOrderSourceCustomer
+                      ? `রিপিট কাস্টমার (${reOrderSourceCustomer}) এর তথ্য লোড হয়েছে। এটি নতুন এন্ট্রি হিসেবে সেভ হবে (আগের রেকর্ড অপরিবর্তিত থাকবে)।`
+                      : 'Fill in the customer information and subscription plan details below.'}
                 </p>
               </div>
             </div>
@@ -4152,6 +4226,16 @@ export default function SubscriptionManager() {
                               </a>
                             )}
 
+                            {/* Re-Order Quick Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReOrderModal(sub)}
+                              className="p-1 rounded-md bg-amber-50 text-amber-600 hover:bg-amber-100 hover:text-amber-700 border border-amber-200 transition-colors shadow-2xs cursor-pointer"
+                              title="Re-Order / Repeat Customer (রি-অর্ডার এন্ট্রি করুন)"
+                            >
+                              <RotateCw size={13} />
+                            </button>
+
                             {/* View Full Details Button */}
                             <button
                               type="button"
@@ -4294,6 +4378,19 @@ export default function SubscriptionManager() {
                           <UserX size={10} />
                         )}
                         <span>{selectedSubDetail.status === 'Not Renewed' ? 'Revert Status' : 'Mark as Not Renewed'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const s = selectedSubDetail;
+                          setShowDetailModal(false);
+                          handleOpenReOrderModal(s);
+                        }}
+                        className="px-2 py-0.5 text-[10px] font-bold rounded-md border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                        title="Re-Order: Load details into new subscription entry"
+                      >
+                        <RotateCw size={10} className="text-amber-600" />
+                        <span>Re-Order</span>
                       </button>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 truncate">
@@ -5743,6 +5840,20 @@ export default function SubscriptionManager() {
                     onClick={() => {
                       const s = viewingSub;
                       setShowViewModal(false);
+                      handleOpenReOrderModal(s);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                    title="Load details into a new subscription entry (Re-Order)"
+                  >
+                    <RotateCw size={13} />
+                    <span>Re-Order (রি-অর্ডার)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = viewingSub;
+                      setShowViewModal(false);
                       handleOpenEditModal(s);
                     }}
                     className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -5855,6 +5966,21 @@ export default function SubscriptionManager() {
           </button>
 
           <div className="border-t border-slate-100 my-1"></div>
+
+          {/* Re-Order (রি-অর্ডার) Button */}
+          <button
+            type="button"
+            onClick={() => {
+              const s = activeMenuSub;
+              setActiveMenuSub(null);
+              handleOpenReOrderModal(s);
+            }}
+            className="w-full px-3 py-2 text-amber-700 hover:bg-amber-50 hover:text-amber-800 flex items-center gap-2 font-bold cursor-pointer transition-colors"
+            title="Load details into new subscription entry (Re-Order)"
+          >
+            <RotateCw size={13} className="text-amber-600 shrink-0" />
+            <span>Re-Order (রি-অর্ডার)</span>
+          </button>
 
           {/* View Details */}
           <button

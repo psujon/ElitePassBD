@@ -571,8 +571,12 @@ export default function UserDashboard() {
               className="flex items-center space-x-2.5 bg-white hover:bg-slate-50 border border-slate-200/60 hover:border-violet-300 px-3 py-1.5 rounded-xl shadow-xs cursor-pointer transition-all text-left group"
               title="Edit Profile"
             >
-              <div className="w-7 h-7 rounded-full bg-violet-650 flex items-center justify-center text-white font-extrabold text-xs uppercase shadow-sm group-hover:scale-105 transition-transform">
-                {user?.name ? user.name.substring(0, 2) : 'US'}
+              <div className="w-7 h-7 rounded-full overflow-hidden bg-violet-650 flex items-center justify-center text-white font-extrabold text-xs uppercase shadow-sm group-hover:scale-105 transition-transform border border-violet-200/60 shrink-0">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt={user?.name || 'User'} className="w-full h-full object-cover" />
+                ) : (
+                  user?.name ? user.name.substring(0, 2) : 'US'
+                )}
               </div>
               <div className="hidden sm:block text-left">
                 <span className="block text-xs font-bold text-slate-700 leading-tight flex items-center gap-1.5">

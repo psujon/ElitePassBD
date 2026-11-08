@@ -509,10 +509,14 @@ export default function Navbar({ onCartClick }) {
 
                 <Link
                   to="/dashboard"
-                  className="bg-violet-50/90 hover:bg-violet-100/90 text-violet-700 border border-violet-200/70 font-extrabold px-3.5 py-1.5 rounded-full text-xs flex items-center space-x-1.5 transition-all shadow-2xs"
+                  className="bg-violet-50/90 hover:bg-violet-100/90 text-violet-700 border border-violet-200/70 font-extrabold px-3 py-1.5 rounded-full text-xs flex items-center space-x-1.5 transition-all shadow-2xs"
                   title="My Account"
                 >
-                  <User className="w-3.5 h-3.5 text-violet-600" />
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt={user.name || 'Account'} className="w-4 h-4 rounded-full object-cover border border-violet-300 shrink-0" />
+                  ) : (
+                    <User className="w-3.5 h-3.5 text-violet-600" />
+                  )}
                   <span>Account</span>
                 </Link>
 
@@ -750,9 +754,13 @@ export default function Navbar({ onCartClick }) {
                     <Link
                       to="/dashboard/profile"
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold text-violet-700 bg-violet-50/80 hover:bg-violet-100"
+                      className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl text-xs font-bold text-violet-700 bg-violet-50/80 hover:bg-violet-100"
                     >
-                      <User className="w-4 h-4 text-violet-600" />
+                      {user?.avatar ? (
+                        <img src={user.avatar} alt={user.name || 'User'} className="w-5 h-5 rounded-full object-cover border border-violet-300 shrink-0" />
+                      ) : (
+                        <User className="w-4 h-4 text-violet-600" />
+                      )}
                       <span>My Profile & Settings</span>
                     </Link>
                     <button

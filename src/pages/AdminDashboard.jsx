@@ -3,13 +3,14 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import JoditEditor from 'jodit-react';
 import { api, API_BASE_URL } from '../utils/api';
-import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, ChevronUp, ChevronRight, Database, KeyRound, Key, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent, Search, RefreshCw, Megaphone, ArrowUp, ArrowDown, Headphones, ExternalLink, Globe, Mail, Phone, TrendingUp, ShoppingBag, ArrowRight, ArrowUpRight, CheckCircle2, Sparkles, Clock, Calendar, Eye, Copy, Filter, ArrowUpDown, RotateCcw, Hourglass, Truck, XCircle, ShieldCheck, Save, Send, HardDrive, AlertCircle, Bell, Menu, MoreVertical, Crown, Info, SlidersHorizontal, LogOut, User, Store, Shield, ScrollText } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2, Check, X, ClipboardList, Package, Banknote, MessageSquare, Layers, ChevronDown, ChevronUp, ChevronRight, Database, KeyRound, Key, LayoutDashboard, Palette, Tag, ToggleLeft, ToggleRight, Percent, Search, RefreshCw, Megaphone, ArrowUp, ArrowDown, Headphones, ExternalLink, Globe, Mail, Phone, TrendingUp, ShoppingBag, ArrowRight, ArrowUpRight, CheckCircle2, Sparkles, Clock, Calendar, Eye, Copy, Filter, ArrowUpDown, RotateCcw, Hourglass, Truck, XCircle, ShieldCheck, Save, Send, HardDrive, AlertCircle, Bell, Menu, MoreVertical, Crown, Info, SlidersHorizontal, LogOut, User, Store, Shield, ScrollText, FileText } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import SubscriptionManager from '../components/admin/SubscriptionManager';
 import VendorManager from '../components/admin/VendorManager';
 import LicenseManager from '../components/admin/LicenseManager';
 import ProductUsageRules from '../components/admin/ProductUsageRules';
+import PageSettingsManager from '../components/admin/PageSettingsManager';
 import UserProfileView from '../components/UserProfileView';
 import { htmlToPlainText } from '../utils/textUtils';
 
@@ -129,6 +130,10 @@ const tabSlugToKey = {
   'support_settings': 'support_settings',
   'theme-settings': 'theme_settings',
   'theme_settings': 'theme_settings',
+  'page-settings': 'page_settings',
+  'page_settings': 'page_settings',
+  'page-sections': 'page_settings',
+  'pages': 'page_settings',
   'profile': 'profile',
   'my-profile': 'profile',
   'admin-profile': 'profile',
@@ -153,6 +158,7 @@ const keyToTabSlug = {
   'marquee_settings': '/dashboard/marquee',
   'support_settings': '/dashboard/support-links',
   'theme_settings': '/dashboard/theme-settings',
+  'page_settings': '/dashboard/page-settings',
   'profile': '/dashboard/profile'
 };
 
@@ -257,6 +263,10 @@ export default function AdminDashboard() {
     theme_settings: {
       title: 'Website Settings & Theme',
       subtitle: 'Customize store colors, branding themes, presets, and typography.'
+    },
+    page_settings: {
+      title: 'Page Settings (পেইজ সেটিংস)',
+      subtitle: 'Manage content sections, titles, and descriptions for all information and policy pages.'
     },
     profile: {
       title: 'My Profile & Security',
@@ -1021,7 +1031,7 @@ export default function AdminDashboard() {
       try {
         const parsed = JSON.parse(items);
         if (Array.isArray(parsed)) return parsed;
-      } catch (_) {}
+      } catch (_) { }
     }
     return [];
   };
@@ -1952,6 +1962,11 @@ export default function AdminDashboard() {
           icon: Palette
         },
         {
+          id: 'page_settings',
+          label: 'Page Settings',
+          icon: FileText
+        },
+        {
           id: 'marquee_settings',
           label: 'Moving Text / Marquee',
           icon: Megaphone
@@ -2302,6 +2317,11 @@ export default function AdminDashboard() {
                 <ProductUsageRules />
               </div>
             )}
+            {activeTab === 'page_settings' && (
+              <div className="animate-fade-in text-left min-w-0 w-full max-w-full">
+                <PageSettingsManager />
+              </div>
+            )}
             {activeTab === 'vendors' && (
               <div className="animate-fade-in text-left min-w-0 w-full max-w-full">
                 <VendorManager />
@@ -2360,11 +2380,10 @@ export default function AdminDashboard() {
                                       setRevenueTimeRange(opt.key);
                                       setTimeRangeDropdownOpen(false);
                                     }}
-                                    className={`w-full text-left px-3 py-1.5 text-xs font-semibold flex items-center justify-between cursor-pointer transition-colors ${
-                                      revenueTimeRange === opt.key
+                                    className={`w-full text-left px-3 py-1.5 text-xs font-semibold flex items-center justify-between cursor-pointer transition-colors ${revenueTimeRange === opt.key
                                         ? 'bg-emerald-50 text-emerald-700 font-bold'
                                         : 'text-slate-700 hover:bg-slate-50'
-                                    }`}
+                                      }`}
                                   >
                                     <span>{opt.label}</span>
                                     {revenueTimeRange === opt.key && (
@@ -2385,11 +2404,10 @@ export default function AdminDashboard() {
                             ৳{revenueStats.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </h3>
                           <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                            <span className={`inline-flex items-center gap-0.5 text-[11px] font-extrabold px-1.5 py-0.2 rounded-full border ${
-                              revenueStats.isPositive
+                            <span className={`inline-flex items-center gap-0.5 text-[11px] font-extrabold px-1.5 py-0.2 rounded-full border ${revenueStats.isPositive
                                 ? 'text-emerald-700 bg-emerald-50 border-emerald-200/80'
                                 : 'text-rose-700 bg-rose-50 border-rose-200/80'
-                            }`}>
+                              }`}>
                               {revenueStats.isPositive ? (
                                 <ArrowUp className="w-2.5 h-2.5 text-emerald-600" />
                               ) : (
@@ -2479,11 +2497,10 @@ export default function AdminDashboard() {
                             <span className="text-[11px] font-bold text-slate-400">orders placed</span>
                           </div>
                           <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                            <span className={`inline-flex items-center gap-0.5 text-[11px] font-extrabold px-1.5 py-0.2 rounded-full border ${
-                              ordersTrend.isPositive
+                            <span className={`inline-flex items-center gap-0.5 text-[11px] font-extrabold px-1.5 py-0.2 rounded-full border ${ordersTrend.isPositive
                                 ? 'text-purple-700 bg-purple-50 border-purple-200/80'
                                 : 'text-rose-700 bg-rose-50 border-rose-200/80'
-                            }`}>
+                              }`}>
                               {ordersTrend.isPositive ? (
                                 <ArrowUp className="w-2.5 h-2.5 text-purple-600" />
                               ) : (

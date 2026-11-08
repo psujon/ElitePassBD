@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { 
   User, Lock, Mail, Phone, MapPin, Key, Eye, EyeOff, 
-  ShieldCheck, Loader2, Save, Info, CheckCircle2, Shield
+  ShieldCheck, Loader2, Save, Info, CheckCircle2, Shield,
+  Camera, Trash2, Upload, Sparkles
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -12,6 +13,9 @@ export default function UserProfileView() {
 
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileUpdating, setProfileUpdating] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
   const [profileForm, setProfileForm] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -63,6 +67,95 @@ export default function UserProfileView() {
       }));
     }
   }, [user]);
+
+  // Handle Profile Picture selection and upload
+  const handleAvatarFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('দয়া করে একটি সঠিক ইমেজ ফাইল নির্বাচন করুন (JPG, PNG, WebP)।');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('ফাইলের সাইজ সর্বোচ্চ 10MB হতে পারবে।');
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+
+      // Compress and optimize image to max 450x450 using HTML5 Canvas
+      const optimizedBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxDim = 450;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxDim) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              }
+            } else {
+              if (height > maxDim) {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.88));
+          };
+          img.onerror = reject;
+          img.src = event.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await api.put('/auth/profile/avatar', { avatar: optimizedBase64 });
+      if (res.success && res.avatar) {
+        updateUser({ ...user, avatar: res.avatar });
+        toast.success('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
+      } else {
+        toast.error(res.message || 'ছবি আপলোড করতে ব্যর্থ হয়েছে।');
+      }
+    } catch (err) {
+      console.error('Avatar upload error:', err);
+      toast.error(err.response?.data?.message || err.message || 'ছবি আপলোড ব্যর্থ হয়েছে।');
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Handle Remove Profile Picture
+  const handleRemoveAvatar = async () => {
+    try {
+      setAvatarUploading(true);
+      const res = await api.delete('/auth/profile/avatar');
+      if (res.success) {
+        updateUser({ ...user, avatar: null });
+        toast.success('প্রোফাইল ছবি অপসারিত হয়েছে।');
+      } else {
+        toast.error(res.message || 'ছবি মুছতে ব্যর্থ হয়েছে।');
+      }
+    } catch (err) {
+      console.error('Remove avatar error:', err);
+      toast.error('ছবি মুছতে ব্যর্থ হয়েছে।');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -140,9 +233,62 @@ export default function UserProfileView() {
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-56 h-56 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 flex items-center justify-center text-white font-black text-xl sm:text-2xl shadow-lg shadow-blue-500/30 ring-4 ring-white/10 shrink-0 uppercase">
-              {profileForm.name ? profileForm.name.substring(0, 2) : 'US'}
+            
+            {/* Avatar with Upload Trigger */}
+            <div className="relative group shrink-0">
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleAvatarFileSelect}
+                className="hidden"
+              />
+              <div
+                onClick={() => !avatarUploading && fileInputRef.current?.click()}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 flex items-center justify-center text-white font-black text-xl sm:text-2xl shadow-lg shadow-blue-500/30 ring-4 ring-white/10 shrink-0 uppercase overflow-hidden cursor-pointer relative"
+                title="প্রোফাইল ছবি পরিবর্তন করতে ক্লিক করুন"
+              >
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={profileForm.name || 'User'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  profileForm.name ? profileForm.name.substring(0, 2) : 'US'
+                )}
+
+                {/* Hover overlay with Camera icon */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[9px] font-bold">
+                  {avatarUploading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-white" />
+                  ) : (
+                    <>
+                      <Camera className="w-5 h-5 mb-0.5" />
+                      <span>Change</span>
+                    </>
+                  )}
+                </div>
+
+                {avatarUploading && (
+                  <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-white" />
+                  </div>
+                )}
+              </div>
+
+              {/* Small Camera Badge Button at bottom right of avatar */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={avatarUploading}
+                title="ছবি আপলোড করুন"
+                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shadow-md border-2 border-[#0d1627] transition hover:scale-110 cursor-pointer"
+              >
+                <Camera className="w-3 h-3" />
+              </button>
             </div>
+
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg sm:text-xl font-black text-white tracking-tight truncate">
@@ -164,6 +310,31 @@ export default function UserProfileView() {
                   Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Recently'}
                 </span>
               </p>
+
+              {/* Profile Picture action pills */}
+              <div className="flex items-center gap-2 mt-2.5">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold border border-white/15 transition cursor-pointer"
+                >
+                  <Camera className="w-3 h-3 text-blue-300" />
+                  <span>{user?.avatar ? 'Change Picture' : 'Upload Picture'}</span>
+                </button>
+                {user?.avatar && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    disabled={avatarUploading}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-[11px] font-bold border border-rose-500/30 transition cursor-pointer"
+                    title="ছবি মুছুন"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Remove</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -238,57 +409,54 @@ export default function UserProfileView() {
                   <Shield className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1.5 flex items-start gap-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-150 leading-relaxed">
-                <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
-                <span>Your email is your permanent account identity tied to all purchases, invoices, and software licenses. For security, email changes are disabled.</span>
-              </p>
             </div>
 
-            {/* WhatsApp / Phone Number */}
+            {/* WhatsApp / Mobile Number */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
                 WhatsApp / Phone Number
               </label>
               <div className="relative">
                 <input
-                  type="tel"
+                  type="text"
                   value={profileForm.whatsapp_number}
                   onChange={(e) => setProfileForm({ ...profileForm, whatsapp_number: e.target.value })}
-                  placeholder="e.g. 017xxxxxxxx"
+                  placeholder="e.g. 01943631046"
                   className="w-full bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 transition-all outline-none font-medium"
                 />
                 <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-              <span className="text-[11px] text-slate-450 mt-1 block">
+              <p className="text-[11px] text-slate-450 mt-1">
                 Used for instant WhatsApp delivery updates, order confirmation, and customer support.
-              </span>
+              </p>
             </div>
 
-            {/* Address */}
+            {/* Delivery / Shipping Address */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
                 Delivery / Shipping Address
               </label>
               <div className="relative">
-                <textarea
-                  rows={3}
+                <input
+                  type="text"
                   value={profileForm.address}
                   onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
                   placeholder="House no, Road no, Area, City, Postcode..."
-                  className="w-full bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 transition-all outline-none font-medium resize-none"
+                  className="w-full bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 transition-all outline-none font-medium"
                 />
-                <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-              <span className="text-[11px] text-slate-450 mt-1 block">
+              <p className="text-[11px] text-slate-450 mt-1">
                 Default shipping and billing address for physical items or billing receipts.
-              </span>
+              </p>
             </div>
 
+            {/* Submit Button */}
             <div className="pt-2 flex justify-end">
               <button
                 type="submit"
                 disabled={profileUpdating}
-                className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-extrabold rounded-xl transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center space-x-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-extrabold rounded-xl transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
               >
                 {profileUpdating ? (
                   <>

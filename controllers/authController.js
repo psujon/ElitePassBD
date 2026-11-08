@@ -174,7 +174,7 @@ exports.googleLogin = async (req, res) => {
 
 exports.getProfile = async (req, res) => {
   try {
-    const [users] = await db.query('SELECT id, name, email, role, whatsapp_number, address, created_at FROM users WHERE id = ?', [req.user.id]);
+    const [users] = await db.query('SELECT id, name, email, role, whatsapp_number, address, avatar, created_at FROM users WHERE id = ?', [req.user.id]);
     if (users.length === 0) {
       return res.status(404).json({ message: 'User not found.' });
     }
@@ -206,7 +206,7 @@ exports.updateProfile = async (req, res) => {
     );
 
     const [users] = await db.query(
-      'SELECT id, name, email, role, whatsapp_number, address, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, role, whatsapp_number, address, avatar, created_at FROM users WHERE id = ?',
       [userId]
     );
 
@@ -230,6 +230,84 @@ exports.updateProfile = async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ message: 'Database error occurred while updating profile.' });
+  }
+};
+
+
+exports.uploadAvatar = async (req, res) => {
+  const userId = req.user.id;
+  const { avatar } = req.body;
+
+  if (!avatar) {
+    return res.status(400).json({ success: false, message: 'Image data is required.' });
+  }
+
+  try {
+    let avatarUrl = avatar;
+
+    // If it's a base64 image data URL, try to save it to public/uploads/avatars/
+    if (typeof avatar === 'string' && avatar.startsWith('data:image/')) {
+      try {
+        const path = require('path');
+        const uploadsDir = path.join(__dirname, '..', 'public', 'uploads', 'avatars');
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+
+        const matches = avatar.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1].replace('+xml', '');
+          const base64Data = matches[2];
+          const fileName = `user_${userId}_${Date.now()}.${ext}`;
+          const filePath = path.join(uploadsDir, fileName);
+
+          fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+          avatarUrl = `/public/uploads/avatars/${fileName}`;
+        }
+      } catch (fsErr) {
+        console.warn('Failed to save avatar to filesystem, storing base64 directly:', fsErr.message);
+        avatarUrl = avatar;
+      }
+    }
+
+    await db.query('UPDATE users SET avatar = ? WHERE id = ?', [avatarUrl, userId]);
+
+    const [users] = await db.query(
+      'SELECT id, name, email, role, whatsapp_number, address, avatar, created_at FROM users WHERE id = ?',
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Profile picture updated successfully!',
+      avatar: avatarUrl,
+      user: users[0]
+    });
+  } catch (error) {
+    console.error('Upload avatar error:', error);
+    return res.status(500).json({ success: false, message: 'Database error occurred while uploading avatar.' });
+  }
+};
+
+exports.removeAvatar = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    await db.query('UPDATE users SET avatar = NULL WHERE id = ?', [userId]);
+
+    const [users] = await db.query(
+      'SELECT id, name, email, role, whatsapp_number, address, avatar, created_at FROM users WHERE id = ?',
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Profile picture removed successfully!',
+      avatar: null,
+      user: users[0]
+    });
+  } catch (error) {
+    console.error('Remove avatar error:', error);
+    return res.status(500).json({ success: false, message: 'Database error occurred while removing avatar.' });
   }
 };
 
