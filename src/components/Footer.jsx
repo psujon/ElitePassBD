@@ -170,11 +170,11 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2.5 text-xs text-slate-500 font-bold">
               <li><Link to="/about" className="hover:text-blue-600 transition-colors">About Us</Link></li>
-              <li><Link to="/about" className="hover:text-blue-600 transition-colors">Our Partners</Link></li>
+              <li><Link to="/partners" className="hover:text-blue-600 transition-colors">Our Partners</Link></li>
               <li><Link to="/privacy" className="hover:text-blue-600 transition-colors">Privacy Policy</Link></li>
               <li><Link to="/terms" className="hover:text-blue-600 transition-colors">Terms of Service</Link></li>
               <li><Link to="/refund-policy" className="hover:text-blue-600 transition-colors">Refund Policy</Link></li>
-              <li><Link to="/privacy" className="hover:text-blue-600 transition-colors">DMCA Policy</Link></li>
+              <li><Link to="/dmca" className="hover:text-blue-600 transition-colors">DMCA Policy</Link></li>
             </ul>
           </div>
 

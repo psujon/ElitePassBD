@@ -23,6 +23,8 @@ import TermsOfService from './pages/TermsOfService';
 import ContactSupport from './pages/ContactSupport';
 import ProductDetails from './pages/ProductDetails';
 import AboutUs from './pages/AboutUs';
+import Partners from './pages/Partners';
+import DmcaPolicy from './pages/DmcaPolicy';
 import RefundPolicy from './pages/RefundPolicy';
 import Products from './pages/Products';
 import PaymentSuccess from './pages/PaymentSuccess';
@@ -80,6 +82,10 @@ function AppContent() {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/contact" element={<ContactSupport />} />
           <Route path="/about" element={<AboutUs />} />
+          <Route path="/partners" element={<Partners />} />
+          <Route path="/our-partners" element={<Partners />} />
+          <Route path="/dmca" element={<DmcaPolicy />} />
+          <Route path="/dmca-policy" element={<DmcaPolicy />} />
           <Route path="/refund-policy" element={<RefundPolicy />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/products" element={<Products />} />
